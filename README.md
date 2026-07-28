@@ -293,7 +293,9 @@ push and pull request.
 Current coverage includes 54 focused T-SQL cases, all four dialects,
 DB2 handler scope, cursor/NOT FOUND flow, labelled loop control, graph-edge
 assertions, T-SQL THROW/CATCH propagation and RAISERROR severity,
-T-SQL `XACT_STATE()` recovery routing and invalid-action termination, PL/pgSQL
+T-SQL `XACT_STATE()` recovery routing, `@@TRANCOUNT` depth decisions, nested
+commit/full rollback behavior, savepoint scope, `SET XACT_ABORT` context, and
+invalid-action termination, PL/pgSQL
 EXCEPTION matching and rethrow propagation, malformed-input diagnostics, SQLite
 trigger RAISE rollback/termination behavior and conditional `WHERE` /
 searched-`CASE` paths, CTE/report queries, dynamic SQL, temporary-table writes,

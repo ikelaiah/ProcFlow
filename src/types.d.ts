@@ -209,12 +209,20 @@ interface PgErrorCondition {
   code: string;
 }
 
+interface TsqlTransactionDepth {
+  min: number;
+  max: number | null;
+}
+
 interface FlowContext {
   parent: FlowContext | null;
   loop?: LoopFlowContext | null;
   handlers: Db2HandlerFlow[];
   handlerExits: FlowExit[];
   xactStates?: number;
+  tranDepth?: TsqlTransactionDepth;
+  xactAbort?: boolean;
+  savepoints?: StringSet;
 }
 
 interface EmitResult {

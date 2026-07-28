@@ -245,6 +245,88 @@ function tsqlXactStateTest(toks) {
         falseStates: equal ? (TSQL_XACT_ALL ^ bit) : bit
     };
 }
+function tsqlTranCountTest(toks) {
+    var start = 0, end = toks.length, changed = true;
+    while (changed && end - start >= 2 && toks[start].v === '(' && toks[end - 1].v === ')') {
+        changed = false;
+        var depth = 0;
+        for (var w = start; w < end; w++) {
+            if (toks[w].v === '(')
+                depth++;
+            else if (toks[w].v === ')')
+                depth--;
+            if (depth === 0) {
+                if (w === end - 1) {
+                    start++;
+                    end--;
+                    changed = true;
+                }
+                break;
+            }
+        }
+    }
+    var op = '', value = null, countFirst = false;
+    if (toks[start] && toks[start].u === '@@TRANCOUNT' && start + 2 < end) {
+        op = toks[start + 1].v;
+        value = tsqlSignedStateAt(toks, start + 2, end);
+        countFirst = true;
+    }
+    else {
+        value = tsqlSignedStateAt(toks, start, end);
+        if (value && value.next + 1 < end && toks[value.next + 1].u === '@@TRANCOUNT') {
+            op = toks[value.next].v;
+            if (value.next + 2 !== end)
+                return null;
+        }
+    }
+    if (!value || value.value < 0 ||
+        ['=', '<>', '!=', '>', '>=', '<', '<='].indexOf(op) < 0)
+        return null;
+    if (!countFirst) {
+        var reversed = {
+            '=': '=', '<>': '<>', '!=': '!=', '>': '<', '>=': '<=', '<': '>', '<=': '>='
+        };
+        op = reversed[op];
+    }
+    else if (value.next !== end)
+        return null;
+    var n = value.value, any = { min: 0, max: null };
+    var trueDepth = any, falseDepth = any;
+    if (op === '=') {
+        trueDepth = { min: n, max: n };
+        falseDepth = n === 0 ? { min: 1, max: null } : any;
+    }
+    else if (op === '<>' || op === '!=') {
+        trueDepth = n === 0 ? { min: 1, max: null } : any;
+        falseDepth = { min: n, max: n };
+    }
+    else if (op === '>') {
+        trueDepth = { min: n + 1, max: null };
+        falseDepth = { min: 0, max: n };
+    }
+    else if (op === '>=') {
+        trueDepth = { min: n, max: null };
+        falseDepth = { min: 0, max: n - 1 };
+    }
+    else if (op === '<') {
+        trueDepth = { min: 0, max: n - 1 };
+        falseDepth = { min: n, max: null };
+    }
+    else {
+        trueDepth = { min: 0, max: n };
+        falseDepth = { min: n + 1, max: null };
+    }
+    var question = n === 0 && (op === '=')
+        ? 'no active transaction?'
+        : (n === 0 && (op === '>' || op === '<>' || op === '!=')
+            ? 'transaction active?'
+            : (n === 1 && op === '>' ? 'nested transaction?' : 'transaction depth?'));
+    return {
+        text: clip(joinToks(toks, 42), 42) + ' · ' + question,
+        trueDepth: trueDepth,
+        falseDepth: falseDepth
+    };
+}
 /* ---------- graph builder ---------- */
 function buildGraph(ast, header, opts) {
     opts = opts || {};
@@ -310,8 +392,33 @@ function buildGraph(ast, header, opts) {
         }
         return TSQL_XACT_ALL;
     }
-    function withXactStates(ctx, states) {
-        return { parent: ctx, handlers: [], handlerExits: [], xactStates: states };
+    function currentTranDepth(ctx) {
+        while (ctx) {
+            if (ctx.tranDepth !== undefined)
+                return ctx.tranDepth;
+            ctx = ctx.parent;
+        }
+        return { min: 0, max: null };
+    }
+    function currentXactAbort(ctx) {
+        while (ctx) {
+            if (ctx.xactAbort !== undefined)
+                return ctx.xactAbort;
+            ctx = ctx.parent;
+        }
+        return undefined;
+    }
+    function currentSavepoints(ctx) {
+        while (ctx) {
+            if (ctx.savepoints !== undefined)
+                return ctx.savepoints;
+            ctx = ctx.parent;
+        }
+        return {};
+    }
+    function withTsqlState(ctx, states, tranDepth) {
+        return { parent: ctx, handlers: [], handlerExits: [],
+            xactStates: states, tranDepth: tranDepth };
     }
     function xactStatesLabel(states) {
         if (states === TSQL_XACT_UNCOMMITTABLE)
@@ -328,38 +435,124 @@ function buildGraph(ast, header, opts) {
             return 'not committable';
         return states === 0 ? 'impossible' : 'any state';
     }
+    function depthRangeLabel(range) {
+        if (range.max !== null && range.min > range.max)
+            return 'impossible';
+        if (range.max === 0)
+            return 'depth 0 · no transaction';
+        if (range.min === 1 && range.max === 1)
+            return 'depth 1 · outermost transaction';
+        if (range.min >= 2 && range.max === null)
+            return 'depth ≥' + range.min + ' · nested transaction';
+        if (range.min === 1 && range.max === null)
+            return 'depth ≥1 · active transaction';
+        if (range.max === null)
+            return 'depth ≥' + range.min;
+        if (range.min === range.max)
+            return 'depth ' + range.min;
+        return 'depth ' + range.min + '–' + range.max;
+    }
+    function intersectDepth(a, b) {
+        var max = a.max === null ? b.max : (b.max === null ? a.max : Math.min(a.max, b.max));
+        return { min: Math.max(a.min, b.min), max: max };
+    }
+    function statesForDepth(range) {
+        if (range.max !== null && range.min > range.max)
+            return 0;
+        if (range.max === 0)
+            return TSQL_XACT_NONE;
+        if (range.min >= 1)
+            return TSQL_XACT_UNCOMMITTABLE | TSQL_XACT_COMMITTABLE;
+        return TSQL_XACT_ALL;
+    }
+    function depthForStates(range, states) {
+        if (states === 0)
+            return { min: 1, max: 0 };
+        if ((states & TSQL_XACT_NONE) === 0)
+            return intersectDepth(range, { min: 1, max: null });
+        if ((states & (TSQL_XACT_UNCOMMITTABLE | TSQL_XACT_COMMITTABLE)) === 0)
+            return intersectDepth(range, { min: 0, max: 0 });
+        return range;
+    }
+    function tsqlTransactionAction(st) {
+        var toks = st.toks, head = toks.length ? toks[0].u : '', i = 1, target = '';
+        if (head === 'BEGIN' && toks[i] && toks[i].u === 'DISTRIBUTED')
+            i++;
+        if (toks[i] && (toks[i].u === 'TRAN' || toks[i].u === 'TRANSACTION' || toks[i].u === 'WORK'))
+            i++;
+        if ((head === 'ROLLBACK' || head === 'SAVE' || head === 'SAVEPOINT') && toks[i])
+            target = toks[i].v;
+        return {
+            kind: head === 'BEGIN' ? 'begin' : (head === 'COMMIT' ? 'commit' :
+                (head === 'ROLLBACK' ? 'rollback' :
+                    ((head === 'SAVE' || head === 'SAVEPOINT') ? 'save' : ''))),
+            target: target,
+            staticTarget: !!target && target.charAt(0) !== '@'
+        };
+    }
     function tsqlTransactionText(st, ctx) {
-        var out = textOf(st), states = currentXactStates(ctx);
-        if (states === TSQL_XACT_ALL || !st.toks.length)
+        var out = textOf(st), states = currentXactStates(ctx), depth = currentTranDepth(ctx);
+        if (!st.toks.length)
             return out;
-        var head = st.toks[0].u;
+        var action = tsqlTransactionAction(st), head = st.toks[0].u;
         if (head === 'ROLLBACK') {
-            var i = 1;
-            if (st.toks[i] && (st.toks[i].u === 'TRAN' || st.toks[i].u === 'TRANSACTION'))
-                i++;
-            var full = i >= st.toks.length;
+            var full = !action.target;
             if (states === TSQL_XACT_UNCOMMITTABLE)
                 return out + (full ? ' — required full rollback' : ' — full rollback required');
             if (states === TSQL_XACT_NONE)
                 return out + ' — invalid: no active transaction';
-            if ((states & TSQL_XACT_NONE) === 0)
-                return out + ' — roll back active transaction';
+            if (full && (states & TSQL_XACT_NONE) === 0)
+                return out + ' — roll back active transaction; reset depth to 0';
+            if (full)
+                return out + ' — full rollback; reset depth to 0';
+            if (action.staticTarget && currentSavepoints(ctx)[action.target])
+                return out + ' — roll back to savepoint ' + action.target + '; depth unchanged';
+            return out + ' — named target unresolved; full or savepoint rollback';
         }
         if (head === 'COMMIT') {
             if (states === TSQL_XACT_UNCOMMITTABLE)
                 return out + ' — invalid: transaction uncommittable';
             if (states === TSQL_XACT_NONE)
                 return out + ' — invalid: no active transaction';
+            if (depth.min === 1 && depth.max === 1 &&
+                (states & TSQL_XACT_UNCOMMITTABLE) === 0)
+                return out + ' — commit outer transaction; depth 1 → 0';
+            if (depth.min >= 2 && (states & TSQL_XACT_UNCOMMITTABLE) === 0)
+                return out + ' — nested commit only; decrement depth';
             if (states === TSQL_XACT_COMMITTABLE)
-                return out + ' — commit committable transaction';
+                return out + ' — commit committable transaction; decrement depth';
+            if (depth.min >= 2)
+                return out + ' — nested commit attempt; outer transaction remains if valid';
+            return out + ' — decrement depth; durable only at outermost';
         }
         if (head === 'SAVE' || head === 'SAVEPOINT') {
             if (states === TSQL_XACT_UNCOMMITTABLE)
                 return out + ' — invalid: full rollback required';
             if (states === TSQL_XACT_NONE)
                 return out + ' — invalid: no active transaction';
+            return out + ' — create savepoint' + (action.target ? ' ' + action.target : '') +
+                (states & TSQL_XACT_UNCOMMITTABLE ? ' if committable' : '') +
+                '; depth unchanged';
+        }
+        if (head === 'BEGIN') {
+            if (depth.max === 0)
+                return out + ' — start outer transaction; depth 0 → 1';
+            if (depth.min >= 1)
+                return out + ' — begin nested transaction; increment depth';
+            return out + ' — increment transaction depth';
         }
         return out;
+    }
+    function tsqlStatementText(st, ctx) {
+        if (kindOf(st) === 'tran')
+            return tsqlTransactionText(st, ctx);
+        if (st.toks.length >= 3 && st.toks[0].u === 'SET' && st.toks[1].u === 'XACT_ABORT') {
+            if (st.toks[2].u === 'ON')
+                return textOf(st) + ' — runtime errors abort transactions';
+            if (st.toks[2].u === 'OFF')
+                return textOf(st) + ' — statement errors may leave transaction active';
+        }
+        return textOf(st);
     }
     function invalidTsqlTransactionAction(st, ctx) {
         var states = currentXactStates(ctx), head = st.toks.length ? st.toks[0].u : '';
@@ -370,6 +563,60 @@ function buildGraph(ast, header, opts) {
         if (head === 'SAVE' || head === 'SAVEPOINT')
             return states === TSQL_XACT_UNCOMMITTABLE || states === TSQL_XACT_NONE;
         return false;
+    }
+    function tsqlStatefulStatement(st) {
+        return st.toks.length >= 2 && st.toks[0].u === 'SET' && st.toks[1].u === 'XACT_ABORT';
+    }
+    function applyTsqlStatementState(st, ctx) {
+        if (st.toks.length >= 3 && st.toks[0].u === 'SET' && st.toks[1].u === 'XACT_ABORT') {
+            if (st.toks[2].u === 'ON')
+                ctx.xactAbort = true;
+            else if (st.toks[2].u === 'OFF')
+                ctx.xactAbort = false;
+            return;
+        }
+        if (kindOf(st) !== 'tran')
+            return;
+        var action = tsqlTransactionAction(st), depth = currentTranDepth(ctx);
+        var states = currentXactStates(ctx);
+        if (action.kind === 'begin') {
+            ctx.tranDepth = {
+                min: depth.min + 1,
+                max: depth.max === null ? null : depth.max + 1
+            };
+            ctx.xactStates = depth.max === 0
+                ? TSQL_XACT_COMMITTABLE
+                : (states & TSQL_XACT_NONE
+                    ? TSQL_XACT_UNCOMMITTABLE | TSQL_XACT_COMMITTABLE
+                    : states);
+        }
+        else if (action.kind === 'commit') {
+            ctx.tranDepth = {
+                min: Math.max(0, depth.min - 1),
+                max: depth.max === null ? null : Math.max(0, depth.max - 1)
+            };
+            if (ctx.tranDepth.max === 0)
+                ctx.xactStates = TSQL_XACT_NONE;
+            else if (ctx.tranDepth.min >= 1)
+                ctx.xactStates = TSQL_XACT_COMMITTABLE;
+            else
+                ctx.xactStates = TSQL_XACT_NONE | TSQL_XACT_COMMITTABLE;
+            if (ctx.tranDepth.max === 0)
+                ctx.savepoints = {};
+        }
+        else if (action.kind === 'rollback' && !action.target) {
+            ctx.tranDepth = { min: 0, max: 0 };
+            ctx.xactStates = TSQL_XACT_NONE;
+            ctx.savepoints = {};
+        }
+        else if (action.kind === 'save' && action.staticTarget) {
+            var saved = {}, inherited = currentSavepoints(ctx);
+            Object.keys(inherited).forEach(function (name) { saved[name] = 1; });
+            saved[action.target] = 1;
+            ctx.savepoints = saved;
+            ctx.xactStates = TSQL_XACT_COMMITTABLE;
+            ctx.tranDepth = intersectDepth(depth, { min: 1, max: null });
+        }
     }
     function findLoop(ctx, target) {
         while (ctx) {
@@ -453,11 +700,13 @@ function buildGraph(ast, header, opts) {
                 continue;
             }
             var statementReachable = reachable || st.type === 'label';
-            if (group && st.type === 'stmt' && kindOf(st) === 'stmt') {
+            if (group && st.type === 'stmt' && kindOf(st) === 'stmt' &&
+                !(dialect === 'tsql' && tsqlStatefulStatement(st))) {
                 var run = [st], j = i + 1;
                 while (j < list.length && run.length < 6) {
                     var candidate = list[j];
-                    if (candidate.type !== 'stmt' || kindOf(candidate) !== 'stmt')
+                    if (candidate.type !== 'stmt' || kindOf(candidate) !== 'stmt' ||
+                        (dialect === 'tsql' && tsqlStatefulStatement(candidate)))
                         break;
                     run.push(candidate);
                     j++;
@@ -493,6 +742,8 @@ function buildGraph(ast, header, opts) {
                 exits = [];
             joinExits(exits, res.entry);
             exits = res.exits;
+            if (dialect === 'tsql' && st.type === 'stmt' && exits.length)
+                applyTsqlStatementState(st, local);
             reachable = exits.length > 0;
         }
         exits = exits.concat(local.handlerExits);
@@ -504,8 +755,7 @@ function buildGraph(ast, header, opts) {
             case 'stmt': {
                 stats.stmt++;
                 var statementKind = kindOf(st);
-                var statementText = statementKind === 'tran' && dialect === 'tsql'
-                    ? tsqlTransactionText(st, ctx) : textOf(st);
+                var statementText = dialect === 'tsql' ? tsqlStatementText(st, ctx) : textOf(st);
                 var invalidTransaction = statementKind === 'tran' && dialect === 'tsql' &&
                     invalidTsqlTransactionAction(st, ctx);
                 var id = add(invalidTransaction ? 'round' : 'rect', statementText, invalidTransaction ? 'err' : statementKind, spanOfTokens(st.toks));
@@ -526,18 +776,35 @@ function buildGraph(ast, header, opts) {
             case 'if': {
                 stats.branch++;
                 var xactTest = dialect === 'tsql' ? tsqlXactStateTest(st.cond) : null;
+                var depthTest = dialect === 'tsql' && !xactTest ? tsqlTranCountTest(st.cond) : null;
                 var incomingStates = currentXactStates(ctx);
-                var trueStates = xactTest ? incomingStates & xactTest.trueStates : incomingStates;
-                var falseStates = xactTest ? incomingStates & xactTest.falseStates : incomingStates;
-                var conditionText = xactTest ? xactTest.text : clip(joinToks(st.cond, 60), 60);
+                var incomingDepth = currentTranDepth(ctx);
+                var trueDepth = xactTest
+                    ? depthForStates(incomingDepth, incomingStates & xactTest.trueStates)
+                    : (depthTest ? intersectDepth(incomingDepth, depthTest.trueDepth) : incomingDepth);
+                var falseDepth = xactTest
+                    ? depthForStates(incomingDepth, incomingStates & xactTest.falseStates)
+                    : (depthTest ? intersectDepth(incomingDepth, depthTest.falseDepth) : incomingDepth);
+                var trueStates = xactTest
+                    ? incomingStates & xactTest.trueStates
+                    : (depthTest ? incomingStates & statesForDepth(trueDepth) : incomingStates);
+                var falseStates = xactTest
+                    ? incomingStates & xactTest.falseStates
+                    : (depthTest ? incomingStates & statesForDepth(falseDepth) : incomingStates);
+                var conditionText = xactTest ? xactTest.text :
+                    (depthTest ? depthTest.text : clip(joinToks(st.cond, 60), 60));
                 var c = add('diamond', conditionText, 'cond', spanOfTokens(st.cond));
-                var trueCtx = xactTest ? withXactStates(ctx, trueStates) : ctx;
-                var falseCtx = xactTest ? withXactStates(ctx, falseStates) : ctx;
+                var trueCtx = xactTest || depthTest
+                    ? withTsqlState(ctx, trueStates, trueDepth) : ctx;
+                var falseCtx = xactTest || depthTest
+                    ? withTsqlState(ctx, falseStates, falseDepth) : ctx;
                 var t = st.then ? emitOne(st.then, trueCtx, depth + 1) : null;
                 var e = st.else ? emitOne(st.else, falseCtx, depth + 1) : null;
                 var ex = [];
-                var yesLabel = xactTest ? 'yes · ' + xactStatesLabel(trueStates) : 'yes';
-                var noLabel = xactTest ? 'no · ' + xactStatesLabel(falseStates) : 'no';
+                var yesLabel = xactTest ? 'yes · ' + xactStatesLabel(trueStates) :
+                    (depthTest ? 'yes · ' + depthRangeLabel(trueDepth) : 'yes');
+                var noLabel = xactTest ? 'no · ' + xactStatesLabel(falseStates) :
+                    (depthTest ? 'no · ' + depthRangeLabel(falseDepth) : 'no');
                 if (t && t.entry) {
                     link(c, t.entry, yesLabel);
                     ex = ex.concat(t.exits);
@@ -654,7 +921,10 @@ function buildGraph(ast, header, opts) {
                 for (var hh = 0; hh < st.handlers.length; hh++) {
                     var h = st.handlers[hh];
                     var lab2 = h.cond && h.cond.length ? clip(joinToks(h.cond, 40), 40) : 'CATCH';
-                    var cm = add('marker', lab2 === 'CATCH' ? 'BEGIN CATCH' : ('WHEN ' + lab2), 'catch');
+                    var catchText = lab2 === 'CATCH' ? 'BEGIN CATCH' : ('WHEN ' + lab2);
+                    if (dialect === 'tsql' && lab2 === 'CATCH' && currentXactAbort(ctx) === true)
+                        catchText += ' · XACT_ABORT ON at TRY entry; inspect XACT_STATE';
+                    var cm = add('marker', catchText, 'catch');
                     if (lab2 !== 'CATCH' && dialect !== 'tsql')
                         nodes[nodes.length - 1].text = 'EXCEPTION WHEN ' + lab2;
                     handlerMarkers.push(cm);
