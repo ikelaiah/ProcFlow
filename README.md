@@ -1,4 +1,4 @@
-# proc>flow
+# proc>flow 🔎
 
 Understand complicated SQL without tracing every branch by hand.
 
@@ -15,7 +15,7 @@ Open the page in a modern browser and start exploring.
 > Parsing is heuristic rather than compiler-grade. Use each diagram as an
 > investigation aid and verify important findings against the source SQL.
 
-## Quick start
+## 🚀 Quick start
 
 1. Download or clone this repository.
 2. Open `index.html` in a modern browser.
@@ -26,9 +26,9 @@ Open the page in a modern browser and start exploring.
 Everything needed to render a diagram is included in the repository, so the
 application works without an internet connection.
 
-## What can I visualise?
+## 🧭 What can I visualise?
 
-### Internal logic
+### 🔬 Internal logic
 
 Follow the execution path inside the selected object:
 
@@ -47,7 +47,7 @@ Click a source-aware diagram node to select the corresponding SQL in the editor.
 For a single query, Procflow can instead show query structure, including CTEs,
 source tables, explicit joins, unions, subqueries, filtering, and grouping.
 
-### Object dependencies
+### 🕸️ Object dependencies
 
 Import or paste several database objects to see an estate-level map:
 
@@ -58,12 +58,12 @@ Import or paste several database objects to see an estate-level map:
 
 Click a known object in the dependency diagram to open its internal logic.
 
-## Designed for local and security-conscious use
+## 🔐 Designed for local and security-conscious use
 
 Procflow performs SQL analysis inside the browser tab. The application code
 does not send SQL, filenames, diagrams, or usage information anywhere.
 
-### Security and privacy summary
+### 🛡️ Security and privacy summary
 
 | Question | Procflow behaviour |
 |---|---|
@@ -78,7 +78,7 @@ does not send SQL, filenames, diagrams, or usage information anywhere.
 | Are exports local? | Yes. SVG and draw.io files are generated in memory and downloaded by the browser. |
 | Does it call an AI service? | No. It can copy a narration prompt, but never submits that prompt itself. |
 
-### What a cyber-security review should know
+### ✅ What a cyber-security review should know
 
 The runtime application consists of:
 
@@ -128,7 +128,7 @@ user chooses to paste or save data. Procflow's security boundary is that its own
 application code performs analysis locally and contains no automatic data
 submission path.
 
-## Supported SQL
+## 🗄️ Supported SQL
 
 Procflow currently recognises:
 
@@ -145,7 +145,7 @@ Dialect detection is automatic, but it can be overridden. Procflow warns when
 detection is uncertain and marks dynamic SQL as opaque when its internal
 behaviour cannot be resolved statically.
 
-## Using the diagrams
+## 🗺️ Using the diagrams
 
 The **Diagram** selector controls the level:
 
@@ -163,7 +163,7 @@ Within **Internal logic**, **Show** controls the representation:
 Additional controls change orientation, label detail, straight-run grouping,
 step numbering, error-path fan-in, and source-table visibility.
 
-## Importing SQL
+## 📥 Importing SQL
 
 Use **Import SQL files** to select multiple `.sql`, `.ddl`, or `.txt` files.
 Files are read into memory by the current browser tab. They are not uploaded or
@@ -172,7 +172,7 @@ persisted.
 Multi-object scripts are split into selectable objects. If a script cannot be
 split confidently, it is treated as a single script.
 
-## Exporting and sharing
+## 📤 Exporting and sharing
 
 - **Copy Mermaid** copies the generated Mermaid definition.
 - **Copy narration prompt** copies a prompt containing the diagram and source
@@ -183,7 +183,7 @@ split confidently, it is treated as a single script.
 draw.io is a trademark of draw.io AG. Procflow is not affiliated with or
 endorsed by draw.io.
 
-## Known limitations
+## ⚠️ Known limitations
 
 - The parser does not provide the same guarantees as the target database
   engine's parser.
@@ -202,7 +202,7 @@ endorsed by draw.io.
 Always confirm critical dependencies, execution paths, and security conclusions
 against the original SQL and the target database platform.
 
-## Project structure
+## 🧱 Project structure
 
 ```text
 index.html
@@ -225,7 +225,7 @@ vendor/
 The shared model records statements, source spans, branches, reads, writes,
 calls, result sets, diagnostics, and graph structures.
 
-## Testing
+## 🧪 Testing
 
 No test runner installation is required. Open these files in a browser:
 
@@ -237,7 +237,7 @@ Current coverage includes all four dialects, CTE/report queries, dynamic SQL,
 temporary-table writes, multi-object estates, special-character escaping, and
 draw.io XML validation.
 
-## Roadmap
+## 🛣️ Roadmap
 
 1. Expand the anonymised golden SQL fixture corpus.
 2. Improve table-function, `APPLY`, comma-source, and DML lineage.
@@ -247,7 +247,7 @@ draw.io XML validation.
 6. Add column-level lineage where it can be resolved safely.
 7. Add optional local workspace persistence and dependency filtering.
 
-## Contributing
+## 🤝 Contributing
 
 Useful bug reports include:
 
