@@ -35,6 +35,13 @@ button,select,textarea,input{font-family:inherit;font-size:inherit;color:inherit
 .tagline{font-family:var(--cond);text-transform:uppercase;letter-spacing:.14em;
   font-size:11px;color:var(--ink-faint);margin:0 0 5px}
 .top-actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.privacy-note{
+  display:flex;align-items:center;gap:10px;padding:9px 26px;
+  color:#b9ddcf;background:#13251f;border-bottom:1px solid #285443;
+  font-size:12px;line-height:1.45
+}
+.privacy-note strong{color:#dff5ec;font-weight:600}
+.privacy-icon{font-size:15px;line-height:1;flex:0 0 auto}
 
 .btn{
   background:var(--panel-2);border:1px solid var(--rule);border-radius:var(--r);
@@ -138,6 +145,7 @@ footer{padding:10px 26px 18px;color:var(--ink-faint);font-size:11.5px;border-top
   .wrap{grid-template-columns:1fr}
   .pane:first-child .editor{min-height:240px}
   .view.active{min-height:60vh}
+  .privacy-note{align-items:flex-start;padding:9px 16px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
