@@ -97,6 +97,7 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
   var dialect=opts.dialect||'tsql';
   var fanIn=opts.fanIn===true, number=opts.number===true;
   var guarded: StringSet={};                       /* nodes already wired to an inner handler */
+  var unreachable: StringSet={};                   /* parsed nodes with no incoming control path */
   var PROTECTABLE: string[]=['stmt','io','call','tran','cursor','opaque'];
   var HANDLER_SOURCES: string[]=['stmt','io','call','tran','cursor','opaque','cond','loop'];
   var handlerWires: StringSet={}, handlerProcessed: StringSet={};
@@ -124,6 +125,12 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
   }
   function kindOf(st: StatementNode): string {
     var h=st.toks&&st.toks[0]?st.toks[0].u:'';
+    if(h==='RAISERROR'){
+      var severity=staticRaiserrorSeverity(st.toks);
+      if(severity!==null&&severity<=10) return 'notice';
+    }
+    if(h==='RAISE'&&st.toks[1]&&
+       ['NOTICE','WARNING','INFO','DEBUG','LOG'].indexOf(st.toks[1].u)>=0) return 'notice';
     if(['FETCH','OPEN','CLOSE','ALLOCATE','DEALLOCATE'].indexOf(h)>=0) return 'cursor';
     if(h==='DECLARE'&&st.toks.some(function(tok){return tok.u==='CURSOR';})) return 'cursor';
     if(['INSERT','UPDATE','DELETE','MERGE','TRUNCATE','REPLACE','COPY'].indexOf(h)>=0) return 'io';
@@ -167,7 +174,8 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
 
   function wireHandlerSources(created: GraphNode[], ctx: FlowContext): void {
     var sources=created.filter(function(node){
-      return HANDLER_SOURCES.indexOf(node.cls)>=0&&!handlerProcessed[node.id];
+      return HANDLER_SOURCES.indexOf(node.cls)>=0&&!handlerProcessed[node.id]&&
+             !unreachable[node.id];
     });
     if(!sources.length) return;
     sources.forEach(function(node){ handlerProcessed[node.id]=1; });
@@ -203,10 +211,11 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
   function emitList(list: AstNode[], ctx: FlowContext | null, depth: number): EmitResult {
     if(depth>stats.depth) stats.depth=depth;
     var local: FlowContext={parent:ctx, handlers:[], handlerExits:[]};
-    var entry: string | null=null, exits: FlowExit[]=[], i=0;
+    var entry: string | null=null, exits: FlowExit[]=[], i=0, reachable=true;
     while(i<list.length){
       var st=list[i], res: EmitResult | null, mark=nodes.length;
       if(st.type==='go'){ i++; continue; }
+      var statementReachable=reachable||st.type==='label';
       if(group&&st.type==='stmt'&&kindOf(st)==='stmt'){
         var run: StatementNode[]=[st], j=i+1;
         while(j<list.length&&run.length<6){
@@ -224,11 +233,17 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
           i=j;
         } else { res=emitOne(st, local, depth); i++; }
       } else { res=emitOne(st, local, depth); i++; }
-      if(st.type!=='handler') wireHandlerSources(nodes.slice(mark),local);
+      if(!statementReachable)
+        nodes.slice(mark).forEach(function(node){unreachable[node.id]=1;});
+      if(st.type!=='handler'&&statementReachable)
+        wireHandlerSources(nodes.slice(mark),local);
       if(!res||!res.entry) continue;
       if(!entry) entry=res.entry;
+      if(!statementReachable) continue;
+      if(!reachable) exits=[];
       joinExits(exits, res.entry);
       exits=res.exits;
+      reachable=exits.length>0;
     }
     exits=exits.concat(local.handlerExits);
     return {entry:entry, exits:exits};
@@ -343,10 +358,16 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
         if(tb.entry) link(tstart, tb.entry);
         var exits=tb.entry?tb.exits.slice():[{id:tstart}];
 
-        /* which statements inside this block can raise? */
-        var raisers=[];
+        /* Explicit errors always identify their source; fan-in adds potential raisers. */
+        var explicitRaisers: string[]=[], raisers: string[]=[];
+        nodes.slice(mark).forEach(function(n){
+          if(n.cls==='err'&&!guarded[n.id]&&!unreachable[n.id])
+            explicitRaisers.push(n.id);
+        });
+        raisers=explicitRaisers.slice();
         if(fanIn) nodes.slice(mark).forEach(function(n){
-          if(PROTECTABLE.indexOf(n.cls)>=0&&!guarded[n.id]) raisers.push(n.id);
+          if(PROTECTABLE.indexOf(n.cls)>=0&&!guarded[n.id]&&!unreachable[n.id]&&
+             raisers.indexOf(n.id)<0) raisers.push(n.id);
         });
 
         /* more than one handler: fan into a junction, then branch */
@@ -362,13 +383,17 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
           if(junction) link(junction, cm, lab2==='CATCH'?'':lab2, 'dotted');
           else if(fanIn&&raisers.length)
             raisers.forEach(function(id){ link(id, cm, '', 'dotted'); });
-          else link(tstart, cm, 'error', 'dotted');
+          else {
+            link(tstart, cm, 'error', 'dotted');
+            explicitRaisers.forEach(function(id){link(id,cm,'','dotted');});
+          }
           var cb2=emitList(h.body, ctx, depth+1);
           if(cb2.entry){ link(cm, cb2.entry); exits=exits.concat(cb2.exits); }
           else exits.push({id:cm});
         }
         if(junction) raisers.forEach(function(id){ link(id, junction, '', 'dotted'); });
         if(fanIn) raisers.forEach(function(id){ guarded[id]=1; });
+        else explicitRaisers.forEach(function(id){guarded[id]=1;});
         return {entry:tstart, exits:exits};
       }
 
@@ -473,7 +498,8 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
   if(number){
     var step=0;
     nodes.forEach(function(n){
-      if(PROTECTABLE.indexOf(n.cls)>=0) n.text=(++step)+'. '+n.text;
+      if(PROTECTABLE.indexOf(n.cls)>=0||n.cls==='notice')
+        n.text=(++step)+'. '+n.text;
     });
     stats.steps=step;
   }

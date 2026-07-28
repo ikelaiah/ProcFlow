@@ -38,12 +38,14 @@
     }catch(err){ record(f.name,false,String(err&&err.stack||err)); }
   });
 
-  function matchingNode(graph: Graph, text: string): GraphNode | null {
+  function matchingNode(graph: Graph, text: string, occurrence?: number): GraphNode | null {
     var matches=graph.nodes.filter(function(node){return node.text.indexOf(text)>=0;});
+    if(occurrence!==undefined) return matches[occurrence-1]||null;
     return matches.length===1?matches[0]:null;
   }
   function matchingWire(graph: Graph, expected: ExpectedGraphWire): boolean {
-    var from=matchingNode(graph,expected.fromText), to=matchingNode(graph,expected.toText);
+    var from=matchingNode(graph,expected.fromText,expected.fromOccurrence);
+    var to=matchingNode(graph,expected.toText,expected.toOccurrence);
     if(!from||!to) return false;
     return graph.edges.some(function(edge){
       return edge.from===from.id&&edge.to===to.id&&
@@ -52,18 +54,20 @@
     });
   }
 
-  PROCFLOW_DB2_GRAPH_FIXTURES.forEach(function(fixture){
+  PROCFLOW_GRAPH_FIXTURES.forEach(function(fixture){
     try{
       var result=analyse(fixture.sql,
-        {dialect:'db2',mode:'flow',group:false,sources:true,fanIn:true});
+        {dialect:fixture.dialect,mode:'flow',group:false,sources:true,fanIn:true});
       var missing=fixture.graphExpect.required.filter(function(wire){
         return !matchingWire(result.graph,wire);
       });
       var unexpected=fixture.graphExpect.forbidden.filter(function(wire){
         return matchingWire(result.graph,wire);
       });
-      var unsourced=(fixture.graphExpect.sourced||[]).filter(function(text){
-        var node=matchingNode(result.graph,text);
+      var unsourced=(fixture.graphExpect.sourced||[]).filter(function(expected){
+        var text=typeof expected==='string'?expected:expected.text;
+        var occurrence=typeof expected==='string'?undefined:expected.occurrence;
+        var node=matchingNode(result.graph,text,occurrence);
         return !node||!node.source||node.source.start<0||
           node.source.end<=node.source.start||node.source.end>fixture.sql.length;
       });

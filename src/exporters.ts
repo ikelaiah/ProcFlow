@@ -18,6 +18,7 @@ function toMermaid(graph: Graph, dir?: DiagramDirection): string {
   var styles: Record<string, string>={
     start:'fill:#2b3d4a,stroke:#8ea3b4,color:#e7eef3',
     stmt:'fill:#1e2b35,stroke:#516878,color:#e7eef3',
+    notice:'fill:#25313a,stroke:#7b91a3,color:#d7e2ea',
     io:'fill:#1b3140,stroke:#7ea6e0,color:#dcebff',
     cursor:'fill:#172d36,stroke:#4fb3a5,color:#d9fff8',
     call:'fill:#20303c,stroke:#7ea6e0,color:#dcebff',
@@ -103,6 +104,7 @@ function toDrawio(graph: Graph, opts?: DrawioOptions): string {
   var pos=layoutDrawio(graph,opts.dir||'TD');
   var fills: Record<string, [string, string, string]>={
     start:['#e2e8f0','#64748b','#0f172a'], stmt:['#f8fafc','#64748b','#0f172a'],
+    notice:['#f1f5f9','#94a3b8','#334155'],
     io:['#dbeafe','#3b82f6','#172554'], call:['#e0e7ff','#6366f1','#1e1b4b'],
     cursor:['#ccfbf1','#14b8a6','#134e4a'],
     tran:['#dcfce7','#22c55e','#14532d'], cond:['#fef3c7','#d97706','#451a03'],

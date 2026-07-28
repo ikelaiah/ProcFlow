@@ -75,6 +75,21 @@ function eat(p: ParserState, word: string): boolean {
 }
 function skipSemis(p: ParserState): void { while(peek(p)&&peek(p).v===';') p.i++; }
 
+function staticRaiserrorSeverity(toks: TokenList): number | null {
+  if(!toks.length||toks[0].u!=='RAISERROR') return null;
+  var depth=0;
+  for(var i=1;i<toks.length-1;i++){
+    if(toks[i].v==='(') depth++;
+    else if(toks[i].v===')') depth--;
+    else if(toks[i].v===','&&depth===1){
+      var severity=toks[i+1];
+      return severity&&severity.type==='num'&&/^\d+$/.test(severity.v)
+        ? parseInt(severity.v,10) : null;
+    }
+  }
+  return null;
+}
+
 function newStatementHere(tok: Token, prev: Token | undefined, startWord: string): boolean {
   if(!tok.nl||!prev) return false;
   if(CONT_M[prev.u]||CONT_OPS_M[prev.v]) return false;
@@ -331,6 +346,13 @@ function parseStatement(p: ParserState): AstNode | null {
     return {type:'return', toks:readTokens(p,'stmt')};
   }
   if(t.type==='word'&&u==='THROW'&&tsql) return {type:'throw', toks:readTokens(p,'stmt')};
+  if(t.type==='word'&&u==='RAISERROR'&&tsql){
+    var raiseToks=readTokens(p,'stmt');
+    var severity=staticRaiserrorSeverity(raiseToks);
+    return severity!==null&&severity>10
+      ? {type:'throw',toks:raiseToks}
+      : {type:'stmt',toks:raiseToks};
+  }
   if(t.type==='word'&&(u==='SIGNAL'||u==='RESIGNAL')&&p.d==='db2')
     return {type:'throw', toks:readTokens(p,'stmt')};
   if(t.type==='word'&&u==='RAISE'&&p.d==='plpgsql'){

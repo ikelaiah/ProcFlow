@@ -378,17 +378,26 @@ interface ProcflowFixture {
 interface ExpectedGraphWire {
   fromText: string;
   toText: string;
+  fromOccurrence?: number;
+  toOccurrence?: number;
   label?: string;
   style?: 'solid' | 'dotted';
 }
 
-interface Db2GraphFixture extends ProcflowFixture {
+interface ExpectedGraphNode {
+  text: string;
+  occurrence?: number;
+}
+
+interface GraphFixture extends ProcflowFixture {
   graphExpect: {
     required: ExpectedGraphWire[];
     forbidden: ExpectedGraphWire[];
-    sourced?: string[];
+    sourced?: Array<string | ExpectedGraphNode>;
   };
 }
+
+interface Db2GraphFixture extends GraphFixture {}
 
 interface Window {
   mermaid: {

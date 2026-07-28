@@ -243,7 +243,8 @@ tests/
 ├── index.html     # parser, model, dependency, and exporter suite
 ├── fixtures.ts
 ├── dialects/
-│   └── db2.ts     # DB2 handlers, cursors, labelled loops, and graph edges
+│   ├── db2.ts     # DB2 handlers, cursors, labelled loops, and graph edges
+│   └── tsql.ts    # T-SQL exception propagation and graph-edge fixtures
 ├── tsql-fixtures.ts
 ├── tests.ts
 ├── fuzz.html      # deterministic mutation and invariant suite
@@ -289,7 +290,8 @@ push and pull request.
 
 Current coverage includes 54 focused T-SQL cases, all four dialects,
 DB2 handler scope, cursor/NOT FOUND flow, labelled loop control, graph-edge
-assertions, malformed-input diagnostics,
+assertions, T-SQL THROW/CATCH propagation and RAISERROR severity,
+malformed-input diagnostics,
 CTE/report queries, dynamic SQL, temporary-table writes, multi-object estates,
 special-character escaping, draw.io XML validation, and 400 deterministic
 mutation cases.
