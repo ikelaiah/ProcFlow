@@ -96,7 +96,8 @@ function buildQueryGraph(stmtToks, header, opts){
   var fi=refsIn(finalToks);
   stats.joins+=fi.joins; stats.unions+=fi.unions; stats.subs+=fi.subs;
   var fd=descr(fi);
-  var finalId=add('round', (header.name||'Final SELECT')+(fd?'\u0001'+fd:''), 'final',
+  var finalLabel=opts.finalLabel||header.name||'Final SELECT';
+  var finalId=add('round', finalLabel+(fd?'\u0001'+fd:''), 'final',
                   spanOfTokens(finalToks));
 
   function srcNode(name){
@@ -137,5 +138,87 @@ function buildQueryGraph(stmtToks, header, opts){
   stats.depth=depthOf(finalId,0);
   stats.parts=stats.ctes+stats.joins+stats.unions+stats.subs;
   return {nodes:nodes, edges:edges, stats:stats, empty:split.ctes.length===0&&fi.refs.length===0};
+}
+
+/*
+ * Build one query/data-structure view for a whole procedure or script.
+ * Control-flow constructs are deliberately ignored here: each query-bearing
+ * statement becomes an operation, with its CTEs and source objects wired in.
+ */
+function buildObjectQueryGraph(ast, header, opts){
+  opts=opts||{};
+  var statements=[];
+  var QUERY_HEAD=S(['SELECT','INSERT','UPDATE','DELETE','MERGE','REPLACE','COPY']);
+
+  function collect(list){
+    (list||[]).forEach(function(st){
+      if(st.toks){
+        var split=splitCTEs(st.toks);
+        var finalToks=st.toks.slice(split.finalStart);
+        var head=finalToks[0]?finalToks[0].u:'';
+        if(split.ctes.length||QUERY_HEAD[head]) statements.push(st.toks);
+      }
+      if(st.type==='block') collect(st.body);
+      else if(st.type==='if'){
+        if(st.then) collect([st.then]);
+        if(st.else) collect([st.else]);
+      } else if(st.type==='case'){
+        st.branches.forEach(function(b){ collect(b.body); });
+        collect(st.else);
+      } else if(['while','for','loop','repeat'].indexOf(st.type)>=0&&st.body)
+        collect([st.body]);
+      else if(st.type==='try'){
+        collect(st.body);
+        st.handlers.forEach(function(h){ collect(h.body); });
+      } else if(st.type==='handler'&&st.body) collect([st.body]);
+    });
+  }
+  collect(ast);
+
+  var nodes=[], edges=[], seq=0, sourceIds={};
+  var stats={ctes:0,tables:0,joins:0,unions:0,subs:0,depth:0,parts:0};
+
+  statements.forEach(function(toks){
+    var split=splitCTEs(toks);
+    var finalToks=toks.slice(split.finalStart);
+    var childOpts={sources:opts.sources};
+    childOpts.finalLabel=summarise(finalToks,64);
+    var child=buildQueryGraph(toks,{name:''},childOpts);
+    var remap={};
+
+    child.nodes.forEach(function(n){
+      if(n.cls==='src'){
+        var sourceKey=n.text.toUpperCase();
+        if(!sourceIds[sourceKey]){
+          sourceIds[sourceKey]='oq'+(++seq);
+          nodes.push({id:sourceIds[sourceKey],shape:n.shape,text:n.text,cls:n.cls,
+                      source:n.source||null});
+        }
+        remap[n.id]=sourceIds[sourceKey];
+      } else {
+        remap[n.id]='oq'+(++seq);
+        nodes.push({id:remap[n.id],shape:n.shape,text:n.text,cls:n.cls,
+                    source:n.source||null});
+      }
+    });
+    child.edges.forEach(function(e){
+      if(remap[e.from]&&remap[e.to]&&remap[e.from]!==remap[e.to])
+        edges.push({from:remap[e.from],to:remap[e.to],label:e.label||'',
+                    style:e.style||'solid'});
+    });
+    stats.ctes+=child.stats.ctes;
+    stats.joins+=child.stats.joins;
+    stats.unions+=child.stats.unions;
+    stats.subs+=child.stats.subs;
+    stats.depth=Math.max(stats.depth,child.stats.depth);
+  });
+
+  stats.tables=Object.keys(sourceIds).length;
+  stats.parts=stats.ctes+stats.joins+stats.unions+stats.subs+statements.length;
+  if(!nodes.length){
+    nodes.push({id:'oq1',shape:'round',text:'No query-bearing statements found',
+                cls:'final',source:null});
+  }
+  return {nodes:nodes,edges:edges,stats:stats,empty:statements.length===0};
 }
 

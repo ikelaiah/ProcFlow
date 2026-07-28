@@ -42,6 +42,16 @@
       pass:d.getElementById('coverage-val').textContent==='100%'&&
         /%$/.test(d.getElementById('confidence-val').textContent)&&
         /^\d+$/.test(d.getElementById('diagnostic-val').textContent)});
+    var view=d.getElementById('opt-view');
+    view.value='flow';
+    view.dispatchEvent(new Event('change'));
+    var flowCode=d.getElementById('mermaid-out').textContent;
+    view.value='query';
+    view.dispatchEvent(new Event('change'));
+    var queryCode=d.getElementById('mermaid-out').textContent;
+    results.push({name:'control flow and query structure selector',
+      pass:flowCode!==queryCode&&/dbo\.export_students/.test(queryCode)&&
+        d.getElementById('cc-label').textContent==='Moving parts'});
 
     setTimeout(function(){
       var node=d.querySelector('#stage .node[data-source-start]'),

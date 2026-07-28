@@ -613,7 +613,9 @@ function analyse(sql, opts){
   var flat = graph.stats.branch+graph.stats.loop+graph.stats.cat===0;
   var single = ast.length===1&&ast[0].type==='stmt';
   var q=null;
-  if(single&&(mode==='query'||(mode==='auto'&&flat))){
+  if(mode==='query'){
+    q=buildObjectQueryGraph(ast, header, gopts);
+  } else if(single&&mode==='auto'&&flat){
     q=buildQueryGraph(ast[0].toks, header, gopts);
     if(q.empty||q.nodes.length<2) q=null;
   }

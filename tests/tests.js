@@ -42,6 +42,47 @@
     (window.PROCFLOW_TSQL_FIXTURE_COUNT||0)>=50,
     'Found '+(window.PROCFLOW_TSQL_FIXTURE_COUNT||0)+' T-SQL fixtures.');
 
+  try{
+    var multiQuery=[
+      'CREATE PROCEDURE dbo.query_modes AS',
+      'BEGIN',
+      '  IF EXISTS (SELECT 1 FROM dbo.Account)',
+      '    INSERT INTO dbo.AuditLog(AccountId)',
+      '      SELECT AccountId FROM dbo.Account;',
+      '  ELSE',
+      '    SELECT AccountId FROM dbo.ArchivedAccount;',
+      'END'
+    ].join('\n');
+    var flowMode=analyse(multiQuery,
+      {dialect:'tsql',mode:'flow',group:false,sources:true});
+    var queryMode=analyse(multiQuery,
+      {dialect:'tsql',mode:'query',group:false,sources:true});
+    var sources=queryMode.graph.nodes.filter(function(n){return n.cls==='src';})
+      .map(function(n){return n.text;});
+    var modesDiffer=flowMode.mode==='flow'&&queryMode.mode==='query'&&
+      flowMode.mermaid!==queryMode.mermaid&&
+      flowMode.graph.nodes.some(function(n){return n.cls==='cond';})&&
+      !queryMode.graph.nodes.some(function(n){return n.cls==='cond';})&&
+      has(sources,'dbo.Account')&&has(sources,'dbo.ArchivedAccount');
+    record('Control flow and query structure are distinct for procedures',
+      modesDiffer,JSON.stringify({flow:flowMode.graph,query:queryMode.graph}));
+  }catch(err){
+    record('Control flow and query structure are distinct for procedures',
+      false,String(err&&err.stack||err));
+  }
+
+  try{
+    var noQuery=analyse('CREATE PROCEDURE dbo.assign_only AS BEGIN SET NOCOUNT ON; END',
+      {dialect:'tsql',mode:'query',group:false,sources:true});
+    record('Explicit query mode does not silently fall back to control flow',
+      noQuery.mode==='query'&&noQuery.graph.nodes.length===1&&
+        /No query-bearing/.test(noQuery.graph.nodes[0].text),
+      JSON.stringify(noQuery.graph));
+  }catch(err){
+    record('Explicit query mode does not silently fall back to control flow',
+      false,String(err&&err.stack||err));
+  }
+
   [
     {name:'unclosed parenthesis diagnostic',sql:'SELECT (1;',code:'unclosed_parenthesis'},
     {name:'unterminated string diagnostic',sql:"SELECT 'value;",code:'unterminated_string'},
