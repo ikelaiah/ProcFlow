@@ -52,6 +52,11 @@
       <textarea id="sql" spellcheck="false" placeholder="Paste a procedure, function, trigger or script — T-SQL, DB2 SQL PL, PL/pgSQL or SQLite. Or press Load sample."></textarea>
     </div>
     <div class="readout" aria-live="polite">
+      <div class="analysis-health" id="analysis-health">
+        <div class="health-item"><span>Confidence</span><b id="confidence-val">—</b></div>
+        <div class="health-item"><span>Input coverage</span><b id="coverage-val">—</b></div>
+        <div class="health-item"><span>Diagnostics</span><b id="diagnostic-val">0</b></div>
+      </div>
       <div class="stats" id="stats"></div>
       <div class="cc-head"><span id="cc-label">Cyclomatic complexity</span><b id="cc-val">1</b></div>
       <div class="meter" id="meter" data-band="1"></div>
@@ -123,7 +128,11 @@
 <footer>Parsing is heuristic, not a compiler. Dynamic SQL is opaque to any static eye, and semicolon-free batches may bend the picture. Trust it as a map, not as the territory.</footer>
 
 <script src="vendor/mermaid/mermaid.min.js"></script>
-<script src="src/core.js"></script>
+<script src="src/tokenizer.js"></script>
+<script src="src/dialects.js"></script>
+<script src="src/lineage.js"></script>
+<script src="src/ir.js"></script>
+<script src="src/exporters.js"></script>
 <script src="src/app.js"></script>
 </body>
 </html>

@@ -12,23 +12,49 @@
       var r=analyse(f.sql,{dialect:f.dialect,mode:'auto',group:false,sources:true});
       var ir=buildObjectIR(r,{id:'fixture',name:f.name,kind:r.header.kind,
                               file:f.name,sql:f.sql});
-      var e=f.expect, ok=r.mode===e.mode;
+      var e=f.expect, ok=e.mode===undefined||r.mode===e.mode;
       if(e.branch!==undefined) ok=ok&&r.stats.branch===e.branch;
+      if(e.loop!==undefined) ok=ok&&r.stats.loop===e.loop;
       if(e.cat!==undefined) ok=ok&&r.stats.cat===e.cat;
+      if(e.exit!==undefined) ok=ok&&r.stats.exit===e.exit;
       if(e.opaque!==undefined) ok=ok&&r.stats.opaque===e.opaque;
       if(e.ctes!==undefined) ok=ok&&r.stats.ctes===e.ctes;
       if(e.tables!==undefined) ok=ok&&r.stats.tables===e.tables;
       if(e.call) ok=ok&&has(ir.calls,e.call);
       if(e.write) ok=ok&&has(ir.writes,e.write);
       if(e.write2) ok=ok&&has(ir.writes,e.write2);
+      if(e.read) ok=ok&&has(ir.reads,e.read);
+      if(e.read2) ok=ok&&has(ir.reads,e.read2);
+      if(e.object) ok=ok&&ir.name.toUpperCase()===e.object.toUpperCase();
       if(e.resultSets!==undefined) ok=ok&&ir.resultSets.length===e.resultSets;
       if(e.diagnostic) ok=ok&&r.diagnostics.some(function(d){return d.code===e.diagnostic;});
+      if(e.noErrors) ok=ok&&!r.diagnostics.some(function(d){return d.severity==='error';});
+      if(e.coverageMin!==undefined) ok=ok&&r.coverage>=e.coverageMin;
       var sourced=r.graph.nodes.filter(function(n){return n.source;});
       ok=ok&&sourced.every(function(n){
         return n.source.start>=0&&n.source.end>n.source.start&&n.source.end<=f.sql.length;
       });
       record(f.name,ok,JSON.stringify({stats:r.stats,diagnostics:r.diagnostics,ir:ir}));
     }catch(err){ record(f.name,false,String(err&&err.stack||err)); }
+  });
+
+  record('T-SQL fixture corpus has at least 50 cases',
+    (window.PROCFLOW_TSQL_FIXTURE_COUNT||0)>=50,
+    'Found '+(window.PROCFLOW_TSQL_FIXTURE_COUNT||0)+' T-SQL fixtures.');
+
+  [
+    {name:'unclosed parenthesis diagnostic',sql:'SELECT (1;',code:'unclosed_parenthesis'},
+    {name:'unterminated string diagnostic',sql:"SELECT 'value;",code:'unterminated_string'},
+    {name:'unterminated comment diagnostic',sql:'SELECT 1; /* open',code:'unterminated_comment'},
+    {name:'missing END diagnostic',sql:'CREATE PROC dbo.bad AS BEGIN SELECT 1;',code:'missing_end'},
+    {name:'unconsumed input diagnostic',sql:'END SELECT 1;',code:'unconsumed_input',coverageBelow:1}
+  ].forEach(function(c){
+    try{
+      var r=analyse(c.sql,{dialect:'tsql',mode:'auto',group:false,sources:true});
+      var ok=r.diagnostics.some(function(d){return d.code===c.code;});
+      if(c.coverageBelow!==undefined) ok=ok&&r.coverage<c.coverageBelow;
+      record(c.name,ok,JSON.stringify({coverage:r.coverage,diagnostics:r.diagnostics}));
+    }catch(err){ record(c.name,false,String(err&&err.stack||err)); }
   });
 
   try{

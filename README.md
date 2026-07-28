@@ -85,7 +85,11 @@ The runtime application consists of:
 ```text
 index.html
 styles.css
-src/core.js
+src/tokenizer.js
+src/dialects.js
+src/lineage.js
+src/ir.js
+src/exporters.js
 src/app.js
 vendor/mermaid/mermaid.min.js
 ```
@@ -163,6 +167,17 @@ Within **Internal logic**, **Show** controls the representation:
 Additional controls change orientation, label detail, straight-run grouping,
 step numbering, error-path fan-in, and source-table visibility.
 
+The analysis panel reports:
+
+- **Confidence** — combines dialect certainty, parser coverage, and error
+  diagnostics.
+- **Input coverage** — the percentage of body tokens consumed by the parser.
+- **Diagnostics** — balance errors, missing block terminators, unconsumed input,
+  uncertain dialects, and opaque dynamic SQL.
+
+Low confidence or incomplete coverage is a signal to select the dialect
+manually and verify the highlighted source region.
+
 ## 📥 Importing SQL
 
 Use **Import SQL files** to select multiple `.sql`, `.ddl`, or `.txt` files.
@@ -207,13 +222,22 @@ against the original SQL and the target database platform.
 ```text
 index.html
 styles.css
+.github/
+└── workflows/correctness.yml
 src/
-├── core.js        # parser, shared model, dependencies, and exporters
+├── tokenizer.js   # lexical analysis, escaping, balance checks, source spans
+├── dialects.js    # dialect detection and procedural parsers
+├── lineage.js     # CTE and query dependency extraction
+├── ir.js          # graphs, shared model, diagnostics, and estate analysis
+├── exporters.js   # Mermaid, draw.io, and narration output
 └── app.js         # browser UI and workspace interaction
 tests/
 ├── index.html     # parser, model, dependency, and exporter suite
 ├── fixtures.js
+├── tsql-fixtures.js
 ├── tests.js
+├── fuzz.html      # deterministic mutation and invariant suite
+├── fuzz.js
 ├── ui.html        # browser interaction and offline-runtime suite
 └── ui-tests.js
 vendor/
@@ -230,12 +254,17 @@ calls, result sets, diagnostics, and graph structures.
 No test runner installation is required. Open these files in a browser:
 
 - `tests/index.html` — golden parser, model, dependency, and exporter tests
+- `tests/fuzz.html` — deterministic mutation, no-crash, source-span, graph,
+  determinism, Mermaid, and draw.io invariants
 - `tests/ui.html` — object selection, linked diagrams, source highlighting, and
   offline-runtime tests
 
-Current coverage includes all four dialects, CTE/report queries, dynamic SQL,
-temporary-table writes, multi-object estates, special-character escaping, and
-draw.io XML validation.
+GitHub Actions runs all three browser suites for every push and pull request.
+
+Current coverage includes 54 focused T-SQL cases, all four dialects,
+malformed-input diagnostics, CTE/report queries, dynamic SQL, temporary-table
+writes, multi-object estates, special-character escaping, draw.io XML
+validation, and 400 deterministic mutation cases.
 
 ## 🛣️ Roadmap
 

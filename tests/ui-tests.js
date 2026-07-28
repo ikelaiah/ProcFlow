@@ -38,6 +38,10 @@
     results.push({name:'linked object selection',
       pass:/refresh_students/i.test(d.getElementById('proc-name').textContent)&&
         /refresh_students/i.test(d.getElementById('sql').value)});
+    results.push({name:'confidence and coverage display',
+      pass:d.getElementById('coverage-val').textContent==='100%'&&
+        /%$/.test(d.getElementById('confidence-val').textContent)&&
+        /^\d+$/.test(d.getElementById('diagnostic-val').textContent)});
 
     setTimeout(function(){
       var node=d.querySelector('#stage .node[data-source-start]'),
@@ -50,6 +54,14 @@
           linkedCount:d.querySelectorAll('#stage .node[data-source-start]').length,
           ids:Array.prototype.map.call(d.querySelectorAll('#stage .node'),function(n){return n.id;}),
           start:d.getElementById('sql').selectionStart,end:d.getElementById('sql').selectionEnd,before:before}});
+      d.getElementById('sql').value='END SELECT (1;';
+      d.getElementById('sql').dispatchEvent(new Event('input'));
+      d.getElementById('opt-dialect').value='tsql';
+      d.getElementById('btn-draw').click();
+      results.push({name:'malformed input health warning',
+        pass:parseInt(d.getElementById('coverage-val').textContent,10)<100&&
+          parseInt(d.getElementById('diagnostic-val').textContent,10)>=2&&
+          d.getElementById('analysis-health').getAttribute('data-band')==='low'});
       results.push({name:'local Mermaid runtime',
         pass:!!w.mermaid&&!Array.prototype.some.call(d.scripts,function(s){return /^https?:/i.test(s.src);})});
       finish(results);

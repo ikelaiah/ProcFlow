@@ -86,6 +86,17 @@ button,select,textarea,input{font-family:inherit;font-size:inherit;color:inherit
 
 /* ---------- readout (signature) ---------- */
 .readout{border-top:1px solid var(--rule);padding:14px 16px 16px;background:var(--panel-2)}
+.analysis-health{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:13px}
+.health-item{
+  display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  min-width:112px;padding:6px 8px;border:1px solid var(--rule);border-radius:var(--r);
+  background:#18252e
+}
+.health-item span{font-family:var(--cond);text-transform:uppercase;letter-spacing:.08em;
+  font-size:9px;color:var(--ink-faint)}
+.health-item b{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--jade)}
+.analysis-health[data-band="medium"] .health-item b{color:var(--marigold)}
+.analysis-health[data-band="low"] .health-item b{color:var(--coral)}
 .stats{display:flex;flex-wrap:wrap;gap:18px 26px;margin-bottom:14px}
 .stat{min-width:60px}
 .stat b{display:block;font-family:var(--mono);font-size:19px;font-weight:500;letter-spacing:-.02em}

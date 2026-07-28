@@ -251,6 +251,31 @@
     showMsg(lines.join('\n'),'warn');
   }
 
+  function setAnalysisHealth(confidence, coverage, diagnosticCount){
+    confidence=isFinite(confidence)?confidence:0;
+    coverage=isFinite(coverage)?coverage:0;
+    diagnosticCount=diagnosticCount||0;
+    $('confidence-val').textContent=Math.round(confidence*100)+'%';
+    $('coverage-val').textContent=Math.round(coverage*100)+'%';
+    $('diagnostic-val').textContent=diagnosticCount;
+    var score=Math.min(confidence,coverage);
+    $('analysis-health').setAttribute('data-band',score>=0.85?'high':score>=0.6?'medium':'low');
+    $('analysis-health').title='Confidence combines dialect certainty, parser coverage, and error diagnostics.';
+  }
+
+  function estateHealth(currentEstate){
+    var objects=currentEstate&&currentEstate.objects||[];
+    if(!objects.length) return {confidence:0,coverage:0,diagnostics:0};
+    var confidence=1, consumed=0, total=0, diagnostics=0;
+    objects.forEach(function(o){
+      var r=o.result;
+      confidence=Math.min(confidence,r.confidence);
+      consumed+=r.consumedTokens; total+=r.totalTokens;
+      diagnostics+=r.diagnostics.length;
+    });
+    return {confidence:confidence,coverage:total?consumed/total:1,diagnostics:diagnostics};
+  }
+
   function populateObjects(){
     var picker=$('object-select'), label=$('lbl-object');
     picker.innerHTML='';
@@ -285,6 +310,7 @@
       out.textContent='flowchart TD';
       stage.innerHTML='<div class="empty"><p>The chart appears here. Paste SQL on the left, then press Draw flowchart.</p></div>';
       setStats('flow',{stmt:0,branch:0,loop:0,cat:0,exit:0,depth:0,cc:1});
+      setAnalysisHealth(0,0,0);
       $('proc-name').textContent='';
       $('lbl-object').hidden=true;
       lastCode=''; lastGraph=null; lastTitle=''; lastResult=null; estate=null;
@@ -313,6 +339,8 @@
       $('lbl-sources').style.display='none';
       $('proc-name').textContent='Estate · '+estate.objects.length+' object'+(estate.objects.length===1?'':'s');
       setStats('dependencies',estate.stats);
+      var health=estateHealth(estate);
+      setAnalysisHealth(health.confidence,health.coverage,health.diagnostics);
       showDiagnostics(estate.diagnostics);
       out.textContent=dependencyCode;
       lastCode=dependencyCode; lastGraph=estate.graph; lastResult=null;
@@ -342,6 +370,7 @@
       : '');
     $('proc-name').textContent=result.header.name||'';
     setStats(result.mode, st);
+    setAnalysisHealth(result.confidence,result.coverage,result.diagnostics.length);
     out.textContent=result.mermaid;
     lastCode=result.mermaid;
     lastDialect=result.dialect;
