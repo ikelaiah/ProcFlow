@@ -156,7 +156,7 @@ function buildObjectQueryGraph(ast: AstNode[], header: SqlHeader, opts?: Analyse
 
   function collect(list: any): void {
     (list||[]).forEach(function(st){
-      if(st.toks){
+      if(st.toks&&st.type!=='unknown'){
         var split=splitCTEs(st.toks);
         var finalToks=st.toks.slice(split.finalStart);
         var head=finalToks[0]?finalToks[0].u:'';

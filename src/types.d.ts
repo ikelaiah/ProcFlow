@@ -58,22 +58,150 @@ interface ParserState {
   exhausted: boolean;
 }
 
-interface AstNode {
-  type: string;
-  toks?: TokenList;
-  body?: AstNode | AstNode[];
+interface AstBase {
+  label?: string;
+}
+
+interface BlockNode extends AstBase {
+  type: 'block';
+  body: AstNode[];
+}
+
+interface StatementNode extends AstBase {
+  type: 'stmt';
+  toks: TokenList;
+}
+
+interface DynamicSqlNode extends AstBase {
+  type: 'dynamic';
+  toks: TokenList;
+}
+
+interface IfNode extends AstBase {
+  type: 'if';
+  cond: TokenList;
+  then: AstNode | null;
+  else: AstNode | null;
+}
+
+interface CaseNode extends AstBase {
+  type: 'case';
+  sel: TokenList;
+  branches: Array<{cond: TokenList; body: AstNode[]}>;
+  else: AstNode[] | null;
+}
+
+interface LoopNode extends AstBase {
+  type: 'while' | 'for' | 'loop' | 'repeat';
+  body: AstNode | null;
   cond?: TokenList;
   head?: TokenList;
-  sel?: TokenList;
-  when?: TokenList;
-  then?: AstNode | null;
-  else?: AstNode | AstNode[] | null;
-  branches?: Array<{cond: TokenList; body: AstNode[]}>;
-  handlers?: Array<{cond: TokenList | null; body: AstNode[]}>;
-  dynamic?: boolean;
-  name?: string;
-  target?: string;
-  [property: string]: any;
+}
+
+interface ExceptionHandler {
+  cond: TokenList | null;
+  body: AstNode[];
+}
+
+interface TryNode extends AstBase {
+  type: 'try';
+  body: AstNode[];
+  handlers: ExceptionHandler[];
+}
+
+type Db2HandlerKind = 'CONTINUE' | 'EXIT' | 'UNDO';
+
+interface Db2HandlerNode extends AstBase {
+  type: 'handler';
+  kind: Db2HandlerKind;
+  conds: TokenList;
+  body: AstNode | null;
+}
+
+interface ReturnNode extends AstBase {
+  type: 'return';
+  toks: TokenList;
+}
+
+interface ThrowNode extends AstBase {
+  type: 'throw';
+  toks: TokenList;
+}
+
+interface LoopControlNode extends AstBase {
+  type: 'break' | 'continue';
+  target: string | null;
+  when: TokenList | null;
+  word: string;
+}
+
+interface LabelNode extends AstBase {
+  type: 'label';
+  label: string;
+}
+
+interface GotoNode extends AstBase {
+  type: 'goto';
+  label: string;
+}
+
+interface BatchSeparatorNode extends AstBase {
+  type: 'go';
+}
+
+interface UnknownNode extends AstBase {
+  type: 'unknown';
+  toks: TokenList;
+  reason: string;
+}
+
+type AstNode =
+  | BlockNode
+  | StatementNode
+  | DynamicSqlNode
+  | IfNode
+  | CaseNode
+  | LoopNode
+  | TryNode
+  | Db2HandlerNode
+  | ReturnNode
+  | ThrowNode
+  | LoopControlNode
+  | LabelNode
+  | GotoNode
+  | BatchSeparatorNode
+  | UnknownNode;
+
+interface FlowExit {
+  id: string;
+  label?: string;
+}
+
+interface LoopFlowContext {
+  cond: string;
+  breaks: FlowExit[];
+  label: string | null;
+}
+
+interface Db2HandlerFlow {
+  id: string;
+  kind: Db2HandlerKind;
+  label: string;
+  conditionKey: string;
+  scopeExit: string | null;
+  summarySource: string | null;
+}
+
+interface FlowContext {
+  parent: FlowContext | null;
+  loop?: LoopFlowContext | null;
+  handlers: Db2HandlerFlow[];
+  handlerExits: FlowExit[];
+}
+
+interface EmitResult {
+  entry: string | null;
+  exits: FlowExit[];
 }
 
 interface SqlHeader {
@@ -242,6 +370,20 @@ interface ProcflowFixture {
   dialect: Dialect;
   sql: string;
   expect: FixtureExpectation;
+}
+
+interface ExpectedGraphWire {
+  fromText: string;
+  toText: string;
+  label?: string;
+  style?: 'solid' | 'dotted';
+}
+
+interface Db2GraphFixture extends ProcflowFixture {
+  graphExpect: {
+    required: ExpectedGraphWire[];
+    forbidden: ExpectedGraphWire[];
+  };
 }
 
 interface Window {

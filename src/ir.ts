@@ -95,6 +95,8 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
   var fanIn=opts.fanIn===true, number=opts.number===true;
   var guarded: StringSet={};                       /* nodes already wired to an inner handler */
   var PROTECTABLE: string[]=['stmt','io','call','tran','opaque'];
+  var HANDLER_SOURCES: string[]=['stmt','io','call','tran','opaque','cond','loop'];
+  var handlerWires: StringSet={}, handlerProcessed: StringSet={};
   var maxLen = detail==='full' ? 110 : 52;
   var nodes: GraphNode[]=[], edges: GraphEdge[]=[], seq=0;
   var stats: GraphStats={stmt:0, branch:0, loop:0, cat:0, exit:0, depth:0, opaque:0};
@@ -113,15 +115,17 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
   function joinExits(exits: any[], to: string): void {
     for(var i=0;i<exits.length;i++) link(exits[i].id, to, exits[i].label);
   }
-  function textOf(st){ return detail==='full' ? clip(joinToks(st.toks,maxLen),maxLen) : summarise(st.toks,maxLen); }
-  function kindOf(st){
+  function textOf(st: StatementNode): string {
+    return detail==='full' ? clip(joinToks(st.toks,maxLen),maxLen) : summarise(st.toks,maxLen);
+  }
+  function kindOf(st: StatementNode): string {
     var h=st.toks&&st.toks[0]?st.toks[0].u:'';
     if(['INSERT','UPDATE','DELETE','MERGE','TRUNCATE','REPLACE','COPY'].indexOf(h)>=0) return 'io';
     if(['EXEC','EXECUTE','CALL','PERFORM'].indexOf(h)>=0) return 'call';
     if(['COMMIT','ROLLBACK','SAVE','SAVEPOINT','RELEASE','BEGIN'].indexOf(h)>=0) return 'tran';
     return 'stmt';
   }
-  function findLoop(ctx, target){
+  function findLoop(ctx: FlowContext | null, target?: string | null): LoopFlowContext | null {
     while(ctx){
       if(ctx.loop&&(!target||!ctx.loop.label||ctx.loop.label.toUpperCase()===target.toUpperCase())) return ctx.loop;
       ctx=ctx.parent;
@@ -129,16 +133,54 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
     return null;
   }
 
-  function emitList(list, ctx, depth){
+  function activeHandlers(ctx: FlowContext | null): Db2HandlerFlow[] {
+    var found: Db2HandlerFlow[]=[], seen: StringSet={};
+    while(ctx){
+      for(var i=0;i<ctx.handlers.length;i++){
+        var handler=ctx.handlers[i];
+        if(!seen[handler.conditionKey]){
+          seen[handler.conditionKey]=1;
+          found.push(handler);
+        }
+      }
+      ctx=ctx.parent;
+    }
+    return found;
+  }
+
+  function wireHandlerSources(created: GraphNode[], ctx: FlowContext): void {
+    var sources=created.filter(function(node){
+      return HANDLER_SOURCES.indexOf(node.cls)>=0&&!handlerProcessed[node.id];
+    });
+    if(!sources.length) return;
+    sources.forEach(function(node){ handlerProcessed[node.id]=1; });
+    activeHandlers(ctx).forEach(function(handler){
+      var selected=fanIn?sources:(handler.summarySource?[]:[sources[0]]);
+      selected.forEach(function(source){
+        var key=handler.id+'>'+source.id;
+        if(handlerWires[key]) return;
+        handlerWires[key]=1;
+        link(source.id,handler.id,handler.label,'dotted');
+        if(!handler.summarySource) handler.summarySource=source.id;
+      });
+    });
+  }
+
+  function emitList(list: AstNode[], ctx: FlowContext | null, depth: number): EmitResult {
     if(depth>stats.depth) stats.depth=depth;
-    var local={parent:ctx, handlers:[]};
-    var entry=null, exits=[], i=0;
+    var local: FlowContext={parent:ctx, handlers:[], handlerExits:[]};
+    var entry: string | null=null, exits: FlowExit[]=[], i=0;
     while(i<list.length){
-      var st=list[i], res;
+      var st=list[i], res: EmitResult | null, mark=nodes.length;
       if(st.type==='go'){ i++; continue; }
       if(group&&st.type==='stmt'&&kindOf(st)==='stmt'){
-        var run=[st], j=i+1;
-        while(j<list.length&&list[j].type==='stmt'&&kindOf(list[j])==='stmt'&&run.length<6){ run.push(list[j]); j++; }
+        var run: StatementNode[]=[st], j=i+1;
+        while(j<list.length&&run.length<6){
+          var candidate=list[j];
+          if(candidate.type!=='stmt'||kindOf(candidate)!=='stmt') break;
+          run.push(candidate);
+          j++;
+        }
         if(run.length>1){
           var runSpan={start:run[0].toks[0].pos,
                        end:run[run.length-1].toks[run[run.length-1].toks.length-1].end};
@@ -148,17 +190,17 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
           i=j;
         } else { res=emitOne(st, local, depth); i++; }
       } else { res=emitOne(st, local, depth); i++; }
+      if(st.type!=='handler') wireHandlerSources(nodes.slice(mark),local);
       if(!res||!res.entry) continue;
       if(!entry) entry=res.entry;
       joinExits(exits, res.entry);
       exits=res.exits;
     }
-    for(var h=0;h<local.handlers.length;h++)
-      link(entry||local.handlers[h].id, local.handlers[h].id, local.handlers[h].label, 'dotted');
+    exits=exits.concat(local.handlerExits);
     return {entry:entry, exits:exits};
   }
 
-  function emitOne(st, ctx, depth){
+  function emitOne(st: AstNode, ctx: FlowContext | null, depth: number): EmitResult | null {
     switch(st.type){
       case 'block': return emitList(st.body, ctx, depth);
 
@@ -175,12 +217,19 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
         return {entry:dyn, exits:[{id:dyn}]};
       }
 
+      case 'unknown': {
+        stats.stmt++; stats.opaque++;
+        var unknown=add('rect','Unresolved SQL — '+clip(joinToks(st.toks,42),42),
+                        'opaque',spanOfTokens(st.toks));
+        return {entry:unknown,exits:[{id:unknown}]};
+      }
+
       case 'if': {
         stats.branch++;
         var c=add('diamond', clip(joinToks(st.cond,60),60), 'cond', spanOfTokens(st.cond));
         var t=st.then?emitOne(st.then, ctx, depth+1):null;
         var e=st.else?emitOne(st.else, ctx, depth+1):null;
-        var ex=[];
+        var ex: FlowExit[]=[];
         if(t&&t.entry){ link(c,t.entry,'yes'); ex=ex.concat(t.exits); } else ex.push({id:c, label:'yes'});
         if(e&&e.entry){ link(c,e.entry,'no'); ex=ex.concat(e.exits); } else ex.push({id:c, label:'no'});
         return {entry:c, exits:ex};
@@ -194,7 +243,7 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
           return {entry:cs, exits:[{id:cs}]};
         }
         var selTxt=st.sel&&st.sel.length?joinToks(st.sel,40):'';
-        var entry=null, prev=null, exits=[];
+        var entry: string | null=null, prev: string | null=null, exits: FlowExit[]=[];
         for(var b=0;b<st.branches.length;b++){
           stats.branch++;
           var br=st.branches[b];
@@ -222,7 +271,10 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
                 : st.type==='for'   ? clip('for '+joinToks(st.head,54),58)
                 : 'loop';
         var wc=add('hex', txt, 'loop', spanOfTokens(st.cond||st.head));
-        var inner={loop:{cond:wc, breaks:[], label:st.label||null}, parent:ctx, handlers:[]};
+        var inner: FlowContext={
+          loop:{cond:wc, breaks:[], label:st.label||null},
+          parent:ctx, handlers:[], handlerExits:[]
+        };
         var body=st.body?emitOne(st.body, inner, depth+1):null;
         if(body&&body.entry){ link(wc, body.entry, st.type==='loop'?'':'yes'); joinExits(body.exits, wc); }
         else link(wc, wc, 'loop');
@@ -233,14 +285,18 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
 
       case 'repeat': {
         stats.loop++;
-        var body2=st.body?emitOne(st.body, {loop:null, parent:ctx}, depth+1):null;
         var rc=add('diamond', 'until '+clip(joinToks(st.cond,50),50), 'loop',
                    spanOfTokens(st.cond));
-        var inner2={loop:{cond:rc, breaks:[], label:st.label||null}, parent:ctx};
+        var inner2: FlowContext={
+          loop:{cond:rc, breaks:[], label:st.label||null},
+          parent:ctx, handlers:[], handlerExits:[]
+        };
+        var body2=st.body?emitOne(st.body,inner2,depth+1):null;
         if(body2&&body2.entry){
           joinExits(body2.exits, rc);
           link(rc, body2.entry, 'no');
-          return {entry:body2.entry, exits:[{id:rc, label:'yes'}].concat(inner2.loop.breaks)};
+          var repeatExits: FlowExit[]=[{id:rc,label:'yes'}];
+          return {entry:body2.entry,exits:repeatExits.concat(inner2.loop.breaks)};
         }
         return {entry:rc, exits:[{id:rc, label:'yes'}]};
       }
@@ -284,10 +340,27 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
 
       case 'handler': {
         stats.cat++;
-        var hm=add('marker', st.kind+' HANDLER FOR '+clip(joinToks(st.conds,34),34), 'catch');
-        var hb=st.body?emitOne(st.body, ctx, depth+1):null;
+        var condition=clip(joinToks(st.conds,34),34);
+        var hm=add('marker', st.kind+' HANDLER FOR '+condition, 'catch',
+                   spanOfTokens(st.conds));
+        /* Same-scope handlers do not handle conditions raised by one another. */
+        var hb=st.body?emitList([st.body],ctx?ctx.parent:null,depth+1):null;
         if(hb&&hb.entry) link(hm, hb.entry);
-        if(ctx&&ctx.handlers) ctx.handlers.push({id:hm, label:'on condition'});
+        var terminalText=st.kind==='CONTINUE'
+          ? 'Resume after raising statement'
+          : (st.kind==='UNDO'?'Undo and exit compound block':'Exit compound block');
+        var terminal=add('marker',terminalText,st.kind==='CONTINUE'?'flowctl':'catch');
+        joinExits(hb&&hb.entry?hb.exits:[{id:hm}],terminal);
+        if(ctx){
+          ctx.handlers.push({
+            id:hm,kind:st.kind,label:condition||'condition',
+            conditionKey:(condition||'condition').toUpperCase(),
+            scopeExit:st.kind==='CONTINUE'?null:terminal,
+            summarySource:null
+          });
+          if(st.kind!=='CONTINUE')
+            ctx.handlerExits.push({id:terminal,label:st.kind==='UNDO'?'undo':'handler exit'});
+        }
         return {entry:null, exits:[]};
       }
 
@@ -454,12 +527,17 @@ function walkAst(list: any, visit: (statement: AstNode, depth: number) => void, 
 function buildObjectIR(result: AnalysisResult, unit: any): ObjectIR {
   var statements=[], branches=[], reads=[], writes=[], calls=[], resultSets=[];
   walkAst(result.ast,function(st,depth){
-    var condition=st.cond||st.head||st.sel||null;
+    var condition: TokenList | null=null;
+    if(st.type==='if'||st.type==='while'||st.type==='repeat') condition=st.cond||null;
+    else if(st.type==='for') condition=st.head||null;
+    else if(st.type==='case') condition=st.sel;
     if(['if','case','while','for','loop','repeat'].indexOf(st.type)>=0){
       branches.push({type:st.type, depth:depth, span:spanOfTokens(condition)});
     }
-    if(st.toks){
-      var facts=statementFacts(st.toks,st.type==='dynamic');
+    if('toks' in st){
+      var facts=st.type==='unknown'
+        ? {reads:[],writes:[],calls:[],resultSet:false,dynamic:false}
+        : statementFacts(st.toks,st.type==='dynamic');
       var item={type:st.type, text:joinToks(st.toks), span:spanOfTokens(st.toks),
                 depth:depth, reads:facts.reads, writes:facts.writes,
                 calls:facts.calls, resultSet:facts.resultSet, dynamic:facts.dynamic};
@@ -597,6 +675,7 @@ function analyse(sql: string, opts?: AnalyseOptions): AnalysisResult {
       message:'Parser stopped before '+remaining.length+' token'+(remaining.length===1?' was':'s were')+
         ' consumed. The diagram may be incomplete.',
       span:{start:remaining[0].pos,end:remaining[remaining.length-1].end}});
+    ast.push({type:'unknown',toks:remaining,reason:'Parser stopped before this input.'});
   }
   var totalTokens=bodyToks.length, consumedTokens=Math.min(p.i,totalTokens);
   var coverage=totalTokens?consumedTokens/totalTokens:1;
@@ -620,7 +699,7 @@ function analyse(sql: string, opts?: AnalyseOptions): AnalysisResult {
   if(mode==='query'){
     q=buildObjectQueryGraph(ast, header, gopts);
   } else if(single&&mode==='auto'&&flat){
-    q=buildQueryGraph(ast[0].toks, header, gopts);
+    q=buildQueryGraph((ast[0] as StatementNode).toks, header, gopts);
     if(q.empty||q.nodes.length<2) q=null;
   }
   var selected=q||graph, selectedMode: 'query' | 'flow'=q?'query':'flow';

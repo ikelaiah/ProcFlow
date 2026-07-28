@@ -205,7 +205,7 @@ function buildObjectQueryGraph(ast, header, opts) {
     var QUERY_HEAD = S(['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'MERGE', 'REPLACE', 'COPY']);
     function collect(list) {
         (list || []).forEach(function (st) {
-            if (st.toks) {
+            if (st.toks && st.type !== 'unknown') {
                 var split = splitCTEs(st.toks);
                 var finalToks = st.toks.slice(split.finalStart);
                 var head = finalToks[0] ? finalToks[0].u : '';

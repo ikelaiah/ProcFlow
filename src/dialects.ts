@@ -320,7 +320,7 @@ function parseStatement(p: ParserState): AstNode | null {
       eat(p,'FOR');
       var conds=readTokens(p,'cond');
       var hbody=parseStatement(p);
-      return {type:'handler', kind:k1.u, conds:conds, body:hbody};
+      return {type:'handler', kind:k1.u as Db2HandlerKind, conds:conds, body:hbody};
     }
   }
 

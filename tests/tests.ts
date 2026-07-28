@@ -38,6 +38,37 @@
     }catch(err){ record(f.name,false,String(err&&err.stack||err)); }
   });
 
+  function matchingNode(graph: Graph, text: string): GraphNode | null {
+    var matches=graph.nodes.filter(function(node){return node.text.indexOf(text)>=0;});
+    return matches.length===1?matches[0]:null;
+  }
+  function matchingWire(graph: Graph, expected: ExpectedGraphWire): boolean {
+    var from=matchingNode(graph,expected.fromText), to=matchingNode(graph,expected.toText);
+    if(!from||!to) return false;
+    return graph.edges.some(function(edge){
+      return edge.from===from.id&&edge.to===to.id&&
+        (expected.label===undefined||edge.label===expected.label)&&
+        (expected.style===undefined||edge.style===expected.style);
+    });
+  }
+
+  PROCFLOW_DB2_GRAPH_FIXTURES.forEach(function(fixture){
+    try{
+      var result=analyse(fixture.sql,
+        {dialect:'db2',mode:'flow',group:false,sources:true,fanIn:true});
+      var missing=fixture.graphExpect.required.filter(function(wire){
+        return !matchingWire(result.graph,wire);
+      });
+      var unexpected=fixture.graphExpect.forbidden.filter(function(wire){
+        return matchingWire(result.graph,wire);
+      });
+      record(fixture.name+' · graph edges',missing.length===0&&unexpected.length===0,
+        JSON.stringify({missing:missing,unexpected:unexpected,graph:result.graph}));
+    }catch(err){
+      record(fixture.name+' · graph edges',false,String(err&&err.stack||err));
+    }
+  });
+
   record('T-SQL fixture corpus has at least 50 cases',
     (window.PROCFLOW_TSQL_FIXTURE_COUNT||0)>=50,
     'Found '+(window.PROCFLOW_TSQL_FIXTURE_COUNT||0)+' T-SQL fixtures.');
@@ -88,12 +119,16 @@
     {name:'unterminated string diagnostic',sql:"SELECT 'value;",code:'unterminated_string'},
     {name:'unterminated comment diagnostic',sql:'SELECT 1; /* open',code:'unterminated_comment'},
     {name:'missing END diagnostic',sql:'CREATE PROC dbo.bad AS BEGIN SELECT 1;',code:'missing_end'},
-    {name:'unconsumed input diagnostic',sql:'END SELECT 1;',code:'unconsumed_input',coverageBelow:1}
+    {name:'unconsumed input diagnostic',sql:'END SELECT 1;',code:'unconsumed_input',
+     coverageBelow:1,unknownNode:true}
   ].forEach(function(c){
     try{
       var r=analyse(c.sql,{dialect:'tsql',mode:'auto',group:false,sources:true});
       var ok=r.diagnostics.some(function(d){return d.code===c.code;});
       if(c.coverageBelow!==undefined) ok=ok&&r.coverage<c.coverageBelow;
+      if(c.unknownNode) ok=ok&&r.graph.nodes.some(function(node){
+        return node.cls==='opaque'&&/^Unresolved SQL/.test(node.text);
+      });
       record(c.name,ok,JSON.stringify({coverage:r.coverage,diagnostics:r.diagnostics}));
     }catch(err){ record(c.name,false,String(err&&err.stack||err)); }
   });
