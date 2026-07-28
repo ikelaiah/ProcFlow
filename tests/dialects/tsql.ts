@@ -114,6 +114,156 @@ var PROCFLOW_TSQL_GRAPH_FIXTURES: GraphFixture[] = [
       ],
       sourced:["RAISERROR('note'","RAISERROR('stop'",'SET @unreachable = 1']
     }
+  },
+  {
+    name:'T-SQL graph · XACT_STATE recovery branches',
+    dialect:'tsql',
+    sql:[
+      'CREATE PROCEDURE dbo.recover_transaction AS',
+      'BEGIN',
+      '  SET XACT_ABORT ON;',
+      '  BEGIN TRY',
+      '    BEGIN TRANSACTION;',
+      "    UPDATE dbo.Work SET Status = 'complete';",
+      '    COMMIT TRANSACTION;',
+      '  END TRY',
+      '  BEGIN CATCH',
+      '    IF XACT_STATE() = -1',
+      '    BEGIN',
+      '      ROLLBACK TRANSACTION;',
+      '    END',
+      '    ELSE IF XACT_STATE() = 1',
+      '    BEGIN',
+      '      COMMIT TRANSACTION;',
+      '    END',
+      '    ELSE',
+      "      PRINT 'No active transaction';",
+      '    THROW;',
+      '  END CATCH;',
+      '  SET @done = 1;',
+      'END'
+    ].join('\n'),
+    expect:{mode:'flow',branch:2,cat:1,exit:1,noErrors:true,coverageMin:1},
+    graphExpect:{
+      required:[
+        {fromText:'UPDATE dbo.Work',toText:'BEGIN CATCH',style:'dotted'},
+        {fromText:'BEGIN CATCH',toText:'XACT_STATE() = -1 · uncommittable?'},
+        {fromText:'XACT_STATE() = -1 · uncommittable?',
+         toText:'ROLLBACK TRANSACTION — required full rollback',
+         label:'yes · -1 · uncommittable'},
+        {fromText:'XACT_STATE() = -1 · uncommittable?',
+         toText:'XACT_STATE() = 1 · committable?',
+         label:'no · not uncommittable'},
+        {fromText:'XACT_STATE() = 1 · committable?',
+         toText:'COMMIT TRANSACTION — commit committable transaction',
+         label:'yes · 1 · committable'},
+        {fromText:'XACT_STATE() = 1 · committable?',
+         toText:"PRINT 'No active transaction'",
+         label:'no · 0 · no transaction'},
+        {fromText:'ROLLBACK TRANSACTION — required full rollback',toText:'THROW'},
+        {fromText:'COMMIT TRANSACTION — commit committable transaction',toText:'THROW'},
+        {fromText:"PRINT 'No active transaction'",toText:'THROW'},
+        {fromText:'COMMIT TRANSACTION',fromOccurrence:1,toText:'SET @done = 1'}
+      ],
+      forbidden:[
+        {fromText:'ROLLBACK TRANSACTION — required full rollback',toText:'SET @done = 1'},
+        {fromText:'COMMIT TRANSACTION — commit committable transaction',
+         toText:'SET @done = 1'},
+        {fromText:"PRINT 'No active transaction'",toText:'SET @done = 1'},
+        {fromText:'THROW',toText:'SET @done = 1'}
+      ],
+      sourced:[
+        'XACT_STATE() = -1 · uncommittable?',
+        'ROLLBACK TRANSACTION — required full rollback',
+        'XACT_STATE() = 1 · committable?',
+        'COMMIT TRANSACTION — commit committable transaction',
+        "PRINT 'No active transaction'",'THROW'
+      ]
+    }
+  },
+  {
+    name:'T-SQL graph · XACT_STATE active rollback',
+    dialect:'tsql',
+    sql:[
+      'CREATE PROCEDURE dbo.rollback_active AS',
+      'BEGIN',
+      '  BEGIN TRY',
+      '    BEGIN TRANSACTION;',
+      "    THROW 50010, 'stop', 1;",
+      '  END TRY',
+      '  BEGIN CATCH',
+      '    IF XACT_STATE() <> 0',
+      '      ROLLBACK TRANSACTION;',
+      '    THROW;',
+      '  END CATCH;',
+      '  SET @unreachable = 1;',
+      'END'
+    ].join('\n'),
+    expect:{mode:'flow',branch:1,cat:1,exit:2,noErrors:true,coverageMin:1},
+    graphExpect:{
+      required:[
+        {fromText:"THROW 50010, 'stop', 1",toText:'BEGIN CATCH',style:'dotted'},
+        {fromText:'BEGIN CATCH',toText:'XACT_STATE() <> 0 · transaction active?'},
+        {fromText:'XACT_STATE() <> 0 · transaction active?',
+         toText:'ROLLBACK TRANSACTION — roll back active transaction',
+         label:'yes · active · commit status unknown'},
+        {fromText:'XACT_STATE() <> 0 · transaction active?',
+         toText:'THROW',toOccurrence:2,label:'no · 0 · no transaction'},
+        {fromText:'ROLLBACK TRANSACTION — roll back active transaction',
+         toText:'THROW',toOccurrence:2}
+      ],
+      forbidden:[
+        {fromText:'THROW',fromOccurrence:2,toText:'SET @unreachable = 1'},
+        {fromText:'SET @unreachable = 1',toText:'End'}
+      ],
+      sourced:[
+        'XACT_STATE() <> 0 · transaction active?',
+        'ROLLBACK TRANSACTION — roll back active transaction',
+        {text:'THROW',occurrence:2},'SET @unreachable = 1'
+      ]
+    }
+  },
+  {
+    name:'T-SQL graph · invalid transaction recovery terminates',
+    dialect:'tsql',
+    sql:[
+      'CREATE PROCEDURE dbo.invalid_recovery AS',
+      'BEGIN',
+      '  IF XACT_STATE() = -1',
+      '    COMMIT TRANSACTION;',
+      '  ELSE IF XACT_STATE() = 0',
+      '    ROLLBACK TRANSACTION;',
+      '  SET @valid_path = 1;',
+      'END'
+    ].join('\n'),
+    expect:{mode:'flow',branch:2,exit:2,noErrors:true,coverageMin:1},
+    graphExpect:{
+      required:[
+        {fromText:'XACT_STATE() = -1 · uncommittable?',
+         toText:'COMMIT TRANSACTION — invalid: transaction uncommittable',
+         label:'yes · -1 · uncommittable'},
+        {fromText:'XACT_STATE() = -1 · uncommittable?',
+         toText:'XACT_STATE() = 0 · no active transaction?',
+         label:'no · not uncommittable'},
+        {fromText:'XACT_STATE() = 0 · no active transaction?',
+         toText:'ROLLBACK TRANSACTION — invalid: no active transaction',
+         label:'yes · 0 · no transaction'},
+        {fromText:'XACT_STATE() = 0 · no active transaction?',
+         toText:'SET @valid_path = 1',label:'no · 1 · committable'},
+        {fromText:'SET @valid_path = 1',toText:'End'}
+      ],
+      forbidden:[
+        {fromText:'COMMIT TRANSACTION — invalid: transaction uncommittable',
+         toText:'SET @valid_path = 1'},
+        {fromText:'ROLLBACK TRANSACTION — invalid: no active transaction',
+         toText:'SET @valid_path = 1'}
+      ],
+      sourced:[
+        'COMMIT TRANSACTION — invalid: transaction uncommittable',
+        'ROLLBACK TRANSACTION — invalid: no active transaction',
+        'SET @valid_path = 1'
+      ]
+    }
   }
 ];
 

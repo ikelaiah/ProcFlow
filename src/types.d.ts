@@ -214,6 +214,7 @@ interface FlowContext {
   loop?: LoopFlowContext | null;
   handlers: Db2HandlerFlow[];
   handlerExits: FlowExit[];
+  xactStates?: number;
 }
 
 interface EmitResult {

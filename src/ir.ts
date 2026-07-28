@@ -140,6 +140,66 @@ function escLabel(s: unknown): string {
     .replace(/\s+/g,' ');
 }
 
+var TSQL_XACT_UNCOMMITTABLE=1, TSQL_XACT_NONE=2,
+    TSQL_XACT_COMMITTABLE=4, TSQL_XACT_ALL=7;
+
+function tsqlSignedStateAt(toks: TokenList, start: number, end: number) {
+  var sign=1, i=start;
+  if(i<end&&(toks[i].v==='-'||toks[i].v==='+')){
+    if(toks[i].v==='-') sign=-1;
+    i++;
+  }
+  if(i>=end||toks[i].type!=='num'||!/^\d+$/.test(toks[i].v)) return null;
+  return {value:sign*parseInt(toks[i].v,10),next:i+1};
+}
+
+function tsqlXactFunctionAt(toks: TokenList, start: number, end: number): boolean {
+  return start+2<end&&toks[start].u==='XACT_STATE'&&
+         toks[start+1].v==='('&&toks[start+2].v===')';
+}
+
+function tsqlXactStateTest(toks: TokenList) {
+  var start=0, end=toks.length, changed=true;
+  while(changed&&end-start>=2&&toks[start].v==='('&&toks[end-1].v===')'){
+    changed=false;
+    var depth=0;
+    for(var w=start;w<end;w++){
+      if(toks[w].v==='(') depth++;
+      else if(toks[w].v===')') depth--;
+      if(depth===0){
+        if(w===end-1){ start++; end--; changed=true; }
+        break;
+      }
+    }
+  }
+  var op='', state=null;
+  if(tsqlXactFunctionAt(toks,start,end)&&start+3<end){
+    op=toks[start+3].v;
+    state=tsqlSignedStateAt(toks,start+4,end);
+    if(!state||state.next!==end) return null;
+  } else {
+    state=tsqlSignedStateAt(toks,start,end);
+    if(!state||state.next>=end) return null;
+    op=toks[state.next].v;
+    if(!tsqlXactFunctionAt(toks,state.next+1,end)||state.next+4!==end) return null;
+  }
+  if(['=','<>','!='].indexOf(op)<0||
+     [-1,0,1].indexOf(state.value)<0) return null;
+  var bit=state.value===-1?TSQL_XACT_UNCOMMITTABLE:
+          (state.value===0?TSQL_XACT_NONE:TSQL_XACT_COMMITTABLE);
+  var equal=op==='=';
+  var description=state.value===-1?'uncommittable':
+                  (state.value===0?'no active transaction':'committable');
+  var question=!equal&&state.value===0
+    ? 'transaction active?'
+    : (equal?description+'?':'not '+description+'?');
+  return {
+    text:clip(joinToks(toks,42),42)+' · '+question,
+    trueStates:equal?bit:(TSQL_XACT_ALL^bit),
+    falseStates:equal?(TSQL_XACT_ALL^bit):bit
+  };
+}
+
 /* ---------- graph builder ---------- */
 function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {dialect?: Dialect}): Graph {
   opts=opts||{};
@@ -188,6 +248,63 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
     if(['EXEC','EXECUTE','CALL','PERFORM'].indexOf(h)>=0) return 'call';
     if(['COMMIT','ROLLBACK','SAVE','SAVEPOINT','RELEASE','BEGIN'].indexOf(h)>=0) return 'tran';
     return 'stmt';
+  }
+  function currentXactStates(ctx: FlowContext | null): number {
+    while(ctx){
+      if(ctx.xactStates!==undefined) return ctx.xactStates;
+      ctx=ctx.parent;
+    }
+    return TSQL_XACT_ALL;
+  }
+  function withXactStates(ctx: FlowContext | null, states: number): FlowContext {
+    return {parent:ctx,handlers:[],handlerExits:[],xactStates:states};
+  }
+  function xactStatesLabel(states: number): string {
+    if(states===TSQL_XACT_UNCOMMITTABLE) return '-1 · uncommittable';
+    if(states===TSQL_XACT_NONE) return '0 · no transaction';
+    if(states===TSQL_XACT_COMMITTABLE) return '1 · committable';
+    if(states===(TSQL_XACT_UNCOMMITTABLE|TSQL_XACT_COMMITTABLE))
+      return 'active · commit status unknown';
+    if(states===(TSQL_XACT_NONE|TSQL_XACT_COMMITTABLE)) return 'not uncommittable';
+    if(states===(TSQL_XACT_UNCOMMITTABLE|TSQL_XACT_NONE)) return 'not committable';
+    return states===0?'impossible':'any state';
+  }
+  function tsqlTransactionText(st: StatementNode, ctx: FlowContext | null): string {
+    var out=textOf(st), states=currentXactStates(ctx);
+    if(states===TSQL_XACT_ALL||!st.toks.length) return out;
+    var head=st.toks[0].u;
+    if(head==='ROLLBACK'){
+      var i=1;
+      if(st.toks[i]&&(st.toks[i].u==='TRAN'||st.toks[i].u==='TRANSACTION')) i++;
+      var full=i>=st.toks.length;
+      if(states===TSQL_XACT_UNCOMMITTABLE)
+        return out+(full?' — required full rollback':' — full rollback required');
+      if(states===TSQL_XACT_NONE) return out+' — invalid: no active transaction';
+      if((states&TSQL_XACT_NONE)===0) return out+' — roll back active transaction';
+    }
+    if(head==='COMMIT'){
+      if(states===TSQL_XACT_UNCOMMITTABLE)
+        return out+' — invalid: transaction uncommittable';
+      if(states===TSQL_XACT_NONE) return out+' — invalid: no active transaction';
+      if(states===TSQL_XACT_COMMITTABLE)
+        return out+' — commit committable transaction';
+    }
+    if(head==='SAVE'||head==='SAVEPOINT'){
+      if(states===TSQL_XACT_UNCOMMITTABLE)
+        return out+' — invalid: full rollback required';
+      if(states===TSQL_XACT_NONE) return out+' — invalid: no active transaction';
+    }
+    return out;
+  }
+  function invalidTsqlTransactionAction(st: StatementNode,
+      ctx: FlowContext | null): boolean {
+    var states=currentXactStates(ctx), head=st.toks.length?st.toks[0].u:'';
+    if(head==='COMMIT')
+      return states===TSQL_XACT_UNCOMMITTABLE||states===TSQL_XACT_NONE;
+    if(head==='ROLLBACK') return states===TSQL_XACT_NONE;
+    if(head==='SAVE'||head==='SAVEPOINT')
+      return states===TSQL_XACT_UNCOMMITTABLE||states===TSQL_XACT_NONE;
+    return false;
   }
   function findLoop(ctx: FlowContext | null, target?: string | null): LoopFlowContext | null {
     while(ctx){
@@ -306,8 +423,14 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
 
       case 'stmt': {
         stats.stmt++;
-        var id=add('rect', textOf(st), kindOf(st), spanOfTokens(st.toks));
-        return {entry:id, exits:[{id:id}]};
+        var statementKind=kindOf(st);
+        var statementText=statementKind==='tran'&&dialect==='tsql'
+          ? tsqlTransactionText(st,ctx) : textOf(st);
+        var invalidTransaction=statementKind==='tran'&&dialect==='tsql'&&
+          invalidTsqlTransactionAction(st,ctx);
+        var id=add(invalidTransaction?'round':'rect', statementText,
+                   invalidTransaction?'err':statementKind, spanOfTokens(st.toks));
+        return {entry:id, exits:invalidTransaction?[]:[{id:id}]};
       }
 
       case 'dynamic': {
@@ -326,12 +449,23 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
 
       case 'if': {
         stats.branch++;
-        var c=add('diamond', clip(joinToks(st.cond,60),60), 'cond', spanOfTokens(st.cond));
-        var t=st.then?emitOne(st.then, ctx, depth+1):null;
-        var e=st.else?emitOne(st.else, ctx, depth+1):null;
+        var xactTest=dialect==='tsql'?tsqlXactStateTest(st.cond):null;
+        var incomingStates=currentXactStates(ctx);
+        var trueStates=xactTest?incomingStates&xactTest.trueStates:incomingStates;
+        var falseStates=xactTest?incomingStates&xactTest.falseStates:incomingStates;
+        var conditionText=xactTest?xactTest.text:clip(joinToks(st.cond,60),60);
+        var c=add('diamond', conditionText, 'cond', spanOfTokens(st.cond));
+        var trueCtx=xactTest?withXactStates(ctx,trueStates):ctx;
+        var falseCtx=xactTest?withXactStates(ctx,falseStates):ctx;
+        var t=st.then?emitOne(st.then, trueCtx, depth+1):null;
+        var e=st.else?emitOne(st.else, falseCtx, depth+1):null;
         var ex: FlowExit[]=[];
-        if(t&&t.entry){ link(c,t.entry,'yes'); ex=ex.concat(t.exits); } else ex.push({id:c, label:'yes'});
-        if(e&&e.entry){ link(c,e.entry,'no'); ex=ex.concat(e.exits); } else ex.push({id:c, label:'no'});
+        var yesLabel=xactTest?'yes · '+xactStatesLabel(trueStates):'yes';
+        var noLabel=xactTest?'no · '+xactStatesLabel(falseStates):'no';
+        if(t&&t.entry){ link(c,t.entry,yesLabel); ex=ex.concat(t.exits); }
+        else ex.push({id:c, label:yesLabel});
+        if(e&&e.entry){ link(c,e.entry,noLabel); ex=ex.concat(e.exits); }
+        else ex.push({id:c, label:noLabel});
         return {entry:c, exits:ex};
       }
 
