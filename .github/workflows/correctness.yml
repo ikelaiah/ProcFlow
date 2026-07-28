@@ -22,10 +22,32 @@ jobs:
         run: |
           echo "61b335a46df05a7ce1c98378f60e5f3e77a7fb608a1056997e8a649304a936d6  vendor/mermaid/mermaid.min.js" | sha256sum --check
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install and compile TypeScript
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+
+      - name: Verify generated JavaScript is current
+        shell: bash
+        run: |
+          if [ -n "$(git status --porcelain -- dist)" ]; then
+            git status --short -- dist
+            git diff -- dist
+            echo "Run npm run build and commit the generated dist files."
+            exit 1
+          fi
+
       - name: Check runtime remains local-only
         shell: bash
         run: |
-          if grep -REn "https?://" index.html styles.css src tests; then
+          if grep -REn "https?://" index.html styles.css src dist tests; then
             echo "Runtime files contain an external URL."
             exit 1
           fi

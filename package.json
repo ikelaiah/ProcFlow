@@ -1,0 +1,13 @@
+{
+  "name": "procflow",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local-first SQL control-flow and dependency visualiser",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

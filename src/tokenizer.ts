@@ -1,9 +1,13 @@
 ﻿/* proc>flow: tokenization and source positions */
-var S = function(a){ var o={}; for(var i=0;i<a.length;i++) o[a[i]]=1; return o; };
+var S = function(a: string[]): StringSet {
+  var o: StringSet={};
+  for(var i=0;i<a.length;i++) o[a[i]]=1;
+  return o;
+};
 /* ---------- tokeniser ---------- */
-function tokenize(sql){
-  var toks=[], diagnostics=[], i=0, n=sql.length, nl=true;
-  function issue(code,message,start,end){
+function tokenize(sql: string): TokenList {
+  var toks: TokenList=[], diagnostics: Diagnostic[]=[], i=0, n=sql.length, nl=true;
+  function issue(code: string, message: string, start: number, end: number): void {
     diagnostics.push({severity:'error',code:code,message:message,
                       span:{start:start,end:Math.max(start+1,Math.min(n,end))}});
   }
@@ -22,7 +26,7 @@ function tokenize(sql){
       if(d>0) issue('unterminated_comment','Block comment is not closed.',commentStart,n);
       continue;
     }
-    var start=i, type='op';
+    var start=i, type: TokenType='op';
     var dq=c==='$'?/^\$[A-Za-z_]*\$/.exec(sql.slice(i)):null;
     if(dq){                                        /* $$ … $$ dollar quote */
       var tag=dq[0], close=sql.indexOf(tag, i+tag.length);
@@ -90,8 +94,8 @@ function tokenize(sql){
     toks.push({type:type, v:v, u:type==='word'?v.toUpperCase():v, nl:nl, pos:start, end:i});
     nl=false;
   }
-  var parens=[];
-  toks.forEach(function(t){
+  var parens: Token[]=[];
+  toks.forEach(function(t: Token){
     if(t.v==='(') parens.push(t);
     else if(t.v===')'){
       if(parens.length) parens.pop();
@@ -106,8 +110,4 @@ function tokenize(sql){
   });
   toks.diagnostics=diagnostics;
   return toks;
-}
-function spanOfTokens(toks){
-  if(!toks||!toks.length) return null;
-  return {start:toks[0].pos, end:toks[toks.length-1].end};
 }

@@ -1,6 +1,6 @@
 (function(){
-  var output=document.getElementById('results');
-  function rng(seed){
+  var output=document.getElementById('results') as HTMLElement;
+  function rng(seed: number): () => number {
     return function(){
       seed|=0; seed=seed+0x6D2B79F5|0;
       var t=Math.imul(seed^seed>>>15,1|seed);
@@ -9,10 +9,10 @@
     };
   }
   var random=rng(0x5052464c);
-  function pick(a){ return a[Math.floor(random()*a.length)]; }
+  function pick(a: string[]): string { return a[Math.floor(random()*a.length)]; }
   var inserts=['(',')',';',' BEGIN ',' END ',' IF ',' SELECT ','/* fuzz */','-- fuzz\n',
                "'","[",']',' @x ','\nGO\n',' $$ ',' <> ',' , '];
-  function mutate(sql){
+  function mutate(sql: string): string {
     if(!sql.length) return pick(inserts);
     var mode=Math.floor(random()*7), at=Math.floor(random()*(sql.length+1));
     if(mode===0) return sql.slice(0,at)+pick(inserts)+sql.slice(at);
@@ -26,7 +26,7 @@
     if(mode===5) return sql.replace(/\b(SELECT|BEGIN|END|IF|FROM)\b/i,pick(['SELECT','BEGIN','END','IF','FROM']));
     return sql.split('').map(function(c){return random()<0.015?pick(['(',')',"'",';']):c;}).join('');
   }
-  function graphInvariant(result,sql){
+  function graphInvariant(result: AnalysisResult, sql: string): boolean {
     var ids={}, ok=true;
     result.graph.nodes.forEach(function(n){
       if(ids[n.id]) ok=false;
@@ -36,7 +36,7 @@
     result.graph.edges.forEach(function(e){ if(!ids[e.from]||!ids[e.to]) ok=false; });
     return ok;
   }
-  function stableSummary(result){
+  function stableSummary(result: AnalysisResult): string {
     return JSON.stringify({
       dialect:result.dialect,coverage:result.coverage,diagnostics:result.diagnostics,
       stats:result.stats,nodes:result.graph.nodes,edges:result.graph.edges
@@ -44,13 +44,13 @@
   }
 
   var seeds=PROCFLOW_FIXTURES.map(function(f){return {sql:f.sql,dialect:f.dialect};});
-  var failures=[], cases=400;
+  var failures: Array<{case: number; reason: string; sample?: string}>=[], cases=400;
   for(var i=0;i<cases;i++){
     var seed=seeds[i%seeds.length], sql=seed.sql;
     var rounds=1+Math.floor(random()*4);
     while(rounds--) sql=mutate(sql);
     try{
-      var opts={dialect:seed.dialect||'auto',mode:'auto',group:false,sources:true};
+      var opts: AnalyseOptions={dialect:seed.dialect||'auto',mode:'auto',group:false,sources:true};
       var a=analyse(sql,opts), b=analyse(sql,opts);
       if(!isFinite(a.coverage)||a.coverage<0||a.coverage>1)
         failures.push({case:i,reason:'coverage out of range'});

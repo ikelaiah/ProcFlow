@@ -1,4 +1,4 @@
-var PROCFLOW_FIXTURES = [
+var PROCFLOW_FIXTURES: ProcflowFixture[] = [
   {
     name:'T-SQL procedure',
     dialect:'tsql',
@@ -76,7 +76,7 @@ var PROCFLOW_FIXTURES = [
   }
 ];
 
-var PROCFLOW_ESTATE_FIXTURE = {
+var PROCFLOW_ESTATE_FIXTURE: WorkspaceFile = {
   name:'school.sql',
   text:[
     'CREATE VIEW dbo.student_export AS',

@@ -8,8 +8,9 @@ reviewers. Paste SQL or import several SQL files to explore:
 - how an individual procedure, function, trigger, view, or query works; and
 - how objects depend on tables, views, and called routines.
 
-There is no installation, database connection, backend service, or build step.
-Open the page in a modern browser and start exploring.
+There is no installation, database connection, or backend service. Compiled
+JavaScript is checked into `dist/`, so users can open the page in a modern
+browser without running a build.
 
 > [!IMPORTANT]
 > Parsing is heuristic rather than compiler-grade. Use each diagram as an
@@ -85,12 +86,12 @@ The runtime application consists of:
 ```text
 index.html
 styles.css
-src/tokenizer.js
-src/dialects.js
-src/lineage.js
-src/ir.js
-src/exporters.js
-src/app.js
+dist/src/tokenizer.js
+dist/src/dialects.js
+dist/src/lineage.js
+dist/src/ir.js
+dist/src/exporters.js
+dist/src/app.js
 vendor/mermaid/mermaid.min.js
 ```
 
@@ -222,24 +223,31 @@ against the original SQL and the target database platform.
 ```text
 index.html
 styles.css
+package.json
+package-lock.json
+tsconfig.json
 .github/
 └── workflows/correctness.yml
 src/
-├── tokenizer.js   # lexical analysis, escaping, balance checks, source spans
-├── dialects.js    # dialect detection and procedural parsers
-├── lineage.js     # CTE and query dependency extraction
-├── ir.js          # graphs, shared model, diagnostics, and estate analysis
-├── exporters.js   # Mermaid, draw.io, and narration output
-└── app.js         # browser UI and workspace interaction
+├── types.d.ts     # shared tokens, AST, graphs, diagnostics, and public contracts
+├── tokenizer.ts   # lexical analysis, escaping, balance checks, source spans
+├── dialects.ts    # dialect detection and procedural parsers
+├── lineage.ts     # CTE and query dependency extraction
+├── ir.ts          # graphs, shared model, diagnostics, and estate analysis
+├── exporters.ts   # Mermaid, draw.io, and narration output
+└── app.ts         # browser UI and workspace interaction
+dist/              # generated browser JavaScript and source maps
+├── src/
+└── tests/
 tests/
 ├── index.html     # parser, model, dependency, and exporter suite
-├── fixtures.js
-├── tsql-fixtures.js
-├── tests.js
+├── fixtures.ts
+├── tsql-fixtures.ts
+├── tests.ts
 ├── fuzz.html      # deterministic mutation and invariant suite
-├── fuzz.js
+├── fuzz.ts
 ├── ui.html        # browser interaction and offline-runtime suite
-└── ui-tests.js
+└── ui-tests.ts
 vendor/
 └── mermaid/
     ├── mermaid.min.js
@@ -251,7 +259,20 @@ calls, result sets, diagnostics, and graph structures.
 
 ## 🧪 Testing
 
-No test runner installation is required. Open these files in a browser:
+For a fresh contributor checkout, install the pinned development dependency and
+compile the TypeScript:
+
+```text
+npm ci
+npm run typecheck
+npm run build
+```
+
+`npm run build` writes browser-ready JavaScript and source maps to `dist/`.
+Treat that directory as generated output and make source changes in `src/` or
+`tests/`.
+
+You can then open these files in a browser:
 
 - `tests/index.html` — golden parser, model, dependency, and exporter tests
 - `tests/fuzz.html` — deterministic mutation, no-crash, source-span, graph,
@@ -259,7 +280,8 @@ No test runner installation is required. Open these files in a browser:
 - `tests/ui.html` — object selection, linked diagrams, source highlighting, and
   offline-runtime tests
 
-GitHub Actions runs all three browser suites for every push and pull request.
+GitHub Actions type-checks, builds, and runs all three browser suites for every
+push and pull request.
 
 Current coverage includes 54 focused T-SQL cases, all four dialects,
 malformed-input diagnostics, CTE/report queries, dynamic SQL, temporary-table

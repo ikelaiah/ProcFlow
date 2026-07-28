@@ -1,9 +1,9 @@
 (function(){
-  var results=[];
-  function record(name,pass,detail){
+  var results: Array<{name: string; pass: boolean; detail: unknown}>=[];
+  function record(name: string, pass: unknown, detail?: unknown): void {
     results.push({name:name,pass:!!pass,detail:pass?'':detail});
   }
-  function has(list,value){
+  function has(list: string[], value: string): boolean {
     return (list||[]).some(function(v){ return v.toUpperCase()===value.toUpperCase(); });
   }
 

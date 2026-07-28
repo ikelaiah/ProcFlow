@@ -1,14 +1,16 @@
 ﻿/* ===== UI ===== */
 (function(){
   if(typeof document==='undefined') return;
-  var $=function(id){ return document.getElementById(id); };
+  var $=function(id: string): any { return document.getElementById(id); };
   var sql=$('sql'), gutter=$('gutter'), out=$('mermaid-out'), stage=$('stage'),
       canvas=$('canvas'), msg=$('msg');
-  var scale=1, panX=0, panY=0, lastCode='', lastDialect='tsql',
-      lastGraph=null, lastTitle='', lastDirection='TD', lastResult=null,
-      estate=null, workspaceFiles=null, activeObjectId=null, renderSeq=0;
+  var scale=1, panX=0, panY=0, lastCode='', lastDialect: Dialect='tsql',
+      lastGraph: Graph | null=null, lastTitle='',
+      lastDirection: DiagramDirection='TD', lastResult: AnalysisResult | null=null,
+      estate: EstateResult | null=null, workspaceFiles: WorkspaceFile[] | null=null,
+      activeObjectId: string | null=null, renderSeq=0;
 
-  var SAMPLES = {};
+  var SAMPLES = {} as Record<Dialect, string>;
   SAMPLES.tsql = [
 "CREATE PROCEDURE dbo.usp_SyncStudentPhotos",
 "    @SchoolYear INT,",
@@ -165,7 +167,7 @@
 "    INSERT OR IGNORE INTO sync_queue (student_id) VALUES (old.id);",
 "END;"].join('\n');
 
-  function drawGutter(){
+  function drawGutter(): void {
     var n=sql.value.split('\n').length, s='';
     for(var i=1;i<=n;i++) s+=i+'\n';
     gutter.textContent=s;
@@ -186,23 +188,26 @@
     }
   });
 
-  var timer=null;
-  function schedule(){ clearTimeout(timer); timer=setTimeout(run,350); }
+  var timer: ReturnType<typeof setTimeout> | null=null;
+  function schedule(): void {
+    if(timer!==null) clearTimeout(timer);
+    timer=setTimeout(run,350);
+  }
 
-  function ccNote(cc){
+  function ccNote(cc: number): string {
     if(cc<=5)  return 'A gentle path or two. Most readers will hold it all in their head.';
     if(cc<=10) return 'Moderate. Worth a comment block at the top explaining the branches.';
     if(cc<=20) return 'Busy. Consider splitting the work into smaller procedures.';
     return 'Thorny. Every added branch doubles what a tester must remember.';
   }
-  function qNote(n){
+  function qNote(n: number): string {
     if(n<=8)  return 'A short pipeline. Easy to follow from source to result.';
     if(n<=20) return 'Moderate. A comment naming what each CTE is for would repay itself.';
     if(n<=40) return 'Heavy. Each CTE is re-read by its children — worth checking the plan for repeated scans.';
     return 'Very heavy. A materialised staging table may cost less than rebuilding this every run.';
   }
 
-  function setStats(mode, s){
+  function setStats(mode: 'flow' | 'query' | 'dependencies', s: GraphStats): void {
     var q = mode==='query', deps=mode==='dependencies';
     var rows = deps
       ? [[s.objects,'Objects'],[s.external,'External objects'],[s.reads,'Reads'],
@@ -222,7 +227,7 @@
     $('cc-label').textContent = deps ? 'Estate objects' : (q ? 'Moving parts' : 'Cyclomatic complexity');
     $('cc-val').textContent = val;
     var meter=$('meter'), html='';
-    meter.setAttribute('data-band', band);
+    meter.setAttribute('data-band', String(band));
     for(var i=1;i<=20;i++) html+='<div class="seg'+(i<=filled?' on':'')+'"></div>';
     meter.innerHTML=html;
     $('cc-note').textContent = deps
@@ -230,13 +235,13 @@
       : (q ? qNote(val) : ccNote(val));
   }
 
-  function showMsg(text, kind){
+  function showMsg(text: string, kind?: 'warn'): void {
     msg.textContent=text||'';
     msg.classList.toggle('show', !!text);
     msg.classList.toggle('warn', kind==='warn');
   }
 
-  function analysisOptions(){
+  function analysisOptions(): AnalyseOptions {
     return {
       dialect:$('opt-dialect').value, mode:$('opt-view').value,
       dir:$('opt-dir').value, detail:$('opt-detail').value,
@@ -245,13 +250,13 @@
     };
   }
 
-  function showDiagnostics(list, extra){
+  function showDiagnostics(list: Diagnostic[], extra?: string): void {
     var lines=(list||[]).map(function(d){ return d.message; });
     if(extra) lines.push(extra);
     showMsg(lines.join('\n'),'warn');
   }
 
-  function setAnalysisHealth(confidence, coverage, diagnosticCount){
+  function setAnalysisHealth(confidence: number, coverage: number, diagnosticCount: number): void {
     confidence=isFinite(confidence)?confidence:0;
     coverage=isFinite(coverage)?coverage:0;
     diagnosticCount=diagnosticCount||0;
@@ -263,7 +268,7 @@
     $('analysis-health').title='Confidence combines dialect certainty, parser coverage, and error diagnostics.';
   }
 
-  function estateHealth(currentEstate){
+  function estateHealth(currentEstate: EstateResult | null){
     var objects=currentEstate&&currentEstate.objects||[];
     if(!objects.length) return {confidence:0,coverage:0,diagnostics:0};
     var confidence=1, consumed=0, total=0, diagnostics=0;
@@ -276,7 +281,7 @@
     return {confidence:confidence,coverage:total?consumed/total:1,diagnostics:diagnostics};
   }
 
-  function populateObjects(){
+  function populateObjects(): void {
     var picker=$('object-select'), label=$('lbl-object');
     picker.innerHTML='';
     (estate&&estate.objects||[]).forEach(function(o){
@@ -289,12 +294,12 @@
     if(activeObjectId) picker.value=activeObjectId;
   }
 
-  function activeObject(){
+  function activeObject(): ObjectIR | null {
     if(!estate||!estate.objects.length) return null;
     return estate.objects.filter(function(o){return o.id===activeObjectId;})[0]||estate.objects[0];
   }
 
-  function loadObjectSource(object){
+  function loadObjectSource(object: ObjectIR | null): void {
     if(!object) return;
     sql.value=object.source;
     drawGutter();
@@ -303,7 +308,7 @@
 
 
 
-  function run(){
+  function run(): void {
     var text=sql.value;
     if(!text.trim()&&!(workspaceFiles&&workspaceFiles.length)){
       showMsg('');
@@ -381,7 +386,7 @@
     render(result.mermaid,result.graph);
   }
 
-  function highlightSource(span){
+  function highlightSource(span?: SourceSpan | null): void {
     if(!span||span.start===undefined||span.end===undefined) return;
     var start=Math.max(0,Math.min(sql.value.length,span.start));
     var end=Math.max(start,Math.min(sql.value.length,span.end));
@@ -392,7 +397,7 @@
     gutter.scrollTop=sql.scrollTop;
   }
 
-  function attachNodeLinks(graph){
+  function attachNodeLinks(graph: Graph): void {
     var elements=stage.querySelectorAll('.node');
     Array.prototype.forEach.call(elements,function(el){
       var node=(graph.nodes||[]).filter(function(n){
@@ -400,8 +405,8 @@
       })[0];
       if(!node||(!node.source&&!node.objectId)) return;
       if(node.source){
-        el.setAttribute('data-source-start',node.source.start);
-        el.setAttribute('data-source-end',node.source.end);
+        el.setAttribute('data-source-start',String(node.source.start));
+        el.setAttribute('data-source-end',String(node.source.end));
       }
       if(node.objectId) el.setAttribute('data-object-id',node.objectId);
       el.setAttribute('tabindex','0');
@@ -423,7 +428,7 @@
     });
   }
 
-  function render(code, graph){
+  function render(code: string, graph?: Graph | null): void {
     if(typeof mermaid==='undefined'){
       showMsg('Mermaid could not be loaded. The Mermaid tab still holds your diagram source.');
       return;
@@ -446,8 +451,8 @@
   }
 
   /* zoom + pan */
-  function apply(){ stage.style.transform='translate('+panX+'px,'+panY+'px) scale('+scale+')'; }
-  function fit(){
+  function apply(): void { stage.style.transform='translate('+panX+'px,'+panY+'px) scale('+scale+')'; }
+  function fit(): void {
     var svg=stage.querySelector('svg');
     scale=1; panX=0; panY=0;
     if(svg){
@@ -472,10 +477,10 @@
   },{passive:false});
 
   /* tabs */
-  function tab(which){
+  function tab(which: 'chart' | 'code'): void {
     var chart=which==='chart';
-    $('tab-chart').setAttribute('aria-selected',chart);
-    $('tab-code').setAttribute('aria-selected',!chart);
+    $('tab-chart').setAttribute('aria-selected',String(chart));
+    $('tab-code').setAttribute('aria-selected',String(!chart));
     $('view-chart').classList.toggle('active',chart);
     $('view-code').classList.toggle('active',!chart);
   }
@@ -520,7 +525,7 @@
       b.textContent='Copied'; setTimeout(function(){ b.textContent=old; },1400);
     },function(){ b.textContent='Copy failed'; setTimeout(function(){ b.textContent=old; },1400); });
   };
-  function flash(btn, word){
+  function flash(btn: HTMLElement, word: string): void {
     var old=btn.textContent;
     btn.textContent=word;
     setTimeout(function(){ btn.textContent=old; }, 1500);
@@ -528,8 +533,9 @@
   $('btn-narrate').onclick=function(){
     var b=$('btn-narrate');
     if(!lastCode){ showMsg('Draw a chart first — the prompt carries the extracted structure with it.'); return; }
-    var text=narrationPrompt(lastCode, sql.value, $('opt-dialect').value==='auto'
-      ? (lastDialect||'tsql') : $('opt-dialect').value);
+    var selectedDialect: Dialect = $('opt-dialect').value==='auto'
+      ? lastDialect : $('opt-dialect').value as Dialect;
+    var text=narrationPrompt(lastCode, sql.value, selectedDialect);
     navigator.clipboard.writeText(text).then(function(){ flash(b,'Copied — paste into any model'); },
                                             function(){ flash(b,'Copy failed'); });
   };
