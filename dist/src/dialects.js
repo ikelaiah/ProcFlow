@@ -114,19 +114,18 @@ function staticRaiserrorSeverity(toks) {
     }
     return null;
 }
-function directSqliteRaiseAction(toks) {
-    /* RAISE() is an expression. Model only the canonical unconditional trigger
-       step, SELECT RAISE(...), rather than guessing about nested CASE branches. */
-    if (toks.length < 5 || toks[0].u !== 'SELECT' || toks[1].u !== 'RAISE' ||
-        toks[2].v !== '(')
+function sqliteRaiseAt(toks, start) {
+    if (!toks[start] || toks[start].u !== 'RAISE' || !toks[start + 1] ||
+        toks[start + 1].v !== '(' || !toks[start + 2])
         return null;
-    var action = toks[3].u;
-    var valid = (['FAIL', 'ABORT', 'ROLLBACK'].indexOf(action) >= 0 && toks[4].v === ',') ||
-        (action === 'IGNORE' && toks[4].v === ')');
+    var action = toks[start + 2].u;
+    var next = toks[start + 3];
+    var valid = (['FAIL', 'ABORT', 'ROLLBACK'].indexOf(action) >= 0 && next && next.v === ',') ||
+        (action === 'IGNORE' && next && next.v === ')');
     if (!valid)
         return null;
     var depth = 0, close = -1;
-    for (var i = 2; i < toks.length; i++) {
+    for (var i = start + 1; i < toks.length; i++) {
         if (toks[i].v === '(')
             depth++;
         else if (toks[i].v === ')' && --depth === 0) {
@@ -134,7 +133,111 @@ function directSqliteRaiseAction(toks) {
             break;
         }
     }
-    return close === toks.length - 1 ? action : null;
+    if (close < 0)
+        return null;
+    return {
+        node: { type: 'sqlite_raise', action: action,
+            toks: toks.slice(start, close + 1) },
+        end: close
+    };
+}
+function sqliteTopLevelWord(toks, start, words) {
+    var paren = 0, nestedCase = 0;
+    for (var i = start; i < toks.length; i++) {
+        var tok = toks[i];
+        if (tok.v === '(') {
+            paren++;
+            continue;
+        }
+        if (tok.v === ')') {
+            if (paren > 0)
+                paren--;
+            continue;
+        }
+        if (paren > 0)
+            continue;
+        if (tok.u === 'CASE') {
+            nestedCase++;
+            continue;
+        }
+        if (tok.u === 'END') {
+            if (nestedCase > 0) {
+                nestedCase--;
+                continue;
+            }
+            if (words.indexOf('END') >= 0)
+                return i;
+        }
+        else if (nestedCase === 0 && words.indexOf(tok.u) >= 0)
+            return i;
+    }
+    return -1;
+}
+function sqliteRangeHasRaise(toks, start, end) {
+    for (var i = start; i < end; i++)
+        if (toks[i].u === 'RAISE')
+            return true;
+    return false;
+}
+function parseSqliteRaiseCase(toks) {
+    /* Searched CASE only: SELECT CASE WHEN ... THEN RAISE(...) ... END */
+    if (toks.length < 7 || toks[0].u !== 'SELECT' || toks[1].u !== 'CASE' ||
+        toks[2].u !== 'WHEN')
+        return null;
+    var branches = [], elseBody = null;
+    var i = 2, raiseCount = 0, endCase = -1;
+    while (i < toks.length && toks[i].u === 'WHEN') {
+        var thenAt = sqliteTopLevelWord(toks, i + 1, ['THEN']);
+        if (thenAt < 0 || thenAt === i + 1)
+            return null;
+        var nextAt = sqliteTopLevelWord(toks, thenAt + 1, ['WHEN', 'ELSE', 'END']);
+        if (nextAt < 0 || nextAt === thenAt + 1)
+            return null;
+        var body = [];
+        var matched = sqliteRaiseAt(toks, thenAt + 1);
+        if (matched && matched.end === nextAt - 1) {
+            body = [matched.node];
+            raiseCount++;
+        }
+        else if (sqliteRangeHasRaise(toks, thenAt + 1, nextAt))
+            return null;
+        branches.push({ cond: toks.slice(i + 1, thenAt), body: body });
+        i = nextAt;
+    }
+    if (i < toks.length && toks[i].u === 'ELSE') {
+        endCase = sqliteTopLevelWord(toks, i + 1, ['END']);
+        if (endCase < 0 || endCase === i + 1)
+            return null;
+        var elseRaise = sqliteRaiseAt(toks, i + 1);
+        if (elseRaise && elseRaise.end === endCase - 1) {
+            elseBody = [elseRaise.node];
+            raiseCount++;
+        }
+        else if (sqliteRangeHasRaise(toks, i + 1, endCase))
+            return null;
+        i = endCase;
+    }
+    if (i < toks.length && toks[i].u === 'END')
+        endCase = i;
+    if (!branches.length || !raiseCount || endCase !== toks.length - 1)
+        return null;
+    return { type: 'case', sel: [], branches: branches, else: elseBody };
+}
+function parseSqliteRaiseStatement(toks) {
+    if (toks.length < 2 || toks[0].u !== 'SELECT')
+        return null;
+    if (toks[1].u === 'CASE')
+        return parseSqliteRaiseCase(toks);
+    var matched = sqliteRaiseAt(toks, 1);
+    if (!matched)
+        return null;
+    if (matched.end === toks.length - 1)
+        return matched.node;
+    if (toks[matched.end + 1].u === 'WHERE' && matched.end + 2 < toks.length &&
+        !sqliteRangeHasRaise(toks, matched.end + 2, toks.length)) {
+        return { type: 'if', cond: toks.slice(matched.end + 2), then: matched.node, else: null };
+    }
+    return null;
 }
 function newStatementHere(tok, prev, startWord) {
     if (!tok.nl || !prev)
@@ -501,9 +604,9 @@ function parseStatement(p) {
         return null;
     }
     if (p.d === 'sqlite') {
-        var sqliteAction = directSqliteRaiseAction(toks);
-        if (sqliteAction)
-            return { type: 'sqlite_raise', action: sqliteAction, toks: toks };
+        var sqliteRaise = parseSqliteRaiseStatement(toks);
+        if (sqliteRaise)
+            return sqliteRaise;
     }
     return { type: 'stmt', toks: toks };
 }
