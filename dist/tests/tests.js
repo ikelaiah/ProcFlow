@@ -131,6 +131,31 @@
     catch (err) {
         record('Explicit query mode does not silently fall back to control flow', false, String(err && err.stack || err));
     }
+    try {
+        var sqliteRaiseTrigger = [
+            'CREATE TRIGGER reject_negative BEFORE UPDATE ON item',
+            'BEGIN',
+            "  SELECT RAISE(ABORT, 'quantity must be positive') WHERE NEW.quantity < 0;",
+            '  UPDATE item SET checked = 1 WHERE id = NEW.id;',
+            'END;'
+        ].join('\n');
+        var sqliteAuto = analyse(sqliteRaiseTrigger, { dialect: 'auto', mode: 'flow', group: false, sources: true, fanIn: true });
+        var raiseNode = matchingNode(sqliteAuto.graph, 'RAISE ABORT');
+        var updateNode = matchingNode(sqliteAuto.graph, 'UPDATE item');
+        var conditionNode = matchingNode(sqliteAuto.graph, 'NEW.quantity < 0');
+        var correctRaiseFlow = !!raiseNode && !!updateNode && !!conditionNode &&
+            sqliteAuto.graph.edges.some(function (edge) {
+                return edge.from === conditionNode.id && edge.to === raiseNode.id && edge.label === 'yes';
+            }) && sqliteAuto.graph.edges.some(function (edge) {
+            return edge.from === conditionNode.id && edge.to === updateNode.id && edge.label === 'no';
+        }) && !sqliteAuto.graph.edges.some(function (edge) {
+            return edge.from === raiseNode.id && edge.to === updateNode.id;
+        });
+        record('SQLite RAISE trigger auto-detection preserves terminal flow', sqliteAuto.dialect === 'sqlite' && sqliteAuto.detected.confident && correctRaiseFlow, JSON.stringify({ detected: sqliteAuto.detected, graph: sqliteAuto.graph }));
+    }
+    catch (err) {
+        record('SQLite RAISE trigger auto-detection preserves terminal flow', false, String(err && err.stack || err));
+    }
     [
         { name: 'unclosed parenthesis diagnostic', sql: 'SELECT (1;', code: 'unclosed_parenthesis' },
         { name: 'unterminated string diagnostic', sql: "SELECT 'value;", code: 'unterminated_string' },

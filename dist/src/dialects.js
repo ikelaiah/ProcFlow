@@ -66,6 +66,8 @@ function detectDialect(sql) {
         sc.tsql += 3;
     if (/\bAUTOINCREMENT\b|\bPRAGMA\b|\bsqlite_|\bINSERT\s+OR\s+(REPLACE|IGNORE)\b/i.test(s))
         sc.sqlite += 5;
+    if (/\bRAISE\s*\(\s*(IGNORE|FAIL|ABORT|ROLLBACK)\b/i.test(s))
+        sc.sqlite += 7;
     if (/\bCREATE\s+TRIGGER\b/i.test(s) && /\bFOR\s+EACH\s+ROW\b/i.test(s) &&
         !/\bDECLARE\b|\bLANGUAGE\b/i.test(s))
         sc.sqlite += 2;
