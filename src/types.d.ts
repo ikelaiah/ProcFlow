@@ -195,6 +195,11 @@ interface Db2HandlerFlow {
   resumeSources: string[];
 }
 
+interface PgErrorCondition {
+  name: string;
+  code: string;
+}
+
 interface FlowContext {
   parent: FlowContext | null;
   loop?: LoopFlowContext | null;

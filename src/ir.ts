@@ -21,6 +21,56 @@ function spanOfTokens(toks?: Token[] | null): SourceSpan | null {
   if(!toks||!toks.length) return null;
   return {start:toks[0].pos, end:toks[toks.length-1].end};
 }
+var PG_ERROR_CODES: Record<string, string>={
+  RAISE_EXCEPTION:'P0001', NO_DATA_FOUND:'P0002', TOO_MANY_ROWS:'P0003',
+  ASSERT_FAILURE:'P0004', QUERY_CANCELED:'57014',
+  DIVISION_BY_ZERO:'22012', NUMERIC_VALUE_OUT_OF_RANGE:'22003',
+  INVALID_TEXT_REPRESENTATION:'22P02',
+  INTEGRITY_CONSTRAINT_VIOLATION:'23000', RESTRICT_VIOLATION:'23001',
+  NOT_NULL_VIOLATION:'23502', FOREIGN_KEY_VIOLATION:'23503',
+  UNIQUE_VIOLATION:'23505', CHECK_VIOLATION:'23514',
+  EXCLUSION_VIOLATION:'23P01'
+};
+function pgErrorFromRaise(toks: TokenList): PgErrorCondition | null {
+  if(!toks.length||toks[0].u!=='RAISE'||toks.length===1) return null;
+  var first=toks[1];
+  if(first.u==='SQLSTATE'&&toks[2])
+    return {name:'',code:toks[2].v.replace(/^'/,'').replace(/'$/,'').toUpperCase()};
+  if(first.u==='EXCEPTION'||first.u==='USING'||first.type!=='word')
+    return {name:'RAISE_EXCEPTION',code:'P0001'};
+  return {name:first.u,code:PG_ERROR_CODES[first.u]||''};
+}
+function pgHandlerAlternatives(cond: TokenList | null): Token[][] {
+  var out: Token[][]=[[]], depth=0;
+  (cond||[]).forEach(function(tok){
+    if(tok.v==='(') depth++;
+    else if(tok.v===')') depth--;
+    if(tok.u==='OR'&&depth===0) out.push([]);
+    else out[out.length-1].push(tok);
+  });
+  return out;
+}
+function pgHandlerMatches(cond: TokenList | null, error: PgErrorCondition): boolean {
+  return pgHandlerAlternatives(cond).some(function(part){
+    if(!part.length) return false;
+    var name=part[0].u;
+    if(name==='OTHERS')
+      return ['ASSERT_FAILURE','QUERY_CANCELED'].indexOf(error.name)<0&&
+             ['P0004','57014'].indexOf(error.code)<0;
+    var code=name==='SQLSTATE'&&part[1]
+      ? part[1].v.replace(/^'/,'').replace(/'$/,'').toUpperCase()
+      : (PG_ERROR_CODES[name]||'');
+    if(error.name&&name===error.name) return true;
+    if(!code||!error.code) return false;
+    return code===error.code||
+      (code.length===5&&code.slice(2)==='000'&&code.slice(0,2)===error.code.slice(0,2));
+  });
+}
+function pgHandlerHasOthers(cond: TokenList | null): boolean {
+  return pgHandlerAlternatives(cond).some(function(part){
+    return !!part.length&&part[0].u==='OTHERS';
+  });
+}
 function clip(s: string, max: number): string { return s.length>max ? s.slice(0,max-1).trim()+'…' : s; }
 function qname(toks: Token[], i: number): string {
   if(!toks[i]) return '';
@@ -102,6 +152,7 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
   var HANDLER_SOURCES: string[]=['stmt','io','call','tran','cursor','opaque','cond','loop'];
   var handlerWires: StringSet={}, handlerProcessed: StringSet={};
   var db2Handlers: Db2HandlerFlow[]=[];
+  var pgErrors: Record<string, PgErrorCondition | null>={};
   var maxLen = detail==='full' ? 110 : 52;
   var nodes: GraphNode[]=[], edges: GraphEdge[]=[], seq=0;
   var stats: GraphStats={stmt:0, branch:0, loop:0, cat:0, exit:0, depth:0, opaque:0};
@@ -370,30 +421,84 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
              raisers.indexOf(n.id)<0) raisers.push(n.id);
         });
 
-        /* more than one handler: fan into a junction, then branch */
-        var junction=null;
-        if(fanIn&&raisers.length&&st.handlers.length>1)
-          junction=add('marker','on error','catch');
-
+        var handlerMarkers: string[]=[], handlerLabels: string[]=[];
         for(var hh=0;hh<st.handlers.length;hh++){
           var h=st.handlers[hh];
           var lab2=h.cond&&h.cond.length ? clip(joinToks(h.cond,40),40) : 'CATCH';
           var cm=add('marker', lab2==='CATCH'?'BEGIN CATCH':('WHEN '+lab2), 'catch');
           if(lab2!=='CATCH'&&dialect!=='tsql') nodes[nodes.length-1].text='EXCEPTION WHEN '+lab2;
-          if(junction) link(junction, cm, lab2==='CATCH'?'':lab2, 'dotted');
-          else if(fanIn&&raisers.length)
-            raisers.forEach(function(id){ link(id, cm, '', 'dotted'); });
-          else {
-            link(tstart, cm, 'error', 'dotted');
-            explicitRaisers.forEach(function(id){link(id,cm,'','dotted');});
-          }
-          var cb2=emitList(h.body, ctx, depth+1);
-          if(cb2.entry){ link(cm, cb2.entry); exits=exits.concat(cb2.exits); }
-          else exits.push({id:cm});
+          handlerMarkers.push(cm);
+          handlerLabels.push(lab2);
         }
-        if(junction) raisers.forEach(function(id){ link(id, junction, '', 'dotted'); });
-        if(fanIn) raisers.forEach(function(id){ guarded[id]=1; });
-        else explicitRaisers.forEach(function(id){guarded[id]=1;});
+
+        var handlerReachable: boolean[]=handlerMarkers.map(function(){return false;});
+        var junction: string | null=null, handledRaisers: StringSet={};
+        if(dialect==='plpgsql'){
+          var unknownRaisers=raisers.filter(function(id){return !pgErrors[id];});
+          explicitRaisers.forEach(function(id){
+            var error=pgErrors[id];
+            if(!error) return;
+            for(var hi=0;hi<st.handlers.length;hi++){
+              if(pgHandlerMatches(st.handlers[hi].cond,error)){
+                link(id,handlerMarkers[hi],'','dotted');
+                handlerReachable[hi]=true;
+                handledRaisers[id]=1;
+                break;
+              }
+            }
+          });
+          if(unknownRaisers.length&&handlerMarkers.length>1){
+            junction=add('marker','on error','catch');
+            unknownRaisers.forEach(function(id){link(id,junction,'','dotted');});
+            handlerMarkers.forEach(function(id,index){
+              link(junction,id,handlerLabels[index],'dotted');
+              handlerReachable[index]=true;
+            });
+          } else if(unknownRaisers.length&&handlerMarkers.length){
+            unknownRaisers.forEach(function(id){link(id,handlerMarkers[0],'','dotted');});
+            handlerReachable[0]=true;
+          }
+          if(st.handlers.some(function(handler){return pgHandlerHasOthers(handler.cond);}))
+            unknownRaisers.forEach(function(id){handledRaisers[id]=1;});
+          if(!fanIn||!raisers.length)
+            handlerMarkers.forEach(function(id,index){
+              link(tstart,id,'error','dotted');
+              handlerReachable[index]=true;
+            });
+        } else {
+          if(fanIn&&raisers.length&&handlerMarkers.length>1)
+            junction=add('marker','on error','catch');
+          handlerMarkers.forEach(function(cm,index){
+            if(junction){
+              link(junction,cm,handlerLabels[index]==='CATCH'?'':handlerLabels[index],'dotted');
+              handlerReachable[index]=true;
+            } else if(fanIn&&raisers.length){
+              raisers.forEach(function(id){link(id,cm,'','dotted');});
+              handlerReachable[index]=true;
+            } else {
+              link(tstart,cm,'error','dotted');
+              explicitRaisers.forEach(function(id){link(id,cm,'','dotted');});
+              handlerReachable[index]=true;
+            }
+          });
+          if(junction) raisers.forEach(function(id){link(id,junction,'','dotted');});
+          (fanIn?raisers:explicitRaisers).forEach(function(id){handledRaisers[id]=1;});
+        }
+
+        for(var hbIndex=0;hbIndex<st.handlers.length;hbIndex++){
+          var handlerBodyMark=nodes.length;
+          var cb2=emitList(st.handlers[hbIndex].body,ctx,depth+1);
+          if(handlerReachable[hbIndex]&&cb2.entry){
+            link(handlerMarkers[hbIndex],cb2.entry);
+            exits=exits.concat(cb2.exits);
+          } else if(handlerReachable[hbIndex])
+            exits.push({id:handlerMarkers[hbIndex]});
+          else {
+            unreachable[handlerMarkers[hbIndex]]=1;
+            nodes.slice(handlerBodyMark).forEach(function(node){unreachable[node.id]=1;});
+          }
+        }
+        Object.keys(handledRaisers).forEach(function(id){guarded[id]=1;});
         return {entry:tstart, exits:exits};
       }
 
@@ -434,6 +539,7 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
       case 'throw': {
         var th=add('round', clip(joinToks(st.toks,46),46), 'err',
                    spanOfTokens(st.toks));
+        if(dialect==='plpgsql') pgErrors[th]=pgErrorFromRaise(st.toks);
         return {entry:th, exits:[]};
       }
 
