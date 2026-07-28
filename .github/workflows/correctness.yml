@@ -1,0 +1,85 @@
+name: Correctness
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-correctness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify vendored Mermaid
+        shell: bash
+        run: |
+          echo "61b335a46df05a7ce1c98378f60e5f3e77a7fb608a1056997e8a649304a936d6  vendor/mermaid/mermaid.min.js" | sha256sum --check
+
+      - name: Check runtime remains local-only
+        shell: bash
+        run: |
+          if grep -REn "https?://" index.html styles.css src tests; then
+            echo "Runtime files contain an external URL."
+            exit 1
+          fi
+
+      - name: Start static test server
+        shell: bash
+        run: |
+          python3 -m http.server 8000 --bind 127.0.0.1 > /tmp/procflow-http.log 2>&1 &
+          echo $! > /tmp/procflow-http.pid
+          for attempt in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:8000/tests/index.html > /dev/null; then
+              exit 0
+            fi
+            sleep 0.25
+          done
+          cat /tmp/procflow-http.log
+          exit 1
+
+      - name: Run golden, fuzz, and UI suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$CHROME" ]; then
+            echo "A Chromium-based browser is required on the runner."
+            exit 1
+          fi
+
+          run_suite() {
+            local name="$1"
+            local url="$2"
+            local output="/tmp/procflow-${name}.html"
+            "$CHROME" \
+              --headless=new \
+              --no-sandbox \
+              --disable-gpu \
+              --virtual-time-budget=20000 \
+              --dump-dom "$url" > "$output"
+            if ! grep --quiet '<body class="pass">' "$output"; then
+              echo "${name} suite failed:"
+              cat "$output"
+              exit 1
+            fi
+            grep -o '<p id="summary">[^<]*' "$output" | sed 's/<p id="summary">/'"${name}"': /'
+          }
+
+          run_suite golden http://127.0.0.1:8000/tests/index.html
+          run_suite fuzz http://127.0.0.1:8000/tests/fuzz.html
+          run_suite ui http://127.0.0.1:8000/tests/ui.html
+
+      - name: Stop static test server
+        if: always()
+        shell: bash
+        run: |
+          if [ -f /tmp/procflow-http.pid ]; then
+            kill "$(cat /tmp/procflow-http.pid)" 2>/dev/null || true
+          fi
