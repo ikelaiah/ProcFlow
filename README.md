@@ -245,7 +245,8 @@ tests/
 ├── dialects/
 │   ├── db2.ts     # DB2 handlers, cursors, labelled loops, and graph edges
 │   ├── tsql.ts    # T-SQL exception propagation and graph-edge fixtures
-│   └── plpgsql.ts # PL/pgSQL condition matching and propagation fixtures
+│   ├── plpgsql.ts # PL/pgSQL condition matching and propagation fixtures
+│   └── sqlite.ts  # SQLite trigger RAISE action and termination fixtures
 ├── tsql-fixtures.ts
 ├── tests.ts
 ├── fuzz.html      # deterministic mutation and invariant suite
@@ -293,9 +294,9 @@ Current coverage includes 54 focused T-SQL cases, all four dialects,
 DB2 handler scope, cursor/NOT FOUND flow, labelled loop control, graph-edge
 assertions, T-SQL THROW/CATCH propagation and RAISERROR severity,
 PL/pgSQL EXCEPTION matching and rethrow propagation, malformed-input diagnostics,
-CTE/report queries, dynamic SQL, temporary-table writes, multi-object estates,
-special-character escaping, draw.io XML validation, and 400 deterministic
-mutation cases.
+SQLite trigger RAISE rollback/termination behavior, CTE/report queries, dynamic
+SQL, temporary-table writes, multi-object estates, special-character escaping,
+draw.io XML validation, and 400 deterministic mutation cases.
 
 ## 🛣️ Roadmap
 

@@ -114,6 +114,28 @@ function staticRaiserrorSeverity(toks) {
     }
     return null;
 }
+function directSqliteRaiseAction(toks) {
+    /* RAISE() is an expression. Model only the canonical unconditional trigger
+       step, SELECT RAISE(...), rather than guessing about nested CASE branches. */
+    if (toks.length < 5 || toks[0].u !== 'SELECT' || toks[1].u !== 'RAISE' ||
+        toks[2].v !== '(')
+        return null;
+    var action = toks[3].u;
+    var valid = (['FAIL', 'ABORT', 'ROLLBACK'].indexOf(action) >= 0 && toks[4].v === ',') ||
+        (action === 'IGNORE' && toks[4].v === ')');
+    if (!valid)
+        return null;
+    var depth = 0, close = -1;
+    for (var i = 2; i < toks.length; i++) {
+        if (toks[i].v === '(')
+            depth++;
+        else if (toks[i].v === ')' && --depth === 0) {
+            close = i;
+            break;
+        }
+    }
+    return close === toks.length - 1 ? action : null;
+}
 function newStatementHere(tok, prev, startWord) {
     if (!tok.nl || !prev)
         return false;
@@ -477,6 +499,11 @@ function parseStatement(p) {
     if (!toks.length) {
         p.i++;
         return null;
+    }
+    if (p.d === 'sqlite') {
+        var sqliteAction = directSqliteRaiseAction(toks);
+        if (sqliteAction)
+            return { type: 'sqlite_raise', action: sqliteAction, toks: toks };
     }
     return { type: 'stmt', toks: toks };
 }

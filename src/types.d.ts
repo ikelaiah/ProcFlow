@@ -128,6 +128,14 @@ interface ThrowNode extends AstBase {
   toks: TokenList;
 }
 
+type SqliteRaiseAction = 'IGNORE' | 'FAIL' | 'ABORT' | 'ROLLBACK';
+
+interface SqliteRaiseNode extends AstBase {
+  type: 'sqlite_raise';
+  action: SqliteRaiseAction;
+  toks: TokenList;
+}
+
 interface LoopControlNode extends AstBase {
   type: 'break' | 'continue';
   target: string | null;
@@ -167,6 +175,7 @@ type AstNode =
   | Db2HandlerNode
   | ReturnNode
   | ThrowNode
+  | SqliteRaiseNode
   | LoopControlNode
   | LabelNode
   | GotoNode

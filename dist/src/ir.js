@@ -622,6 +622,16 @@ function buildGraph(ast, header, opts) {
                     pgErrors[th] = pgErrorFromRaise(st.toks);
                 return { entry: th, exits: [] };
             }
+            case 'sqlite_raise': {
+                var effects = {
+                    IGNORE: 'abandon trigger/query; no rollback',
+                    FAIL: 'stop statement; keep prior changes',
+                    ABORT: 'roll back statement changes',
+                    ROLLBACK: 'roll back transaction'
+                };
+                var sr = add('round', 'RAISE ' + st.action + ' — ' + effects[st.action], st.action === 'IGNORE' ? 'halt' : 'err', spanOfTokens(st.toks));
+                return { entry: sr, exits: [] };
+            }
             case 'break':
             case 'continue': {
                 var isBreak = st.type === 'break';
@@ -698,7 +708,9 @@ function buildGraph(ast, header, opts) {
         });
         stats.steps = step;
     }
-    stats.exit = nodes.filter(function (n) { return n.cls === 'ret' || n.cls === 'err'; }).length;
+    stats.exit = nodes.filter(function (n) {
+        return n.cls === 'ret' || n.cls === 'err' || n.cls === 'halt';
+    }).length;
     stats.cc = 1 + stats.branch + stats.loop + stats.cat;
     return { nodes: nodes, edges: edges, stats: stats };
 }
