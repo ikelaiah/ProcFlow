@@ -1,0 +1,121 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>proc&gt;flow — SQL logic visualiser</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="top">
+  <div>
+    <p class="tagline">Four dialects of SQL, one flowchart</p>
+    <h1 class="mark">proc<span class="caret">&gt;</span>flow</h1>
+  </div>
+  <div class="top-actions">
+    <input id="file-input" type="file" accept=".sql,.ddl,.txt,text/plain" multiple hidden>
+    <button class="btn" id="btn-import">Import SQL files</button>
+    <button class="btn" id="btn-sample">Load sample</button>
+    <button class="btn" id="btn-clear">Clear</button>
+    <button class="btn primary" id="btn-draw">Draw flowchart</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="pane">
+    <div class="pane-head"><span class="pane-title">SQL source</span>
+      <label class="opt object-picker" id="lbl-object" hidden>Object
+        <select id="object-select"></select>
+      </label>
+      <span class="pane-title" id="proc-name" style="margin-left:auto;color:var(--marigold)"></span>
+      <label class="opt">Dialect
+        <select id="opt-dialect">
+          <option value="auto">Detect</option>
+          <option value="tsql">T-SQL</option>
+          <option value="db2">DB2 SQL PL</option>
+          <option value="plpgsql">PL/pgSQL</option>
+          <option value="sqlite">SQLite</option>
+        </select>
+      </label></div>
+    <div class="editor">
+      <div class="gutter" id="gutter">1</div>
+      <textarea id="sql" spellcheck="false" placeholder="Paste a procedure, function, trigger or script — T-SQL, DB2 SQL PL, PL/pgSQL or SQLite. Or press Load sample."></textarea>
+    </div>
+    <div class="readout" aria-live="polite">
+      <div class="stats" id="stats"></div>
+      <div class="cc-head"><span id="cc-label">Cyclomatic complexity</span><b id="cc-val">1</b></div>
+      <div class="meter" id="meter" data-band="1"></div>
+      <p class="cc-note" id="cc-note">Paste some SQL to see how many paths a reader would have to walk.</p>
+    </div>
+  </section>
+
+  <section class="pane">
+    <div class="pane-head output-head">
+      <div class="tabs" role="tablist">
+        <button class="tab" id="tab-chart" role="tab" aria-selected="true" aria-controls="view-chart">Flowchart</button>
+        <button class="tab" id="tab-code" role="tab" aria-selected="false" aria-controls="view-code">Mermaid</button>
+      </div>
+      <div class="opts">
+        <label class="opt">Diagram
+          <select id="opt-scope">
+            <option value="internal">Internal logic</option>
+            <option value="dependencies">Object dependencies</option>
+          </select>
+        </label>
+        <label class="opt">Flow
+          <select id="opt-dir">
+            <option value="TD">Top-down</option>
+            <option value="LR">Left-right</option>
+          </select>
+        </label>
+        <label class="opt">Labels
+          <select id="opt-detail">
+            <option value="summary">Summarised</option>
+            <option value="full">Full statement</option>
+          </select>
+        </label>
+        <label class="opt">Show
+          <select id="opt-view">
+            <option value="auto">Auto</option>
+            <option value="flow">Control flow</option>
+            <option value="query">Query structure</option>
+          </select>
+        </label>
+        <label class="opt" id="lbl-group"><input type="checkbox" id="opt-group" checked> Group straight runs</label>
+        <label class="opt" id="lbl-number"><input type="checkbox" id="opt-number"> Number the steps</label>
+        <label class="opt" id="lbl-fanin"><input type="checkbox" id="opt-fanin"> Error path per step</label>
+        <label class="opt" id="lbl-sources" style="display:none"><input type="checkbox" id="opt-sources" checked> Source tables</label>
+      </div>
+      <div class="export-actions" aria-label="Copy and export diagram">
+        <button class="btn" id="btn-copy">Copy Mermaid</button>
+        <button class="btn" id="btn-narrate">Copy narration prompt</button>
+        <button class="btn" id="btn-svg">Save SVG</button>
+        <button class="btn" id="btn-drawio">Save draw.io</button>
+      </div>
+    </div>
+    <div class="msg" id="msg"></div>
+    <div class="view active" id="view-chart" role="tabpanel" aria-labelledby="tab-chart">
+      <div id="canvas">
+        <div id="stage"><div class="empty"><p>The chart appears here. Paste SQL on the left, then press Draw flowchart.</p></div></div>
+        <div class="zoom">
+          <button class="btn" id="z-out" title="Zoom out">−</button>
+          <button class="btn" id="z-in" title="Zoom in">+</button>
+          <button class="btn" id="z-fit" title="Fit to window">Fit</button>
+        </div>
+      </div>
+    </div>
+    <div class="view" id="view-code" role="tabpanel" aria-labelledby="tab-code">
+      <pre id="mermaid-out">flowchart TD</pre>
+    </div>
+  </section>
+</main>
+
+<footer>Parsing is heuristic, not a compiler. Dynamic SQL is opaque to any static eye, and semicolon-free batches may bend the picture. Trust it as a map, not as the territory.</footer>
+
+<script src="vendor/mermaid/mermaid.min.js"></script>
+<script src="src/core.js"></script>
+<script src="src/app.js"></script>
+</body>
+</html>
+

@@ -1,8 +1,8 @@
 # proc>flow
 
 `proc>flow` is a browser-based SQL visualisation tool for DBAs, developers, and
-analysts. Paste SQL source into the editor to generate a control-flow diagram or
-a query-lineage diagram.
+analysts. Paste or import SQL source to explore an estate-level object dependency
+diagram and the internal logic of each object.
 
 The application runs entirely in the browser and does not send SQL source to a
 backend service.
@@ -22,6 +22,15 @@ backend service.
   - explicit joins
   - unions and subqueries
   - filters and grouping
+- Builds an object dependency view:
+  - procedures and functions to called routines
+  - views and result queries to source objects
+  - object-level table reads and writes
+- Splits multi-object scripts and provides an object selector.
+- Imports multiple `.sql`, `.ddl`, and text files.
+- Links dependency objects to their internal diagrams.
+- Selects the corresponding SQL source when an internal diagram node is clicked.
+- Reports uncertain dialect detection and opaque dynamic SQL.
 - Automatically detects the SQL dialect, with a manual override.
 - Supports top-down and left-to-right diagrams.
 - Provides summarised or full SQL labels.
@@ -52,21 +61,24 @@ production analysis.
 No build step or application server is required.
 
 1. Download or clone the project.
-2. Open `procflow.html` in a modern browser.
+2. Open `index.html` in a modern browser.
 3. Paste SQL into the editor, or select a dialect and press **Load sample**.
 4. Press **Draw flowchart**.
 
-The application currently loads Mermaid from a public CDN and IBM Plex fonts
-from Google Fonts. An internet connection is therefore required for complete
-diagram rendering and typography. If Mermaid cannot be loaded, the generated
-Mermaid source remains available in the **Mermaid** tab.
-
-For restricted environments, the third-party assets can be stored locally and
-the references in `procflow.html` changed to local paths.
+The application is self-contained and works offline. Mermaid 10.9.1 is pinned
+under `vendor/mermaid`; the interface uses system font fallbacks and makes no
+runtime CDN requests.
 
 ## Choosing a diagram
 
-The **Show** option controls the diagram type:
+The **Diagram** option selects the product level:
+
+- **Internal logic** visualises the selected object's control flow or query
+  structure. Clicking a source-aware node selects its SQL in the editor.
+- **Object dependencies** visualises all imported or pasted objects and their
+  reads, writes, and calls. Clicking a known object opens its internal logic.
+
+Within **Internal logic**, the **Show** option controls the representation:
 
 - **Auto** selects query structure for a single flat query when useful;
   otherwise it selects control flow.
@@ -115,29 +127,26 @@ external AI service.
 - Clipboard access occurs only when a copy action is selected.
 - SQL included in a narration prompt is copied to the clipboard; it is not sent
   automatically.
-- The browser makes external requests for Mermaid and fonts while the current
-  CDN-based dependencies are in use.
-
-For sensitive or air-gapped environments, vendor the runtime dependencies
-locally and apply an appropriate Content Security Policy.
+- Mermaid is loaded from the local `vendor` directory.
+- No runtime dependency requires an internet connection.
 
 ## Known limitations
 
 - Parsing is heuristic and does not provide the same guarantees as a database
   engine's parser.
-- Dynamic SQL is treated as opaque text.
-- Multiple database objects in one pasted batch are not separated. Analyse one
-  object at a time.
+- Dynamic SQL is shown as an opaque diagnostic node; its internal dependencies
+  and branches cannot be resolved statically.
 - Semicolon-free or unusually formatted batches may produce inaccurate
   statement boundaries.
 - Query lineage is intentionally lightweight. It does not yet provide
   column-level lineage.
 - Comma-separated table sources and some vendor-specific table expressions may
   not be detected.
-- Temporary-table pipelines, synonyms, linked-server resolution, and called
-  object definitions are not followed across files.
+- Temporary-table pipelines, synonyms, linked-server resolution, and
+  schema/database synonym resolution remain lightweight.
 - SQL report definition files such as SSRS/RDL are not currently imported.
-- Parser confidence and unsupported-region diagnostics are not yet displayed.
+- Imported files are analysed in the browser and are not persisted between
+  sessions.
 - draw.io layout is deterministic and editable, but large diagrams may benefit
   from manual rearrangement after export.
 
@@ -146,42 +155,49 @@ the source, checking execution plans, or testing database behaviour.
 
 ## Current architecture
 
-The project is currently a single self-contained application file:
+The application remains build-free, but responsibilities are separated:
 
 ```text
-procflow.html
+index.html
+styles.css
+src/
+├── core.js        # parsing, IR, dependency model, and exporters
+└── app.js         # browser UI and workspace interaction
+tests/
+├── index.html     # parser/model golden suite
+├── fixtures.js
+├── tests.js
+├── ui.html        # browser interaction suite
+└── ui-tests.js
+vendor/
+└── mermaid/
+    ├── mermaid.min.js
+    └── LICENSE
 ```
 
-It contains:
-
-1. The HTML interface and CSS.
-2. SQL dialect detection and tokenisation.
-3. Procedural parsing and query-lineage extraction.
-4. An intermediate graph representation.
-5. Mermaid, SVG, and draw.io output.
-6. Browser interaction and sample SQL.
-
-This keeps deployment simple. As the parser grows, separating the parser,
-graph model, exporters, fixtures, and interface into modules will make testing
-and maintenance easier.
+`src/core.js` exposes a shared object model containing statements, source spans,
+branches, reads, writes, calls, result sets, diagnostics, and generated graphs.
 
 ## Suggested roadmap
 
-1. Add automated parser fixtures and golden diagram tests.
-2. Add source spans, warnings, confidence, and explicit unsupported nodes.
-3. Split multi-object scripts and provide an object selector.
-4. Add cross-object read, write, and call dependencies.
-5. Support temporary-table and multi-statement data lineage.
-6. Add source-to-node highlighting.
-7. Import multiple SQL files and report definitions.
-8. Store runtime dependencies locally for offline deployment.
-9. Add column-level lineage where the SQL can be resolved safely.
+1. Expand the anonymised golden fixture corpus.
+2. Improve comma-source, table-function, `APPLY`, and DML lineage.
+3. Model temporary-table and multi-statement transformations explicitly.
+4. Import report definitions such as SSRS/RDL and link reports to datasets.
+5. Add database/catalog metadata import for more accurate object resolution.
+6. Add column-level lineage where the SQL can be resolved safely.
+7. Persist named workspaces locally and support dependency filtering.
 
 ## Development
 
-There is currently no build toolchain. Edit `procflow.html`, open it in a
-browser, and validate changes against representative SQL from every supported
-dialect.
+There is no build toolchain. Edit the HTML, CSS, or JavaScript files and open
+`index.html` directly in a browser.
+
+Run the browser suites by opening:
+
+- `tests/index.html` for parser, IR, dependency, and exporter fixtures
+- `tests/ui.html` for multi-object selection, linked diagrams, source
+  highlighting, and offline runtime checks
 
 Parser changes should be tested with:
 
@@ -195,6 +211,11 @@ Parser changes should be tested with:
 - malformed and unsupported SQL
 - special characters in Mermaid and draw.io labels
 
+## Third-party software
+
+Mermaid 10.9.1 is distributed under the MIT License. Its license is retained at
+`vendor/mermaid/LICENSE`.
+
 ## Contributing
 
 Bug reports are most useful when they include:
@@ -207,4 +228,3 @@ Bug reports are most useful when they include:
 
 Do not submit production credentials, confidential data, or SQL that cannot be
 shared safely.
-
