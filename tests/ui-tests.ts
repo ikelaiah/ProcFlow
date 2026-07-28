@@ -10,6 +10,21 @@
   frame.addEventListener('load',function(){
     var w=frame.contentWindow, d=frame.contentDocument, results: any[]=[];
     var get=function(id: string): any { return d.getElementById(id); };
+    results.push({name:'compact local-processing header',
+      pass:!!d.querySelector('.top .privacy-disclosure')&&
+        !d.querySelector('.privacy-note')&&
+        !!get('btn-draw').closest('.editor-head')&&
+        !get('btn-draw').closest('.top')});
+    results.push({name:'settings and export menus group secondary controls',
+      pass:!!get('view-settings-menu').querySelector('#opt-group')&&
+        !!get('view-settings-menu').querySelector('#opt-fanin')&&
+        !!get('export-menu').querySelector('#btn-copy')&&
+        !!get('export-menu').querySelector('#btn-drawio')});
+    get('btn-analysis-details').click();
+    results.push({name:'analysis details expand accessibly',
+      pass:!get('analysis-details').hidden&&
+        get('btn-analysis-details').getAttribute('aria-expanded')==='true'});
+    get('btn-analysis-details').click();
     var source=[
       'CREATE VIEW dbo.export_students AS SELECT id FROM dbo.student;',
       'GO',
@@ -40,6 +55,12 @@
     results.push({name:'linked object selection',
       pass:/refresh_students/i.test(get('proc-name').textContent)&&
         /refresh_students/i.test(get('sql').value)});
+    get('proc-name').textContent='Shortcut pending';
+    get('sql').dispatchEvent(new KeyboardEvent('keydown',
+      {key:'Enter',ctrlKey:true,bubbles:true}));
+    results.push({name:'Ctrl+Enter refresh shortcut',
+      pass:get('proc-name').textContent!=='Shortcut pending'&&
+        /refresh_students/i.test(get('proc-name').textContent)});
     results.push({name:'confidence and coverage display',
       pass:get('coverage-val').textContent==='100%'&&
         /%$/.test(get('confidence-val').textContent)&&

@@ -9,31 +9,31 @@
 <body>
 
 <header class="top">
-  <div>
-    <p class="tagline">Four dialects of SQL, one flowchart</p>
+  <div class="brand-lockup">
     <h1 class="mark">proc<span class="caret">&gt;</span>flow</h1>
+    <p class="tagline">Four dialects of SQL, one flowchart</p>
   </div>
+  <details class="privacy-disclosure">
+    <summary>
+      <span class="privacy-icon" aria-hidden="true">🔒</span>
+      Local only
+    </summary>
+    <div class="privacy-popover">
+      <strong>Your SQL stays in this browser.</strong>
+      Procflow does not upload SQL, connect to a database, or send it to an API.
+      Imported files remain in this tab and are discarded when it closes.
+    </div>
+  </details>
   <div class="top-actions">
     <input id="file-input" type="file" accept=".sql,.ddl,.txt,text/plain" multiple hidden>
     <button class="btn" id="btn-import">Import SQL files</button>
     <button class="btn" id="btn-sample">Load sample</button>
-    <button class="btn" id="btn-clear">Clear</button>
-    <button class="btn primary" id="btn-draw">Draw flowchart</button>
   </div>
 </header>
 
-<aside class="privacy-note" aria-label="Privacy notice">
-  <span class="privacy-icon" aria-hidden="true">🔒</span>
-  <div>
-    <strong>Local processing — your SQL stays in this browser.</strong>
-    Procflow does not upload your SQL, connect to a database, or send it to an API.
-    Imported files are held only in this tab and are discarded when the tab closes.
-  </div>
-</aside>
-
 <main class="wrap">
   <section class="pane">
-    <div class="pane-head"><span class="pane-title">SQL source</span>
+    <div class="pane-head editor-head"><span class="pane-title">SQL source</span>
       <label class="opt object-picker" id="lbl-object" hidden>Object
         <select id="object-select"></select>
       </label>
@@ -46,21 +46,38 @@
           <option value="plpgsql">PL/pgSQL</option>
           <option value="sqlite">SQLite</option>
         </select>
-      </label></div>
+      </label>
+      <div class="editor-actions">
+        <button class="btn quiet" id="btn-clear">Clear</button>
+        <button class="btn primary refresh-action" id="btn-draw"
+                aria-keyshortcuts="Control+Enter Meta+Enter"
+                title="Refresh analysis (Ctrl or Cmd + Enter)">
+          Refresh <kbd>Ctrl ↵</kbd>
+        </button>
+      </div>
+    </div>
     <div class="editor">
       <div class="gutter" id="gutter">1</div>
       <textarea id="sql" spellcheck="false" placeholder="Paste a procedure, function, trigger or script — T-SQL, DB2 SQL PL, PL/pgSQL or SQLite. Or press Load sample."></textarea>
     </div>
     <div class="readout" aria-live="polite">
-      <div class="analysis-health" id="analysis-health">
-        <div class="health-item"><span>Confidence</span><b id="confidence-val">—</b></div>
-        <div class="health-item"><span>Input coverage</span><b id="coverage-val">—</b></div>
-        <div class="health-item"><span>Diagnostics</span><b id="diagnostic-val">0</b></div>
+      <div class="status-summary">
+        <div class="analysis-health" id="analysis-health">
+          <div class="health-item"><span>Confidence</span><b id="confidence-val">—</b></div>
+          <div class="health-item"><span>Coverage</span><b id="coverage-val">—</b></div>
+          <div class="health-item"><span>Diagnostics</span><b id="diagnostic-val">0</b></div>
+        </div>
+        <div class="health-item complexity-status" id="complexity-status" data-band="1">
+          <span id="cc-label">Cyclomatic complexity</span><b id="cc-val">1</b>
+        </div>
+        <button class="status-details-trigger" id="btn-analysis-details"
+                aria-expanded="false" aria-controls="analysis-details">Details</button>
       </div>
-      <div class="stats" id="stats"></div>
-      <div class="cc-head"><span id="cc-label">Cyclomatic complexity</span><b id="cc-val">1</b></div>
-      <div class="meter" id="meter" data-band="1"></div>
-      <p class="cc-note" id="cc-note">Paste some SQL to see how many paths a reader would have to walk.</p>
+      <div class="analysis-detail-body" id="analysis-details" hidden>
+        <div class="stats" id="stats"></div>
+        <div class="meter" id="meter" data-band="1"></div>
+        <p class="cc-note" id="cc-note">Paste some SQL to see how many paths a reader would have to walk.</p>
+      </div>
     </div>
   </section>
 
@@ -71,47 +88,57 @@
         <button class="tab" id="tab-code" role="tab" aria-selected="false" aria-controls="view-code">Mermaid</button>
       </div>
       <div class="opts">
-        <label class="opt">Diagram
+        <label class="opt">Scope
           <select id="opt-scope">
             <option value="internal">Internal logic</option>
             <option value="dependencies">Object dependencies</option>
           </select>
         </label>
-        <label class="opt">Flow
+        <label class="opt">Direction
           <select id="opt-dir">
             <option value="TD">Top-down</option>
             <option value="LR">Left-right</option>
           </select>
         </label>
-        <label class="opt">Labels
+        <label class="opt">Detail
           <select id="opt-detail">
             <option value="summary">Summarised</option>
             <option value="full">Full statement</option>
           </select>
         </label>
-        <label class="opt">Show
+        <label class="opt">View
           <select id="opt-view">
             <option value="auto">Auto</option>
             <option value="flow">Control flow</option>
             <option value="query">Query structure</option>
           </select>
         </label>
-        <label class="opt" id="lbl-group"><input type="checkbox" id="opt-group" checked> Group straight runs</label>
-        <label class="opt" id="lbl-number"><input type="checkbox" id="opt-number"> Number the steps</label>
-        <label class="opt" id="lbl-fanin"><input type="checkbox" id="opt-fanin"> Error path per step</label>
-        <label class="opt" id="lbl-sources" style="display:none"><input type="checkbox" id="opt-sources" checked> Source tables</label>
       </div>
-      <div class="export-actions" aria-label="Copy and export diagram">
-        <button class="btn" id="btn-copy">Copy Mermaid</button>
-        <button class="btn" id="btn-narrate">Copy narration prompt</button>
-        <button class="btn" id="btn-svg">Save SVG</button>
-        <button class="btn" id="btn-drawio">Save draw.io</button>
+      <div class="command-menus">
+        <details class="command-menu" id="view-settings-menu">
+          <summary class="btn">View settings</summary>
+          <div class="command-menu-panel settings-panel">
+            <label class="opt" id="lbl-group"><input type="checkbox" id="opt-group" checked> Group straight runs</label>
+            <label class="opt" id="lbl-number"><input type="checkbox" id="opt-number"> Number the steps</label>
+            <label class="opt" id="lbl-fanin"><input type="checkbox" id="opt-fanin"> Error path per step</label>
+            <label class="opt" id="lbl-sources" style="display:none"><input type="checkbox" id="opt-sources" checked> Source tables</label>
+          </div>
+        </details>
+        <details class="command-menu" id="export-menu">
+          <summary class="btn">Export</summary>
+          <div class="command-menu-panel export-actions" aria-label="Copy and export diagram">
+            <button class="menu-action" id="btn-copy">Copy Mermaid</button>
+            <button class="menu-action" id="btn-narrate">Copy narration prompt</button>
+            <button class="menu-action" id="btn-svg">Save SVG</button>
+            <button class="menu-action" id="btn-drawio">Save draw.io</button>
+          </div>
+        </details>
       </div>
     </div>
     <div class="msg" id="msg"></div>
     <div class="view active" id="view-chart" role="tabpanel" aria-labelledby="tab-chart">
       <div id="canvas">
-        <div id="stage"><div class="empty"><p>The chart appears here. Paste SQL on the left, then press Draw flowchart.</p></div></div>
+        <div id="stage" class="empty-stage"><div class="empty"><p>Paste SQL on the left. The flowchart updates automatically as you work.</p></div></div>
         <div class="zoom">
           <button class="btn" id="z-out" title="Zoom out">−</button>
           <button class="btn" id="z-in" title="Zoom in">+</button>

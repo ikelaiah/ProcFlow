@@ -179,7 +179,11 @@
         schedule();
     });
     sql.addEventListener('keydown', function (e) {
-        if (e.key === 'Tab') {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            run();
+        }
+        else if (e.key === 'Tab') {
             e.preventDefault();
             var s = sql.selectionStart, en = sql.selectionEnd;
             sql.value = sql.value.slice(0, s) + '    ' + sql.value.slice(en);
@@ -233,6 +237,7 @@
         $('cc-val').textContent = val;
         var meter = $('meter'), html = '';
         meter.setAttribute('data-band', String(band));
+        $('complexity-status').setAttribute('data-band', String(band));
         for (var i = 1; i <= 20; i++)
             html += '<div class="seg' + (i <= filled ? ' on' : '') + '"></div>';
         meter.innerHTML = html;
@@ -314,7 +319,8 @@
         if (!text.trim() && !(workspaceFiles && workspaceFiles.length)) {
             showMsg('');
             out.textContent = 'flowchart TD';
-            stage.innerHTML = '<div class="empty"><p>The chart appears here. Paste SQL on the left, then press Draw flowchart.</p></div>';
+            stage.innerHTML = '<div class="empty"><p>Paste SQL on the left. The flowchart updates automatically as you work.</p></div>';
+            stage.classList.add('empty-stage');
             setStats('flow', { stmt: 0, branch: 0, loop: 0, cat: 0, exit: 0, depth: 0, cc: 1 });
             setAnalysisHealth(0, 0, 0);
             $('proc-name').textContent = '';
@@ -452,6 +458,7 @@
             mermaid.render(id, code).then(function (res) {
                 if (ticket !== renderSeq)
                     return;
+                stage.classList.remove('empty-stage');
                 stage.innerHTML = res.svg;
                 attachNodeLinks(graph || lastGraph);
                 fit();
@@ -506,6 +513,37 @@
     $('tab-chart').onclick = function () { tab('chart'); };
     $('tab-code').onclick = function () { tab('code'); };
     /* actions */
+    $('btn-analysis-details').onclick = function () {
+        var panel = $('analysis-details'), expanded = this.getAttribute('aria-expanded') === 'true';
+        this.setAttribute('aria-expanded', String(!expanded));
+        panel.hidden = expanded;
+    };
+    var commandMenus = document.querySelectorAll('.command-menu');
+    Array.prototype.forEach.call(commandMenus, function (menu) {
+        menu.addEventListener('toggle', function () {
+            if (!menu.open)
+                return;
+            Array.prototype.forEach.call(commandMenus, function (other) {
+                if (other !== menu)
+                    other.open = false;
+            });
+        });
+    });
+    document.addEventListener('click', function (e) {
+        if (e.target.closest('.command-menu'))
+            return;
+        Array.prototype.forEach.call(commandMenus, function (menu) { menu.open = false; });
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape')
+            return;
+        Array.prototype.forEach.call(commandMenus, function (menu) { menu.open = false; });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.menu-action'), function (action) {
+        action.addEventListener('click', function () {
+            Array.prototype.forEach.call(commandMenus, function (menu) { menu.open = false; });
+        });
+    });
     $('btn-draw').onclick = run;
     $('btn-import').onclick = function () { $('file-input').click(); };
     $('file-input').onchange = function () {
