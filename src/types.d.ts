@@ -209,6 +209,14 @@ interface PgErrorCondition {
   code: string;
 }
 
+interface PgTransactionAssessment {
+  invalid: boolean;
+  label: string;
+  code: string | null;
+  severity: DiagnosticSeverity | null;
+  message: string;
+}
+
 interface TsqlTransactionDepth {
   min: number;
   max: number | null;
@@ -223,6 +231,7 @@ interface FlowContext {
   tranDepth?: TsqlTransactionDepth;
   xactAbort?: boolean;
   savepoints?: StringSet;
+  pgSubtransaction?: boolean;
 }
 
 interface EmitResult {

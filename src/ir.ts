@@ -71,6 +71,94 @@ function pgHandlerHasOthers(cond: TokenList | null): boolean {
     return !!part.length&&part[0].u==='OTHERS';
   });
 }
+function pgTransactionAssessment(toks: TokenList, headerKind: string,
+    inExceptionScope: boolean): PgTransactionAssessment | null {
+  if(!toks.length) return null;
+  var head=toks[0].u;
+  if(['COMMIT','ROLLBACK','SAVE','SAVEPOINT','RELEASE','BEGIN','START'].indexOf(head)<0)
+    return null;
+  var savepoint=head==='SAVE'||head==='SAVEPOINT'||head==='RELEASE'||
+    (head==='ROLLBACK'&&toks.some(function(tok){return tok.u==='TO';}));
+  if(savepoint) return {
+    invalid:true,
+    label:'invalid: PL/pgSQL does not support savepoints',
+    code:'plpgsql_savepoint_unsupported',
+    severity:'error',
+    message:'PL/pgSQL does not support SAVEPOINT, ROLLBACK TO SAVEPOINT, or RELEASE SAVEPOINT; use a block with EXCEPTION instead.'
+  };
+  if(head==='BEGIN'||head==='START') return {
+    invalid:true,
+    label:'invalid: transactions start automatically',
+    code:'plpgsql_transaction_start_unsupported',
+    severity:'error',
+    message:'PL/pgSQL has no separate transaction-start command; BEGIN starts a block and transactions begin automatically after eligible COMMIT or ROLLBACK.'
+  };
+  if(inExceptionScope) return {
+    invalid:true,
+    label:'invalid inside EXCEPTION subtransaction',
+    code:'plpgsql_transaction_in_exception_scope',
+    severity:'error',
+    message:'Transaction control is not allowed inside a block with EXCEPTION because that block forms a subtransaction.'
+  };
+  var kind=String(headerKind||'').toUpperCase();
+  if(kind!=='PROCEDURE'&&kind!=='PROC'&&kind!=='DO') return {
+    invalid:true,
+    label:'invalid: requires eligible CALL or DO context',
+    code:'plpgsql_transaction_context',
+    severity:'error',
+    message:'Transaction control is only allowed in procedures reached through an eligible CALL chain or in DO blocks.'
+  };
+  if(kind==='DO') return {
+    invalid:false,
+    label:'eligible DO transaction control',
+    code:null,
+    severity:null,
+    message:''
+  };
+  return {
+    invalid:false,
+    label:'requires eligible CALL context',
+    code:'plpgsql_transaction_context_required',
+    severity:'warning',
+    message:'Transaction control in a procedure requires an uninterrupted top-level or nested CALL/DO invocation chain; an intervening command makes it invalid.'
+  };
+}
+function addPgTransactionDiagnostics(list: AstNode[], header: SqlHeader,
+    diagnostics: Diagnostic[], inExceptionScope?: boolean): void {
+  (list||[]).forEach(function(st){
+    if(st.type==='stmt'){
+      var assessment=pgTransactionAssessment(
+        st.toks,header.kind||'',inExceptionScope===true);
+      if(assessment&&assessment.code&&assessment.severity)
+        diagnostics.push({
+          severity:assessment.severity,
+          code:assessment.code,
+          message:assessment.message,
+          span:spanOfTokens(st.toks)
+        });
+    }
+    if(st.type==='block')
+      addPgTransactionDiagnostics(st.body,header,diagnostics,inExceptionScope);
+    else if(st.type==='if'){
+      if(st.then) addPgTransactionDiagnostics([st.then],header,diagnostics,inExceptionScope);
+      if(st.else) addPgTransactionDiagnostics([st.else],header,diagnostics,inExceptionScope);
+    } else if(st.type==='case'){
+      st.branches.forEach(function(branch){
+        addPgTransactionDiagnostics(branch.body,header,diagnostics,inExceptionScope);
+      });
+      if(st.else) addPgTransactionDiagnostics(st.else,header,diagnostics,inExceptionScope);
+    } else if((st.type==='while'||st.type==='for'||st.type==='loop'||
+               st.type==='repeat')&&st.body)
+      addPgTransactionDiagnostics([st.body],header,diagnostics,inExceptionScope);
+    else if(st.type==='try'){
+      addPgTransactionDiagnostics(st.body,header,diagnostics,true);
+      st.handlers.forEach(function(handler){
+        addPgTransactionDiagnostics(handler.body,header,diagnostics,true);
+      });
+    } else if(st.type==='handler'&&st.body)
+      addPgTransactionDiagnostics([st.body],header,diagnostics,inExceptionScope);
+  });
+}
 function clip(s: string, max: number): string { return s.length>max ? s.slice(0,max-1).trim()+'…' : s; }
 function qname(toks: Token[], i: number): string {
   if(!toks[i]) return '';
@@ -314,7 +402,7 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
     if(h==='DECLARE'&&st.toks.some(function(tok){return tok.u==='CURSOR';})) return 'cursor';
     if(['INSERT','UPDATE','DELETE','MERGE','TRUNCATE','REPLACE','COPY'].indexOf(h)>=0) return 'io';
     if(['EXEC','EXECUTE','CALL','PERFORM'].indexOf(h)>=0) return 'call';
-    if(['COMMIT','ROLLBACK','SAVE','SAVEPOINT','RELEASE','BEGIN'].indexOf(h)>=0) return 'tran';
+    if(['COMMIT','ROLLBACK','SAVE','SAVEPOINT','RELEASE','BEGIN','START'].indexOf(h)>=0) return 'tran';
     return 'stmt';
   }
   function currentXactStates(ctx: FlowContext | null): number {
@@ -344,6 +432,13 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
       ctx=ctx.parent;
     }
     return {};
+  }
+  function currentPgSubtransaction(ctx: FlowContext | null): boolean {
+    while(ctx){
+      if(ctx.pgSubtransaction) return true;
+      ctx=ctx.parent;
+    }
+    return false;
   }
   function withTsqlState(ctx: FlowContext | null, states: number,
       tranDepth: TsqlTransactionDepth): FlowContext {
@@ -635,9 +730,14 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
       case 'stmt': {
         stats.stmt++;
         var statementKind=kindOf(st);
+        var pgTransaction=dialect==='plpgsql'&&statementKind==='tran'
+          ? pgTransactionAssessment(st.toks,header.kind||'',currentPgSubtransaction(ctx))
+          : null;
         var statementText=dialect==='tsql'?tsqlStatementText(st,ctx):textOf(st);
-        var invalidTransaction=statementKind==='tran'&&dialect==='tsql'&&
-          invalidTsqlTransactionAction(st,ctx);
+        if(pgTransaction) statementText+=' — '+pgTransaction.label;
+        var invalidTransaction=statementKind==='tran'&&
+          ((dialect==='tsql'&&invalidTsqlTransactionAction(st,ctx))||
+           (dialect==='plpgsql'&&!!pgTransaction&&pgTransaction.invalid));
         var id=add(invalidTransaction?'round':'rect', statementText,
                    invalidTransaction?'err':statementKind, spanOfTokens(st.toks));
         return {entry:id, exits:invalidTransaction?[]:[{id:id}]};
@@ -764,9 +864,15 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
 
       case 'try': {
         stats.cat += st.handlers.length||1;
-        var tstart=add('marker', dialect==='tsql'?'BEGIN TRY':'BEGIN block', 'try');
+        var tstart=add('marker',
+          dialect==='tsql'?'BEGIN TRY':
+          (dialect==='plpgsql'?'BEGIN exception block · subtransaction':'BEGIN block'),
+          'try');
         var mark=nodes.length;
-        var tb=emitList(st.body, ctx, depth+1);
+        var exceptionCtx: FlowContext | null=dialect==='plpgsql'
+          ? {parent:ctx,handlers:[],handlerExits:[],pgSubtransaction:true}
+          : ctx;
+        var tb=emitList(st.body, exceptionCtx, depth+1);
         if(tb.entry) link(tstart, tb.entry);
         var exits=tb.entry?tb.exits.slice():[{id:tstart}];
 
@@ -850,16 +956,27 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
         }
 
         for(var hbIndex=0;hbIndex<st.handlers.length;hbIndex++){
-          var handlerBodyMark=nodes.length;
-          var cb2=emitList(st.handlers[hbIndex].body,ctx,depth+1);
+          var handlerScopeMark=nodes.length;
+          var rollbackMarker: string | null=null;
+          if(dialect==='plpgsql')
+            rollbackMarker=add('marker',
+              'Implicit rollback · '+clip(handlerLabels[hbIndex],32)+
+              '\u0001Persistent changes undone · variables preserved','tran');
+          var cb2=emitList(st.handlers[hbIndex].body,exceptionCtx,depth+1);
           if(handlerReachable[hbIndex]&&cb2.entry){
-            link(handlerMarkers[hbIndex],cb2.entry);
+            if(rollbackMarker){
+              link(handlerMarkers[hbIndex],rollbackMarker);
+              link(rollbackMarker,cb2.entry);
+            } else link(handlerMarkers[hbIndex],cb2.entry);
             exits=exits.concat(cb2.exits);
-          } else if(handlerReachable[hbIndex])
-            exits.push({id:handlerMarkers[hbIndex]});
-          else {
+          } else if(handlerReachable[hbIndex]){
+            if(rollbackMarker){
+              link(handlerMarkers[hbIndex],rollbackMarker);
+              exits.push({id:rollbackMarker});
+            } else exits.push({id:handlerMarkers[hbIndex]});
+          } else {
             unreachable[handlerMarkers[hbIndex]]=1;
-            nodes.slice(handlerBodyMark).forEach(function(node){unreachable[node.id]=1;});
+            nodes.slice(handlerScopeMark).forEach(function(node){unreachable[node.id]=1;});
           }
         }
         Object.keys(handledRaisers).forEach(function(id){guarded[id]=1;});
@@ -1236,6 +1353,8 @@ function analyse(sql: string, opts?: AnalyseOptions): AnalysisResult {
       message:'Dynamic SQL is opaque and its internal reads, writes, calls, and branches are not resolved.',
       span:spanOfTokens(st.toks)});
   },0);
+  if(dialect==='plpgsql')
+    addPgTransactionDiagnostics(ast,header,diagnostics,false);
   var gopts={detail:opts.detail, group:opts.group, dialect:dialect, sources:opts.sources,
              fanIn:opts.fanIn, number:opts.number};
   var graph=buildGraph(ast, header, gopts);

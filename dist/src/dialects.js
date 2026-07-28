@@ -621,6 +621,15 @@ function findBody(toks, dialect, src) {
             i++;
     }
     var start = i;
+    if (dialect === 'plpgsql' && toks[i] && toks[i].u === 'DO') {
+        for (var di = i + 1; di < toks.length; di++)
+            if (toks[di].type === 'dollar') {
+                var doTag = /^\$[A-Za-z_]*\$/.exec(toks[di].v);
+                return { name: '', params: '', kind: 'DO', index: -1, gate: null,
+                    inner: toks[di].v.replace(/^\$[A-Za-z_]*\$/, '').replace(/\$[A-Za-z_]*\$$/, ''),
+                    innerOffset: toks[di].pos + (doTag ? doTag[0].length : 0) };
+            }
+    }
     var isCreate = toks[i] && ['CREATE', 'ALTER', 'REPLACE'].indexOf(toks[i].u) >= 0;
     if (!isCreate)
         return { name: '', params: '', kind: '', index: start, gate: null };
