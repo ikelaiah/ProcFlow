@@ -133,6 +133,7 @@ interface LoopControlNode extends AstBase {
   target: string | null;
   when: TokenList | null;
   word: string;
+  span: SourceSpan;
 }
 
 interface LabelNode extends AstBase {
@@ -190,6 +191,8 @@ interface Db2HandlerFlow {
   conditionKey: string;
   scopeExit: string | null;
   summarySource: string | null;
+  terminal: string;
+  resumeSources: string[];
 }
 
 interface FlowContext {
@@ -383,6 +386,7 @@ interface Db2GraphFixture extends ProcflowFixture {
   graphExpect: {
     required: ExpectedGraphWire[];
     forbidden: ExpectedGraphWire[];
+    sourced?: string[];
   };
 }
 

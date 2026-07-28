@@ -84,11 +84,19 @@ function summarise(toks, max) {
             out = 'SELECT … FROM ' + v(from + 1);
     }
     else if (head === 'DECLARE') {
+        var cursor = -1;
+        for (var c = 2; c < toks.length; c++)
+            if (u(c) === 'CURSOR') {
+                cursor = c;
+                break;
+            }
+        if (cursor >= 0)
+            out = 'DECLARE CURSOR ' + v(1);
         var vars = [];
         for (var j = 1; j < toks.length && vars.length < 4; j++)
             if (toks[j].v.charAt(0) === '@' && (j === 1 || toks[j - 1].v === ','))
                 vars.push(toks[j].v);
-        if (vars.length)
+        if (!out && vars.length)
             out = 'DECLARE ' + vars.join(', ') + (vars.length > 3 ? ' …' : '');
     }
     else if (head === 'RAISE' || head === 'SIGNAL' || head === 'RESIGNAL' || head === 'RAISERROR') {
@@ -118,9 +126,10 @@ function buildGraph(ast, header, opts) {
     var dialect = opts.dialect || 'tsql';
     var fanIn = opts.fanIn === true, number = opts.number === true;
     var guarded = {}; /* nodes already wired to an inner handler */
-    var PROTECTABLE = ['stmt', 'io', 'call', 'tran', 'opaque'];
-    var HANDLER_SOURCES = ['stmt', 'io', 'call', 'tran', 'opaque', 'cond', 'loop'];
+    var PROTECTABLE = ['stmt', 'io', 'call', 'tran', 'cursor', 'opaque'];
+    var HANDLER_SOURCES = ['stmt', 'io', 'call', 'tran', 'cursor', 'opaque', 'cond', 'loop'];
     var handlerWires = {}, handlerProcessed = {};
+    var db2Handlers = [];
     var maxLen = detail === 'full' ? 110 : 52;
     var nodes = [], edges = [], seq = 0;
     var stats = { stmt: 0, branch: 0, loop: 0, cat: 0, exit: 0, depth: 0, opaque: 0 };
@@ -145,6 +154,10 @@ function buildGraph(ast, header, opts) {
     }
     function kindOf(st) {
         var h = st.toks && st.toks[0] ? st.toks[0].u : '';
+        if (['FETCH', 'OPEN', 'CLOSE', 'ALLOCATE', 'DEALLOCATE'].indexOf(h) >= 0)
+            return 'cursor';
+        if (h === 'DECLARE' && st.toks.some(function (tok) { return tok.u === 'CURSOR'; }))
+            return 'cursor';
         if (['INSERT', 'UPDATE', 'DELETE', 'MERGE', 'TRUNCATE', 'REPLACE', 'COPY'].indexOf(h) >= 0)
             return 'io';
         if (['EXEC', 'EXECUTE', 'CALL', 'PERFORM'].indexOf(h) >= 0)
@@ -155,11 +168,21 @@ function buildGraph(ast, header, opts) {
     }
     function findLoop(ctx, target) {
         while (ctx) {
-            if (ctx.loop && (!target || !ctx.loop.label || ctx.loop.label.toUpperCase() === target.toUpperCase()))
+            if (ctx.loop && (!target ||
+                (ctx.loop.label && ctx.loop.label.toUpperCase() === target.toUpperCase())))
                 return ctx.loop;
             ctx = ctx.parent;
         }
         return null;
+    }
+    function isNotFoundHandler(handler) {
+        return handler.conditionKey.indexOf('NOT FOUND') >= 0 ||
+            handler.conditionKey.indexOf('02000') >= 0;
+    }
+    function handlerAcceptsNode(handler, node) {
+        if (!isNotFoundHandler(handler))
+            return true;
+        return /^FETCH\b/i.test(node.text) || /^SELECT\b.+\bINTO\b/i.test(node.text);
     }
     function activeHandlers(ctx) {
         var found = [], seen = {};
@@ -183,7 +206,8 @@ function buildGraph(ast, header, opts) {
             return;
         sources.forEach(function (node) { handlerProcessed[node.id] = 1; });
         activeHandlers(ctx).forEach(function (handler) {
-            var selected = fanIn ? sources : (handler.summarySource ? [] : [sources[0]]);
+            var accepted = sources.filter(function (node) { return handlerAcceptsNode(handler, node); });
+            var selected = fanIn ? accepted : (handler.summarySource ? [] : accepted.slice(0, 1));
             selected.forEach(function (source) {
                 var key = handler.id + '>' + source.id;
                 if (handlerWires[key])
@@ -192,6 +216,22 @@ function buildGraph(ast, header, opts) {
                 link(source.id, handler.id, handler.label, 'dotted');
                 if (!handler.summarySource)
                     handler.summarySource = source.id;
+                handler.resumeSources.push(source.id);
+            });
+        });
+    }
+    function wireContinueResumes() {
+        db2Handlers.forEach(function (handler) {
+            if (handler.kind !== 'CONTINUE' || !isNotFoundHandler(handler))
+                return;
+            var targets = {};
+            handler.resumeSources.forEach(function (source) {
+                edges.forEach(function (edge) {
+                    if (edge.from === source && edge.style === 'solid' && !targets[edge.to]) {
+                        targets[edge.to] = 1;
+                        link(handler.terminal, edge.to, 'resume', 'dotted');
+                    }
+                });
             });
         });
     }
@@ -420,12 +460,14 @@ function buildGraph(ast, header, opts) {
                 var terminal = add('marker', terminalText, st.kind === 'CONTINUE' ? 'flowctl' : 'catch');
                 joinExits(hb && hb.entry ? hb.exits : [{ id: hm }], terminal);
                 if (ctx) {
-                    ctx.handlers.push({
+                    var handlerFlow = {
                         id: hm, kind: st.kind, label: condition || 'condition',
                         conditionKey: (condition || 'condition').toUpperCase(),
                         scopeExit: st.kind === 'CONTINUE' ? null : terminal,
-                        summarySource: null
-                    });
+                        summarySource: null, terminal: terminal, resumeSources: []
+                    };
+                    ctx.handlers.push(handlerFlow);
+                    db2Handlers.push(handlerFlow);
                     if (st.kind !== 'CONTINUE')
                         ctx.handlerExits.push({ id: terminal, label: st.kind === 'UNDO' ? 'undo' : 'handler exit' });
                 }
@@ -446,7 +488,7 @@ function buildGraph(ast, header, opts) {
                 var word = (st.word || (isBreak ? 'BREAK' : 'CONTINUE')).toUpperCase() + (st.target ? ' ' + st.target : '');
                 if (st.when && st.when.length) {
                     stats.branch++;
-                    var dq = add('diamond', word + ' WHEN ' + clip(joinToks(st.when, 40), 40), 'cond', spanOfTokens(st.when));
+                    var dq = add('diamond', word + ' WHEN ' + clip(joinToks(st.when, 40), 40), 'cond', st.span);
                     if (L) {
                         if (isBreak)
                             L.breaks.push({ id: dq, label: 'yes' });
@@ -455,7 +497,7 @@ function buildGraph(ast, header, opts) {
                     }
                     return { entry: dq, exits: [{ id: dq, label: 'no' }] };
                 }
-                var bn = add('rect', word, 'flowctl');
+                var bn = add('rect', word, 'flowctl', st.span);
                 if (L) {
                     if (isBreak)
                         L.breaks.push({ id: bn });
@@ -500,6 +542,7 @@ function buildGraph(ast, header, opts) {
     else if (body.entry)
         link(start, body.entry);
     joinExits(body.entry ? body.exits : [{ id: head }], end);
+    wireContinueResumes();
     for (var i2 = 0; i2 < nodes.length; i2++)
         if (nodes[i2].cls === 'ret')
             link(nodes[i2].id, end, '', 'dotted');

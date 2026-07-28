@@ -80,7 +80,13 @@
             var unexpected = fixture.graphExpect.forbidden.filter(function (wire) {
                 return matchingWire(result.graph, wire);
             });
-            record(fixture.name + ' · graph edges', missing.length === 0 && unexpected.length === 0, JSON.stringify({ missing: missing, unexpected: unexpected, graph: result.graph }));
+            var unsourced = (fixture.graphExpect.sourced || []).filter(function (text) {
+                var node = matchingNode(result.graph, text);
+                return !node || !node.source || node.source.start < 0 ||
+                    node.source.end <= node.source.start || node.source.end > fixture.sql.length;
+            });
+            record(fixture.name + ' · graph edges', missing.length === 0 && unexpected.length === 0 && unsourced.length === 0, JSON.stringify({ missing: missing, unexpected: unexpected,
+                unsourced: unsourced, graph: result.graph }));
         }
         catch (err) {
             record(fixture.name + ' · graph edges', false, String(err && err.stack || err));

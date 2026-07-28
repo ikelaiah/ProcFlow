@@ -19,6 +19,7 @@ function toMermaid(graph: Graph, dir?: DiagramDirection): string {
     start:'fill:#2b3d4a,stroke:#8ea3b4,color:#e7eef3',
     stmt:'fill:#1e2b35,stroke:#516878,color:#e7eef3',
     io:'fill:#1b3140,stroke:#7ea6e0,color:#dcebff',
+    cursor:'fill:#172d36,stroke:#4fb3a5,color:#d9fff8',
     call:'fill:#20303c,stroke:#7ea6e0,color:#dcebff',
     tran:'fill:#232f2b,stroke:#54c39b,color:#dff5ec',
     cond:'fill:#3a2c15,stroke:#e8a33d,color:#ffeccc',
@@ -103,6 +104,7 @@ function toDrawio(graph: Graph, opts?: DrawioOptions): string {
   var fills: Record<string, [string, string, string]>={
     start:['#e2e8f0','#64748b','#0f172a'], stmt:['#f8fafc','#64748b','#0f172a'],
     io:['#dbeafe','#3b82f6','#172554'], call:['#e0e7ff','#6366f1','#1e1b4b'],
+    cursor:['#ccfbf1','#14b8a6','#134e4a'],
     tran:['#dcfce7','#22c55e','#14532d'], cond:['#fef3c7','#d97706','#451a03'],
     loop:['#dbeafe','#3b82f6','#172554'], try:['#dcfce7','#16a34a','#14532d'],
     catch:['#fee2e2','#dc2626','#450a0a'], ret:['#dcfce7','#16a34a','#14532d'],

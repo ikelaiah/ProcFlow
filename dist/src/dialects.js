@@ -438,7 +438,9 @@ function parseStatement(p) {
         if (eat(p, 'WHEN'))
             when = readTokens(p, 'cond');
         skipSemis(p);
-        return { type: isBreak ? 'break' : 'continue', target: target, when: when, word: t.v };
+        var controlEnd = p.t[p.i - 1] || t;
+        return { type: isBreak ? 'break' : 'continue', target: target, when: when, word: t.v,
+            span: { start: t.pos, end: controlEnd.end } };
     }
     if (t.type === 'word' && u === 'GOTO') {
         p.i++;
