@@ -654,5 +654,10 @@
         });
     }
     drawGutter();
+    document.documentElement.setAttribute('data-procflow-ready', String(typeof mermaid !== 'undefined' &&
+        typeof tokenize === 'function' &&
+        typeof detectDialect === 'function' &&
+        typeof analyse === 'function' &&
+        typeof toDrawio === 'function'));
 })();
 //# sourceMappingURL=app.js.map

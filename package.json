@@ -5,6 +5,7 @@
   "description": "Local-first SQL control-flow and dependency visualiser",
   "scripts": {
     "build": "tsc --project tsconfig.json",
+    "test:file": "node scripts/file-smoke.mjs",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "devDependencies": {

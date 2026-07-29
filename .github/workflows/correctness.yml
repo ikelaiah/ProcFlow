@@ -44,6 +44,19 @@ jobs:
             exit 1
           fi
 
+      - name: Locate Chromium
+        shell: bash
+        run: |
+          CHROME_PATH="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$CHROME_PATH" ]; then
+            echo "A Chromium-based browser is required on the runner."
+            exit 1
+          fi
+          echo "CHROME_PATH=$CHROME_PATH" >> "$GITHUB_ENV"
+
+      - name: Run local-file smoke test
+        run: npm run test:file
+
       - name: Check runtime remains local-only
         shell: bash
         run: |
@@ -70,17 +83,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
-          if [ -z "$CHROME" ]; then
-            echo "A Chromium-based browser is required on the runner."
-            exit 1
-          fi
 
           run_suite() {
             local name="$1"
             local url="$2"
             local output="/tmp/procflow-${name}.html"
-            "$CHROME" \
+            "$CHROME_PATH" \
               --headless=new \
               --no-sandbox \
               --disable-gpu \

@@ -2,36 +2,110 @@
 
 Understand complicated SQL without tracing every branch by hand.
 
-`proc>flow` is a local-first SQL visualiser for DBAs, developers, analysts, and
-reviewers. Paste SQL or import several SQL files to explore:
+`proc>flow` is a local-first SQL logic and dependency visualiser for database
+administrators, SQL report engineers, developers, analysts, and reviewers.
+Paste SQL or import a group of SQL files to see:
 
-- how an individual procedure, function, trigger, view, or query works; and
-- how objects depend on tables, views, and called routines.
+- how a procedure, function, trigger, view, or query works internally; and
+- how database objects read, write, and call one another.
 
-There is no installation, database connection, or backend service. Compiled
-JavaScript is checked into `dist/`, so users can open the page in a modern
-browser without running a build.
+There is no installation, database connection, backend service, or sign-in.
+The application runs entirely in a browser and works from the local filesystem.
 
 > [!IMPORTANT]
-> Parsing is heuristic rather than compiler-grade. Use each diagram as an
-> investigation aid and verify important findings against the source SQL.
+> ProcFlow uses a heuristic parser rather than a database engine's compiler.
+> Treat diagrams as investigation aids. Check important findings against the
+> source SQL and the target database.
 
-## 🚀 Quick start
+For the first stable release, see
+[RELEASE_NOTE_v1.0.0.md](RELEASE_NOTE_v1.0.0.md).
 
-1. Download or clone this repository.
-2. Open `index.html` in a modern browser.
-3. Paste SQL, press **Load sample**, or use **Import SQL files**.
-4. Press **Draw flowchart**.
-5. Switch between **Internal logic** and **Object dependencies**.
+## Start here
 
-Everything needed to render a diagram is included in the repository, so the
-application works without an internet connection.
+| I want to… | Go to |
+|---|---|
+| Open ProcFlow and try it now | [60-second quick start](#60-second-quick-start) |
+| Review a stored procedure, function, or trigger | [Workflow for DBAs](#workflow-for-database-administrators) |
+| Understand a report or dataset query | [Workflow for SQL report engineers](#workflow-for-sql-report-engineers) |
+| Understand confidence, coverage, and warnings | [Reading the analysis safely](#reading-the-analysis-safely) |
+| Check privacy or prepare a security review | [Security and privacy](#security-and-privacy) |
+| Build, test, or change the project | [Developer guide](#developer-guide) |
+| Prepare a release | [Release checklist](#release-checklist) |
 
-## 🧭 What can I visualise?
+## 60-second quick start
 
-### 🔬 Internal logic
+1. Download the `v1.0.0` archive from
+   [GitHub Releases](https://github.com/ikelaiah/ProcFlow/releases) or clone
+   this repository.
+2. Extract the complete archive. Keep `index.html`, `styles.css`, `dist/`, and
+   `vendor/` together.
+3. Open `index.html` in a recent Chrome, Edge, Firefox, or Chromium browser.
+4. Choose one input:
+   - press **Load sample**;
+   - paste SQL into **SQL source**; or
+   - press **Import SQL files** and select one or more files.
+5. Press **Refresh** or use `Ctrl+Enter` (`Cmd+Enter` on macOS).
 
-Follow the execution path inside the selected object:
+No `npm install`, local server, database, or internet connection is required
+for normal use.
+
+If the page opens but the diagram does not render, first confirm that the whole
+archive was extracted. Opening a copied `index.html` without its sibling
+`dist/` and `vendor/` directories will not work.
+
+## Workflow for database administrators
+
+Use ProcFlow to shorten the first pass through unfamiliar routines and change
+reviews.
+
+1. Import the relevant `.sql`, `.ddl`, or `.txt` files.
+2. Set **Scope** to **Object dependencies** to see routine calls and table
+   reads/writes across the imported files.
+3. Select a known object in the diagram or use the **Object** selector.
+4. Set **Scope** to **Internal logic**.
+5. Use **View → Control flow** for branches, loops, transactions, exits, and
+   error paths.
+6. Check **Confidence**, **Coverage**, and **Diagnostics** before relying on the
+   chart.
+7. Click a source-aware diagram node to select its SQL in the editor.
+8. Use **Export** to save SVG or editable draw.io XML when the diagram is ready
+   to share.
+
+Useful DBA review questions include:
+
+- Which tables are read or changed?
+- Which routines are called?
+- Can execution exit before a commit or final result?
+- Where can an exception or error be handled, rethrown, or terminate work?
+- Does transaction state affect the available recovery path?
+- Is any dynamic SQL hiding behavior from static analysis?
+
+When automatic dialect detection is uncertain, select the dialect explicitly
+and refresh the analysis.
+
+## Workflow for SQL report engineers
+
+Use ProcFlow to understand report datasets, extracts, views, and large SELECT
+statements.
+
+1. Paste the dataset query or import its SQL file.
+2. Leave **View** on **Auto**, or choose **Query structure** explicitly.
+3. Review CTEs, source tables, explicit joins, unions, subqueries, filtering,
+   and grouping.
+4. Turn **Source tables** on or off to adjust the amount of detail.
+5. For several views or queries, use **Object dependencies** to see shared
+   sources and upstream objects.
+6. Check **Coverage** and **Diagnostics**, especially for vendor-specific table
+   expressions or comma-separated sources.
+7. Export the result as SVG or draw.io when documenting a report or handing
+   analysis to another engineer.
+
+ProcFlow imports SQL text, not report-definition files. SSRS/RDL import is on
+the roadmap; for v1.0.0, paste or export the dataset SQL itself.
+
+## What ProcFlow can show
+
+### Internal control flow
 
 - `IF`, `ELSE`, and `CASE` decisions
 - loops, loop exits, and early returns
@@ -39,47 +113,122 @@ Follow the execution path inside the selected object:
 - procedure and function calls
 - table reads and writes
 - temporary-table transformations
-- transactions
+- transactions and savepoints
 - exception handling and T-SQL `TRY`/`CATCH`
-- dynamic SQL, shown explicitly as an opaque step
+- dynamic SQL as an explicit opaque step
 
-Click a source-aware diagram node to select the corresponding SQL in the editor.
+### Query structure
 
-For a single query, Procflow can instead show query structure, including CTEs,
-source tables, explicit joins, unions, subqueries, filtering, and grouping.
+- common table expressions
+- source tables and views
+- explicit joins
+- unions
+- subqueries
+- filtering
+- grouping
 
-### 🕸️ Object dependencies
-
-Import or paste several database objects to see an estate-level map:
+### Object dependencies
 
 - procedure or function → called routine
 - view or query → source object
 - object → table read
 - object → table write
 
-Click a known object in the dependency diagram to open its internal logic.
+Known imported objects are linked. Selecting one can open its internal logic.
 
-## 🔐 Designed for local and security-conscious use
+## Reading the analysis safely
 
-Procflow performs SQL analysis inside the browser tab. The application code
-does not send SQL, filenames, diagrams, or usage information anywhere.
+The analysis panel provides three release-safety signals:
 
-### 🛡️ Security and privacy summary
+- **Confidence** combines dialect certainty, parser coverage, and diagnostics.
+- **Coverage** is the percentage of body tokens consumed by the parser.
+- **Diagnostics** reports uncertain dialects, balance errors, missing block
+  terminators, unconsumed input, invalid actions, and opaque dynamic SQL.
 
-| Question | Procflow behaviour |
+Use this rule of thumb:
+
+- High confidence and complete coverage: review the chart, then verify material
+  findings in the SQL.
+- Reduced confidence: select the dialect manually and inspect the diagnostics.
+- Incomplete coverage: treat the unresolved source region as a review item.
+- Dynamic SQL warning: review the generated SQL separately; its internal reads,
+  writes, calls, and branches cannot be inferred safely.
+
+Input the parser cannot consume is represented as an unresolved node rather
+than silently disappearing from the diagram.
+
+## Supported SQL
+
+ProcFlow v1.0.0 recognises:
+
+- Microsoft T-SQL
+- IBM DB2 SQL PL
+- PostgreSQL PL/pgSQL
+- SQLite
+
+Supported inputs include procedures, functions, triggers, views, plain SQL
+statements, report dataset queries, and multi-object scripts where those object
+types apply to the selected dialect.
+
+Dialect-specific v1.0.0 coverage includes:
+
+- **T-SQL:** `TRY`/`CATCH`, `THROW`, `RAISERROR` severity, `XACT_STATE()`,
+  `@@TRANCOUNT`, nested transaction depth, savepoints, `SET XACT_ABORT`, and
+  invalid transaction-action termination.
+- **DB2 SQL PL:** scoped handlers, cursors, `NOT FOUND` flow, and labelled loop
+  control.
+- **PL/pgSQL:** `EXCEPTION` condition matching, transactional exception scopes,
+  and rethrow propagation.
+- **SQLite:** trigger `RAISE` actions, termination behavior, trigger `WHEN`,
+  conditional `WHERE`, and searched `CASE` paths.
+
+Detection is automatic and can be overridden from the **Dialect** selector.
+
+## Importing SQL
+
+**Import SQL files** accepts multiple `.sql`, `.ddl`, and `.txt` files. Files
+are read into memory by the current browser tab; they are not uploaded or
+persisted.
+
+Multi-object scripts are split into selectable objects. If the split cannot be
+made confidently, ProcFlow keeps the input as one script and reports the
+uncertainty.
+
+## Exporting and sharing
+
+The **Export** menu provides:
+
+- **Copy Mermaid** — copy the generated Mermaid definition.
+- **Copy narration prompt** — copy a prompt containing diagram structure and
+  source SQL.
+- **Save SVG** — download the rendered diagram.
+- **Save draw.io** — download editable native `.drawio` XML.
+
+The narration prompt is never submitted automatically. It reaches another
+system only if a user pastes it there. Review organisational policy before
+sharing confidential SQL.
+
+draw.io is a trademark of draw.io AG. ProcFlow is not affiliated with or
+endorsed by draw.io.
+
+## Security and privacy
+
+### Quick answers
+
+| Question | ProcFlow v1.0.0 behavior |
 |---|---|
-| Is SQL uploaded to a server? | No. Parsing and diagram generation happen in the browser. |
-| Does it connect to a database? | No. There is no database driver, connection string, or query execution capability. |
+| Is SQL uploaded? | No. Analysis and rendering happen in the browser tab. |
+| Does it connect to a database? | No. There is no driver, connection string, or query execution. |
 | Is there a backend or API? | No. It is a static HTML, CSS, and JavaScript application. |
-| Does it contain analytics or telemetry? | No. There are no analytics, tracking, or telemetry calls. |
-| Does it require internet access? | No when opened locally or hosted internally. Mermaid is included in `vendor/`. |
-| Are imported files uploaded? | No. The browser File API reads them into the current tab only. |
-| Is SQL stored after closing the tab? | No. Procflow does not use cookies, `localStorage`, `sessionStorage`, or IndexedDB. |
-| Does it write to the clipboard automatically? | No. Clipboard writes occur only after a user chooses a copy action. |
+| Is there analytics or telemetry? | No. |
+| Is internet access required? | No for local or internally hosted use. |
+| Are imported files uploaded? | No. The browser File API reads them into the current tab. |
+| Is SQL retained after closing the tab? | No. ProcFlow does not use cookies, `localStorage`, `sessionStorage`, or IndexedDB. |
+| Does ProcFlow write to the clipboard automatically? | No. Clipboard writes follow an explicit copy action. |
 | Are exports local? | Yes. SVG and draw.io files are generated in memory and downloaded by the browser. |
-| Does it call an AI service? | No. It can copy a narration prompt, but never submits that prompt itself. |
+| Does it call an AI service? | No. It can copy a narration prompt but never submits it. |
 
-### ✅ What a cyber-security review should know
+### Runtime files
 
 The runtime application consists of:
 
@@ -95,214 +244,212 @@ dist/src/app.js
 vendor/mermaid/mermaid.min.js
 ```
 
-There is no `fetch`, `XMLHttpRequest`, WebSocket, beacon, or other application
+There is no application `fetch`, `XMLHttpRequest`, WebSocket, beacon, or other
 network-submission code. The only bundled third-party runtime is the pinned
 Mermaid 10.9.1 renderer. Its MIT licence is stored at
-`vendor/mermaid/LICENSE`. The vendored `mermaid.min.js` SHA-256 for this
-revision is:
+`vendor/mermaid/LICENSE`.
+
+The SHA-256 of `vendor/mermaid/mermaid.min.js` in v1.0.0 is:
 
 ```text
 61B335A46DF05A7CE1C98378F60E5F3E77A7FB608A1056997E8A649304A936D6
 ```
 
-For higher-assurance use:
+The repository's `.gitattributes` preserves this vendored file byte-for-byte
+so the release checksum remains reproducible across operating systems.
 
-1. Review and pin a specific repository commit.
-2. Open the reviewed files locally or serve them from an approved internal
+### Guidance for security review
+
+1. Review and pin the `v1.0.0` tag or its exact commit.
+2. Verify the vendored Mermaid checksum.
+3. Review the runtime files listed above.
+4. Open the reviewed files locally or serve them from an approved internal
    static host.
-3. Keep browser extensions and developer tools within organisational policy.
-4. Re-review dependency changes before upgrading the vendored Mermaid file.
-5. Apply your organisation's Content Security Policy at the hosting layer.
+5. Keep browser extensions and developer tools within organisational policy.
+6. Re-review runtime and dependency changes before upgrading.
+7. Apply the organisation's Content Security Policy at the hosting layer when
+   serving ProcFlow over HTTP.
 
-If the application is served through GitHub Pages, the browser must download
-the static application files from GitHub. After the application loads, Procflow
-still does not transmit the SQL entered by the user. Organisations that do not
-permit public hosting should use the same files locally or on an internal static
-web server. As with any hosted website, GitHub may record ordinary request
-metadata such as IP address and browser details while serving the static files;
-those requests do not contain the SQL entered into Procflow.
+If ProcFlow is served through GitHub Pages or another host, that host receives
+ordinary web-request metadata while serving the static files. ProcFlow still
+does not place entered SQL in those requests. Organisations that do not permit
+public hosting should use the release files locally or on an internal static
+server.
 
-The main deliberate data-release action is **Copy narration prompt**. It places
-the SQL and diagram structure on the clipboard. Procflow does not send it
-anywhere, but users should follow organisational policy before pasting it into
-an external AI product, email, chat, or ticket.
+The primary deliberate data-release action is **Copy narration prompt**. It
+places SQL and diagram structure on the clipboard. Users remain responsible for
+where that information is pasted or saved.
 
 No browser application can guarantee the security of the host computer,
-browser, installed extensions, modified source files, or the location where a
-user chooses to paste or save data. Procflow's security boundary is that its own
-application code performs analysis locally and contains no automatic data
-submission path.
+browser, installed extensions, modified source files, or external destination.
+ProcFlow's boundary is that its own application code performs analysis locally
+and contains no automatic data-submission path.
 
-## 🗄️ Supported SQL
+## Known limitations
 
-Procflow currently recognises:
-
-- Microsoft T-SQL
-- IBM DB2 SQL PL
-- PostgreSQL PL/pgSQL
-- SQLite
-
-Supported object headers include procedures, functions, triggers, and views.
-Plain SQL statements, report dataset queries, and multi-object scripts can also
-be visualised.
-
-Dialect detection is automatic, but it can be overridden. Procflow warns when
-detection is uncertain and marks dynamic SQL as opaque when its internal
-behaviour cannot be resolved statically.
-
-## 🗺️ Using the diagrams
-
-The **Diagram** selector controls the level:
-
-- **Internal logic** shows the selected object's execution or query structure.
-- **Object dependencies** shows relationships across all imported objects.
-
-Within **Internal logic**, **Show** controls the representation:
-
-- **Auto** chooses query structure for a suitable flat query and control flow
-  otherwise.
-- **Control flow** shows execution order, decisions, loops, exits, and error
-  paths.
-- **Query structure** shows CTE and source-table relationships.
-
-Additional controls change orientation, label detail, straight-run grouping,
-step numbering, error-path fan-in, and source-table visibility.
-
-The analysis panel reports:
-
-- **Confidence** — combines dialect certainty, parser coverage, and error
-  diagnostics.
-- **Input coverage** — the percentage of body tokens consumed by the parser.
-- **Diagnostics** — balance errors, missing block terminators, unconsumed input,
-  uncertain dialects, and opaque dynamic SQL.
-
-Low confidence or incomplete coverage is a signal to select the dialect
-manually and verify the highlighted source region.
-
-## 📥 Importing SQL
-
-Use **Import SQL files** to select multiple `.sql`, `.ddl`, or `.txt` files.
-Files are read into memory by the current browser tab. They are not uploaded or
-persisted.
-
-Multi-object scripts are split into selectable objects. If a script cannot be
-split confidently, it is treated as a single script.
-
-## 📤 Exporting and sharing
-
-- **Copy Mermaid** copies the generated Mermaid definition.
-- **Copy narration prompt** copies a prompt containing the diagram and source
-  SQL. Review organisational policy before sharing it externally.
-- **Save SVG** downloads the rendered diagram as an image.
-- **Save draw.io** downloads editable native `.drawio` XML.
-
-draw.io is a trademark of draw.io AG. Procflow is not affiliated with or
-endorsed by draw.io.
-
-## ⚠️ Known limitations
-
-- The parser does not provide the same guarantees as the target database
-  engine's parser.
-- Dynamic SQL is opaque; its internal reads, writes, calls, and branches cannot
-  be determined safely.
-- Semicolon-free or unusually formatted batches may produce inaccurate
+- Parsing is heuristic and does not provide the guarantees of the target
+  database engine's parser.
+- Dynamic SQL is opaque.
+- Semicolon-free or unusually formatted batches can produce inaccurate
   statement boundaries.
-- Query lineage is currently object-level rather than column-level.
-- Comma-separated sources and some vendor-specific table expressions may not be
-  detected.
-- Temporary-table, synonym, linked-server, and cross-database resolution remain
+- Query lineage is object-level rather than column-level.
+- Comma-separated sources and some vendor-specific table expressions might not
+  be detected.
+- Temporary-table, synonym, linked-server, and cross-database resolution is
   lightweight.
-- SSRS/RDL report definition files are not yet imported.
-- Large draw.io exports may benefit from manual rearrangement.
+- SSRS/RDL files are not imported in v1.0.0.
+- Large draw.io exports can require manual rearrangement.
 
-Always confirm critical dependencies, execution paths, and security conclusions
-against the original SQL and the target database platform.
+Always confirm critical dependencies, execution paths, transaction behavior,
+and security conclusions against the original SQL and target database.
 
-## 🧱 Project structure
+## Developer guide
+
+### Prerequisites
+
+- Node.js 22 is recommended and is the CI baseline.
+- npm, included with Node.js.
+- A recent Chrome, Edge, or Chromium browser for the local-file smoke test.
+- Python 3 is optional and is used only for the simple manual test server shown
+  below.
+
+### First checkout
+
+```text
+git clone https://github.com/ikelaiah/ProcFlow.git
+cd ProcFlow
+npm ci
+npm run typecheck
+npm run build
+npm run test:file
+```
+
+`npm run test:file` opens the real `index.html` through a `file://` URL in a
+headless Chromium browser and verifies that the page and all local runtime
+scripts initialise. The runner automatically looks for Chrome, Edge, or
+Chromium. If the browser is installed in a non-standard location, set
+`CHROME_PATH` to its executable.
+
+### Source and generated files
+
+Make source changes in `src/` or `tests/`. `npm run build` compiles TypeScript
+into browser-ready JavaScript and source maps under `dist/`.
+
+`dist/` is committed deliberately so an end user can open `index.html` without
+installing a toolchain. After source changes:
+
+```text
+npm run typecheck
+npm run build
+git status --short
+```
+
+Commit the matching generated `dist/` files with their TypeScript sources.
+
+### Full browser suites
+
+Start a local static server from the repository root:
+
+```text
+python -m http.server 8000
+```
+
+Then open:
+
+- `http://127.0.0.1:8000/tests/index.html` — golden parser, graph, dependency,
+  and exporter tests
+- `http://127.0.0.1:8000/tests/fuzz.html` — deterministic mutation and invariant
+  tests
+- `http://127.0.0.1:8000/tests/ui.html` — browser interaction and local-runtime
+  tests
+
+The v1.0.0 baseline is:
+
+- 131 focused golden tests
+- 400 deterministic mutation cases
+- 12 browser interaction tests
+
+GitHub Actions installs dependencies, type-checks, builds, verifies generated
+files, runs the local-file smoke test, checks that the runtime remains
+local-only, and runs all three served browser suites on every push and pull
+request.
+
+### Project structure
 
 ```text
 index.html
 styles.css
+README.md
+RELEASE_NOTE_v1.0.0.md
 package.json
 package-lock.json
 tsconfig.json
+.gitattributes
 .github/
-└── workflows/correctness.yml
+└── workflows/
+    └── correctness.yml
+scripts/
+└── file-smoke.mjs    # dependency-free local-file release smoke test
 src/
-├── types.d.ts     # shared tokens, AST, graphs, diagnostics, and public contracts
-├── tokenizer.ts   # lexical analysis, escaping, balance checks, source spans
-├── dialects.ts    # dialect detection and procedural parsers
-├── lineage.ts     # CTE and query dependency extraction
-├── ir.ts          # graphs, shared model, diagnostics, and estate analysis
-├── exporters.ts   # Mermaid, draw.io, and narration output
-└── app.ts         # browser UI and workspace interaction
-dist/              # generated browser JavaScript and source maps
+├── types.d.ts        # shared tokens, AST, graphs, diagnostics, and contracts
+├── tokenizer.ts      # lexical analysis, escaping, balance checks, source spans
+├── dialects.ts       # dialect detection and procedural parsing
+├── lineage.ts        # CTE and query dependency extraction
+├── ir.ts             # graphs, diagnostics, and estate analysis
+├── exporters.ts      # Mermaid, draw.io, and narration output
+└── app.ts            # browser UI and workspace interaction
+dist/                 # generated JavaScript and source maps
 ├── src/
 └── tests/
 tests/
-├── index.html     # parser, model, dependency, and exporter suite
+├── index.html
+├── fuzz.html
+├── ui.html
 ├── fixtures.ts
-├── dialects/
-│   ├── db2.ts     # DB2 handlers, cursors, labelled loops, and graph edges
-│   ├── tsql.ts    # T-SQL exception propagation and graph-edge fixtures
-│   ├── plpgsql.ts # PL/pgSQL condition matching and propagation fixtures
-│   └── sqlite.ts  # SQLite trigger RAISE action and termination fixtures
-├── tsql-fixtures.ts
 ├── tests.ts
-├── fuzz.html      # deterministic mutation and invariant suite
 ├── fuzz.ts
-├── ui.html        # browser interaction and offline-runtime suite
-└── ui-tests.ts
+├── ui-tests.ts
+└── dialects/
+    ├── db2.ts
+    ├── tsql.ts
+    ├── plpgsql.ts
+    └── sqlite.ts
 vendor/
 └── mermaid/
     ├── mermaid.min.js
     └── LICENSE
 ```
 
-The shared model uses a discriminated TypeScript AST and records statements,
-source spans, branches, loops, scoped handlers, reads, writes, calls, result
-sets, diagnostics, and graph structures. Input the parser cannot consume is
-shown as an opaque unresolved node instead of disappearing from the chart.
+The shared model uses a discriminated TypeScript AST and records source spans,
+branches, loops, scoped handlers, reads, writes, calls, result sets,
+diagnostics, and graph structures.
 
-## 🧪 Testing
+## Release checklist
 
-For a fresh contributor checkout, install the pinned development dependency and
-compile the TypeScript:
+Run the following from a clean checkout before tagging a release:
 
 ```text
 npm ci
 npm run typecheck
 npm run build
+npm run test:file
+git status --short
 ```
 
-`npm run build` writes browser-ready JavaScript and source maps to `dist/`.
-Treat that directory as generated output and make source changes in `src/` or
-`tests/`.
+Then verify:
 
-You can then open these files in a browser:
+1. The three served browser suites pass.
+2. `git status --short` shows only the intended release changes.
+3. Generated `dist/` files match their TypeScript sources.
+4. The Mermaid SHA-256 matches the value in this README and the workflow.
+5. `RELEASE_NOTE_v1.0.0.md` matches the final tag contents.
+6. The complete archive opens locally with `index.html`.
+7. The tag is named `v1.0.0`.
 
-- `tests/index.html` — golden parser, model, dependency, and exporter tests
-- `tests/fuzz.html` — deterministic mutation, no-crash, source-span, graph,
-  determinism, Mermaid, and draw.io invariants
-- `tests/ui.html` — object selection, linked diagrams, source highlighting, and
-  offline-runtime tests
+The release can then be created manually from the `v1.0.0` tag using
+[RELEASE_NOTE_v1.0.0.md](RELEASE_NOTE_v1.0.0.md).
 
-GitHub Actions type-checks, builds, and runs all three browser suites for every
-push and pull request.
-
-Current coverage includes 54 focused T-SQL cases, all four dialects,
-DB2 handler scope, cursor/NOT FOUND flow, labelled loop control, graph-edge
-assertions, T-SQL THROW/CATCH propagation and RAISERROR severity,
-T-SQL `XACT_STATE()` recovery routing, `@@TRANCOUNT` depth decisions, nested
-commit/full rollback behavior, savepoint scope, `SET XACT_ABORT` context, and
-invalid-action termination, PL/pgSQL
-EXCEPTION matching and rethrow propagation, malformed-input diagnostics, SQLite
-trigger RAISE rollback/termination behavior and conditional `WHERE` /
-searched-`CASE` paths, CTE/report queries, dynamic SQL, temporary-table writes,
-multi-object estates, special-character escaping, draw.io XML validation, and
-400 deterministic mutation cases.
-
-## 🛣️ Roadmap
+## Roadmap after v1.0.0
 
 1. Expand the anonymised golden SQL fixture corpus.
 2. Improve table-function, `APPLY`, comma-source, and DML lineage.
@@ -311,16 +458,23 @@ multi-object estates, special-character escaping, draw.io XML validation, and
 5. Accept database catalogue metadata for more accurate object resolution.
 6. Add column-level lineage where it can be resolved safely.
 7. Add optional local workspace persistence and dependency filtering.
+8. Separate graph, transaction, and estate-analysis internals while preserving
+   the v1.0.0 behavior through golden tests.
 
-## 🤝 Contributing
+## Contributing and reporting problems
 
-Useful bug reports include:
+A useful bug report includes:
 
 - the selected and detected dialect;
 - a minimal anonymised SQL example;
 - the generated Mermaid source;
-- the expected control flow or dependency; and
+- the expected control flow or dependency;
+- the reported confidence, coverage, and diagnostics; and
 - the browser and version.
+
+For parser changes, add a focused fixture that fails before the change and
+passes afterward. Run type-checking, the build, the local-file smoke test, and
+the relevant browser suites before opening a pull request.
 
 Never include production credentials, confidential data, or SQL that cannot be
 shared safely in a public issue.

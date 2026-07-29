@@ -1,0 +1,14 @@
+* text=auto
+
+*.css text eol=lf
+*.html text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.map text eol=lf
+*.md text eol=lf
+*.mjs text eol=lf
+*.ts text eol=lf
+*.yml text eol=lf
+
+# Preserve the reviewed third-party runtime with its pinned LF bytes.
+vendor/mermaid/mermaid.min.js text eol=lf
