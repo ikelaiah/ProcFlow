@@ -1,6 +1,31 @@
-# proc>flow 🔎
+<h1 align="center">
+  <img src="assets/procflow-logo.svg"
+       alt="proc&gt;flow — SQL logic and dependency visualiser"
+       width="760">
+</h1>
 
-Understand complicated SQL without tracing every branch by hand.
+<p align="center"><strong>Understand complicated SQL without tracing every branch by hand.</strong></p>
+
+<p align="center">
+  <a href="https://github.com/ikelaiah/ProcFlow/actions/workflows/correctness.yml">
+    <img src="https://github.com/ikelaiah/ProcFlow/actions/workflows/correctness.yml/badge.svg?branch=main"
+         alt="Correctness workflow status">
+  </a>
+  <a href="https://github.com/ikelaiah/ProcFlow/releases/latest">
+    <img src="https://img.shields.io/github/v/release/ikelaiah/ProcFlow?display_name=tag&amp;sort=semver"
+         alt="Latest release">
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/github/license/ikelaiah/ProcFlow?color=54c39b"
+         alt="MIT license">
+  </a>
+  <a href="#security-and-privacy">
+    <img src="https://img.shields.io/badge/runtime-local--only-54c39b"
+         alt="Runtime: local only">
+  </a>
+</p>
+
+<hr>
 
 `proc>flow` is a local-first SQL logic and dependency visualiser for database
 administrators, SQL report engineers, developers, analysts, and reviewers.
@@ -388,6 +413,8 @@ tsconfig.json
 .github/
 └── workflows/
     └── correctness.yml
+assets/
+└── procflow-logo.svg  # adaptive light/dark README wordmark
 scripts/
 └── file-smoke.mjs    # dependency-free local-file release smoke test
 src/

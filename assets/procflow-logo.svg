@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="220" viewBox="0 0 780 220" role="img" aria-labelledby="title description">
+  <title id="title">proc&gt;flow</title>
+  <desc id="description">ProcFlow logo with a SQL flowchart inside a terminal window</desc>
+
+  <style>
+    .shell-fill { fill: #f5f8fa; }
+    .shell-stroke { stroke: #c5d0d8; }
+    .shell-rule { stroke: #d9e1e7; }
+    .flow-edge { stroke: #6f8798; }
+    .wordmark { fill: #14202a; }
+    .tagline { fill: #5d7385; }
+
+    @media (prefers-color-scheme: dark) {
+      .shell-fill { fill: #18232c; }
+      .shell-stroke { stroke: #3a4f5e; }
+      .shell-rule { stroke: #2b3d4a; }
+      .flow-edge { stroke: #7c93a5; }
+      .wordmark { fill: #e7eef3; }
+      .tagline { fill: #8ea3b4; }
+    }
+  </style>
+
+  <g transform="translate(20 20)">
+    <rect class="shell-fill shell-stroke" x="1.5" y="1.5" width="177" height="177" rx="22" stroke-width="3"/>
+    <path class="shell-rule" d="M2 38.5h176" fill="none" stroke-width="3"/>
+
+    <circle cx="22" cy="20" r="4" fill="#e4645e"/>
+    <circle cx="36" cy="20" r="4" fill="#e8a33d"/>
+    <circle cx="50" cy="20" r="4" fill="#54c39b"/>
+
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path class="flow-edge" d="M90 59v21M90 104v17M90 121H54v17M90 121h36v17" stroke-width="5"/>
+      <path class="flow-edge" d="M54 153v9h72v-9" stroke-width="5" opacity=".55"/>
+    </g>
+
+    <rect x="77" y="47" width="26" height="20" rx="10" fill="#e8a33d"/>
+    <path d="M90 78l13 13-13 13-13-13z" fill="#7ea6e0"/>
+    <rect x="39" y="136" width="30" height="20" rx="6" fill="#54c39b"/>
+    <rect x="111" y="136" width="30" height="20" rx="6" fill="#e4645e"/>
+
+    <path d="M17 64l8 8-8 8M30 80h13" fill="none" stroke="#e8a33d" stroke-linecap="round" stroke-linejoin="round" stroke-width="4" opacity=".85"/>
+  </g>
+
+  <text class="wordmark" x="230" y="118" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, Liberation Mono, monospace" font-size="88" font-weight="700" letter-spacing="-5">
+    proc<tspan fill="#e8a33d">&gt;</tspan>flow
+  </text>
+
+  <text class="tagline" x="236" y="158" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="18" font-weight="650" letter-spacing="4">
+    SQL LOGIC  •  DEPENDENCIES  •  LOCAL ONLY
+  </text>
+</svg>
