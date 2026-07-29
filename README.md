@@ -1,8 +1,8 @@
-<h1 align="center">
+<p align="center">
   <img src="assets/procflow-logo.svg"
        alt="proc&gt;flow — SQL logic and dependency visualiser"
        width="760">
-</h1>
+</p>
 
 <p align="center"><strong>Understand complicated SQL without tracing every branch by hand.</strong></p>
 
