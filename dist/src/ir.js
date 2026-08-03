@@ -441,16 +441,37 @@ function buildGraph(ast, header, opts) {
     var nodes = [], edges = [], seq = 0;
     var stats = { stmt: 0, branch: 0, loop: 0, cat: 0, exit: 0, depth: 0, opaque: 0 };
     var labels = {}, gotos = [];
+    var constructCounts = {};
+    function edgeKindFor(cls, style) {
+        if (style === 'dotted')
+            return 'exception';
+        if (cls === 'call')
+            return 'call';
+        if (cls === 'io' || cls === 'src')
+            return 'data';
+        return 'control';
+    }
     function add(shape, text, cls, source) {
         var id = 'n' + (++seq);
         nodes.push({ id: id, shape: shape, text: (text && String(text).trim()) || '…',
-            cls: cls, source: source || null });
+            cls: cls, source: source || null,
+            provenance: source ? 'source' : 'synthetic' });
         return id;
     }
     function link(from, to, label, style) {
         if (!from || !to)
             return;
-        edges.push({ from: from, to: to, label: label || '', style: style || 'solid' });
+        var fromNode = nodes.filter(function (n) { return n.id === from; })[0];
+        var kind = fromNode ? edgeKindFor(fromNode.cls, style || 'solid') : 'control';
+        edges.push({ from: from, to: to, label: label || '', style: style || 'solid', kind: kind });
+    }
+    function trackConstruct(kind, resolved, opaque) {
+        var c = constructCounts[kind] = constructCounts[kind] || { detected: 0, resolved: 0, opaque: 0 };
+        c.detected++;
+        if (opaque)
+            c.opaque++;
+        else if (resolved)
+            c.resolved++;
     }
     function joinExits(exits, to) {
         for (var i = 0; i < exits.length; i++)
@@ -1455,7 +1476,8 @@ function dependencyGraph(objects) {
     function add(text, cls, source, objectId) {
         var id = 'd' + (++seq);
         nodes.push({ id: id, shape: cls === 'src' ? 'io' : 'rect', text: text, cls: cls,
-            source: source || null, objectId: objectId || null });
+            source: source || null, objectId: objectId || null,
+            provenance: source ? 'source' : (objectId ? 'external' : 'synthetic') });
         return id;
     }
     objects.forEach(function (o) {
@@ -1477,8 +1499,10 @@ function dependencyGraph(objects) {
             { items: o.writes, label: 'writes', type: 'write' },
             { items: o.calls, label: 'calls', type: 'call' }].forEach(function (group) {
             group.items.forEach(function (name) {
+                var kind = group.type === 'call' ? 'call' :
+                    (group.type === 'write' ? 'data' : 'dependency');
                 edges.push({ from: from, to: target(name, group.type), label: group.label,
-                    style: group.type === 'write' ? 'dotted' : 'solid' });
+                    style: group.type === 'write' ? 'dotted' : 'solid', kind: kind });
             });
         });
     });
@@ -1540,7 +1564,8 @@ function analyse(sql, opts) {
         diagnostics.push({ severity: 'error', code: 'unconsumed_input',
             message: 'Parser stopped before ' + remaining.length + ' token' + (remaining.length === 1 ? ' was' : 's were') +
                 ' consumed. The diagram may be incomplete.',
-            span: { start: remaining[0].pos, end: remaining[remaining.length - 1].end } });
+            span: { start: remaining[0].pos, end: remaining[remaining.length - 1].end },
+            scope: 'region' });
         ast.push({ type: 'unknown', toks: remaining, reason: 'Parser stopped before this input.' });
     }
     var totalTokens = bodyToks.length, consumedTokens = Math.min(p.i, totalTokens);
@@ -1548,13 +1573,14 @@ function analyse(sql, opts) {
     if ((!opts.dialect || opts.dialect === 'auto') && !det.confident) {
         diagnostics.push({ severity: 'warning', code: 'dialect_low_confidence',
             message: 'Dialect detection is uncertain; select the dialect manually if the diagram looks wrong.',
-            span: { start: 0, end: Math.min(String(sql || '').length, 1) } });
+            span: { start: 0, end: Math.min(String(sql || '').length, 1) },
+            scope: 'document' });
     }
     walkAst(ast, function (st) {
         if (st.type === 'dynamic')
             diagnostics.push({ severity: 'warning', code: 'dynamic_sql',
                 message: 'Dynamic SQL is opaque and its internal reads, writes, calls, and branches are not resolved.',
-                span: spanOfTokens(st.toks) });
+                span: spanOfTokens(st.toks), scope: 'region' });
     }, 0);
     if (dialect === 'plpgsql')
         addPgTransactionDiagnostics(ast, header, diagnostics, false);
@@ -1577,11 +1603,116 @@ function analyse(sql, opts) {
     var dialectConfidence = (opts.dialect && opts.dialect !== 'auto') ? 1 : Math.min(1, (det.score || 0) / 7);
     var hasErrors = diagnostics.some(function (d) { return d.severity === 'error'; });
     var confidence = Math.max(0, Math.min(1, dialectConfidence * coverage * (hasErrors ? 0.55 : 1)));
+    /* Token attribution: every body token is resolved, deliberately ignored, or opaque/unresolved. */
+    var attribution = { total: totalTokens, resolved: 0, ignored: 0,
+        unresolved: 0, opaque: 0, ignoredCategories: {} };
+    var attributed = new Array(totalTokens).fill(false);
+    function markAttributed(start, end) {
+        for (var ai = 0; ai < totalTokens; ai++) {
+            var tok = bodyToks[ai];
+            if (tok && tok.pos >= start && tok.end <= end)
+                attributed[ai] = true;
+        }
+    }
+    walkAst(ast, function (st) {
+        if ('toks' in st && st.toks && st.toks.length) {
+            var span = spanOfTokens(st.toks);
+            if (span)
+                markAttributed(span.start, span.end);
+            if (st.type === 'dynamic' || st.type === 'unknown')
+                attribution.opaque += st.toks.length;
+            else
+                attribution.resolved += st.toks.length;
+        }
+        if (st.type === 'if' && st.cond && st.cond.length) {
+            var cspan = spanOfTokens(st.cond);
+            if (cspan)
+                markAttributed(cspan.start, cspan.end);
+            attribution.resolved += st.cond.length;
+        }
+        if ((st.type === 'while' || st.type === 'repeat') && st.cond && st.cond.length) {
+            var wspan = spanOfTokens(st.cond);
+            if (wspan)
+                markAttributed(wspan.start, wspan.end);
+            attribution.resolved += st.cond.length;
+        }
+        if (st.type === 'for' && st.head && st.head.length) {
+            var fspan = spanOfTokens(st.head);
+            if (fspan)
+                markAttributed(fspan.start, fspan.end);
+            attribution.resolved += st.head.length;
+        }
+        if (st.type === 'case' && st.sel && st.sel.length) {
+            var sspan = spanOfTokens(st.sel);
+            if (sspan)
+                markAttributed(sspan.start, sspan.end);
+            attribution.resolved += st.sel.length;
+        }
+    }, 0);
+    /* Semicolons and block keywords are deliberately ignored syntax. */
+    for (var bi = 0; bi < totalTokens; bi++) {
+        if (attributed[bi])
+            continue;
+        var bt = bodyToks[bi];
+        if (!bt)
+            continue;
+        if (bt.v === ';') {
+            attribution.ignored++;
+            attribution.ignoredCategories['semicolon'] = (attribution.ignoredCategories['semicolon'] || 0) + 1;
+        }
+        else if (['BEGIN', 'END', 'THEN', 'ELSE', 'ELSEIF', 'ELSIF', 'DO', 'LOOP', 'WHEN', 'EXCEPTION',
+            'UNTIL', 'TRY', 'CATCH', 'ATOMIC', 'NOT'].indexOf(bt.u) >= 0) {
+            attribution.ignored++;
+            attribution.ignoredCategories['block_keyword'] = (attribution.ignoredCategories['block_keyword'] || 0) + 1;
+        }
+        else {
+            attribution.unresolved++;
+        }
+    }
+    /* Construct coverage: branches, loops, handlers, CTEs, source refs. */
+    var constructCoverage = { constructs: 0, resolved: 0, opaque: 0, byKind: {} };
+    function trackC(kind, resolved, opaque) {
+        var c = constructCoverage.byKind[kind] = constructCoverage.byKind[kind] ||
+            { detected: 0, resolved: 0, opaque: 0 };
+        c.detected++;
+        if (opaque)
+            c.opaque++;
+        else if (resolved)
+            c.resolved++;
+        constructCoverage.constructs++;
+        if (opaque)
+            constructCoverage.opaque++;
+        else if (resolved)
+            constructCoverage.resolved++;
+    }
+    walkAst(ast, function (st) {
+        if (st.type === 'if' || st.type === 'case')
+            trackC('branch', true);
+        else if (['while', 'for', 'loop', 'repeat'].indexOf(st.type) >= 0)
+            trackC('loop', true);
+        else if (st.type === 'try')
+            trackC('handler', true);
+        else if (st.type === 'handler')
+            trackC('handler', true);
+        else if (st.type === 'dynamic')
+            trackC('dynamic', false, true);
+        else if (st.type === 'unknown')
+            trackC('unresolved', false, true);
+    }, 0);
+    walkAst(ast, function (st) {
+        if ('toks' in st && st.toks) {
+            var split = splitCTEs(st.toks);
+            split.ctes.forEach(function (c) { trackC('cte', true); });
+            var info = refsIn(st.toks);
+            info.refs.forEach(function () { trackC('source_ref', true); });
+        }
+    }, 0);
     return { dialect: dialect, detected: det, confidence: confidence,
         dialectConfidence: dialectConfidence, coverage: coverage,
         consumedTokens: consumedTokens, totalTokens: totalTokens,
         diagnostics: diagnostics, header: header, ast: ast, mode: selectedMode,
         graph: selected, stats: selected.stats,
-        mermaid: toMermaid(selected, opts.dir || 'TD') };
+        mermaid: toMermaid(selected, opts.dir || 'TD'),
+        attribution: attribution, constructCoverage: constructCoverage };
 }
 //# sourceMappingURL=ir.js.map
