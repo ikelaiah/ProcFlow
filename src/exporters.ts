@@ -1,4 +1,46 @@
 ﻿/* proc>flow: Mermaid, draw.io, and narration exporters */
+/* Canonical node-class→shape/style and semantic edge-kind→style mapping shared by both exporters. */
+var CANONICAL_NODE_STYLE: Record<string, string>={
+  start:'fill:#2b3d4a,stroke:#8ea3b4,color:#e7eef3',
+  stmt:'fill:#1e2b35,stroke:#516878,color:#e7eef3',
+  notice:'fill:#25313a,stroke:#7b91a3,color:#d7e2ea',
+  io:'fill:#1b3140,stroke:#7ea6e0,color:#dcebff',
+  cursor:'fill:#172d36,stroke:#4fb3a5,color:#d9fff8',
+  call:'fill:#20303c,stroke:#7ea6e0,color:#dcebff',
+  tran:'fill:#232f2b,stroke:#54c39b,color:#dff5ec',
+  cond:'fill:#3a2c15,stroke:#e8a33d,color:#ffeccc',
+  loop:'fill:#152b3d,stroke:#7ea6e0,color:#dcebff',
+  try:'fill:#1f2c33,stroke:#54c39b,color:#dff5ec',
+  catch:'fill:#39231f,stroke:#e4645e,color:#ffdedc',
+  ret:'fill:#1f3329,stroke:#54c39b,color:#dff5ec',
+  err:'fill:#3a2320,stroke:#e4645e,color:#ffdedc',
+  halt:'fill:#2a2438,stroke:#a98fd6,color:#ece4ff',
+  opaque:'fill:#332b1f,stroke:#f59e0b,color:#fef3c7,stroke-dasharray:5 3',
+  flowctl:'fill:#2a2438,stroke:#a98fd6,color:#ece4ff',
+  cte:'fill:#1c2f3f,stroke:#7ea6e0,color:#dcebff',
+  src:'fill:#1b242c,stroke:#4c6274,color:#a9bccb',
+  final:'fill:#3a2c15,stroke:#e8a33d,color:#ffeccc'
+};
+var CANONICAL_EDGE_STYLE: Record<string, string>={
+  control:'solid', exception:'dotted', data:'solid', dependency:'solid', call:'solid'
+};
+var CANONICAL_EDGE_COLOR: Record<string, string>={
+  control:'#64748b', exception:'#e4645e', data:'#54c39b', dependency:'#64748b', call:'#7ea6e0'
+};
+
+function provenanceComment(graph: Graph): string {
+  var lines: string[]=['%% proc>flow provenance'];
+  (graph.nodes||[]).forEach(function(n){
+    var bits: string[]=[n.id+':'+n.cls];
+    if(n.provenance) bits.push('provenance='+n.provenance);
+    if(n.source) bits.push('span='+n.source.start+'-'+n.source.end);
+    if(n.objectId) bits.push('object='+n.objectId);
+    if(n.reason) bits.push('reason='+n.reason);
+    lines.push('%% '+bits.join(' '));
+  });
+  return lines.join('\n');
+}
+
 function toMermaid(graph: Graph, dir?: DiagramDirection): string {
   var L: string[]=['flowchart '+(dir||'TD')];
   var wrap: Record<string, [string, string]>={rect:['["','"]'], diamond:['{"','"}'], hex:['{{"','"}}'],
@@ -15,6 +57,8 @@ function toMermaid(graph: Graph, dir?: DiagramDirection): string {
     var arrow=e.style==='dotted' ? '-.->' : '-->';
     L.push('  '+e.from+' '+arrow+(e.label?'|'+escLabel(e.label)+'|':'')+' '+e.to);
   });
+  /* Provenance metadata as a Mermaid comment block. */
+  L.push(provenanceComment(graph));
   var styles: Record<string, string>={
     start:'fill:#2b3d4a,stroke:#8ea3b4,color:#e7eef3',
     stmt:'fill:#1e2b35,stroke:#516878,color:#e7eef3',
@@ -141,19 +185,29 @@ function toDrawio(graph: Graph, opts?: DrawioOptions): string {
     '        <mxCell id="1" parent="0"/>'];
   graph.nodes.forEach(function(n){
     var p=pos[n.id]||{x:0,y:0,w:180,h:60};
+    /* Provenance metadata on draw.io vertices: source spans, object identity, and synthetic origin. */
+    var meta: string[]=[];
+    if(n.provenance) meta.push('provenance='+n.provenance);
+    if(n.source) meta.push('span='+n.source.start+'-'+n.source.end);
+    if(n.objectId) meta.push('object='+n.objectId);
+    if(n.reason) meta.push('reason='+n.reason);
+    var metaAttr=meta.length?' data-procflow="'+xmlAttr(meta.join(' '))+'"':'';
     L.push('        <mxCell id="pf-'+xmlAttr(n.id)+'" value="'+xmlAttr(n.text).replace(/\u0001/g,'&#xa;')+
-      '" style="'+xmlAttr(nodeStyle(n))+'" vertex="1" parent="1">');
+      '" style="'+xmlAttr(nodeStyle(n))+'" vertex="1" parent="1"'+metaAttr+'>');
     L.push('          <mxGeometry x="'+Math.round(p.x)+'" y="'+Math.round(p.y)+
       '" width="'+p.w+'" height="'+p.h+'" as="geometry"/>');
     L.push('        </mxCell>');
   });
   graph.edges.forEach(function(e,i){
+    var kind=e.kind||'control';
+    var edgeColor=CANONICAL_EDGE_COLOR[kind]||'#64748b';
     var style='edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;'+
-      'html=0;endArrow=block;endFill=1;strokeColor=#64748b;fontColor=#334155;';
-    if(e.style==='dotted') style+='dashed=1;';
+      'html=0;endArrow=block;endFill=1;strokeColor='+edgeColor+';fontColor=#334155;';
+    if(e.style==='dotted'||CANONICAL_EDGE_STYLE[kind]==='dotted') style+='dashed=1;';
+    var kindAttr=e.kind?' data-procflow-kind="'+xmlAttr(e.kind)+'"':'';
     L.push('        <mxCell id="pf-e'+(i+1)+'" value="'+xmlAttr(e.label||'')+
       '" style="'+xmlAttr(style)+'" edge="1" parent="1" source="pf-'+xmlAttr(e.from)+
-      '" target="pf-'+xmlAttr(e.to)+'">');
+      '" target="pf-'+xmlAttr(e.to)+'"'+kindAttr+'>');
     L.push('          <mxGeometry relative="1" as="geometry"/>');
     L.push('        </mxCell>');
   });

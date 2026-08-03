@@ -66,7 +66,7 @@ function splitCTEs(toks) {
     return res;
 }
 function refsIn(toks) {
-    var refs = [], joins = 0, unions = 0, subs = 0, filtered = false, d = 0, agg = false;
+    var refs = [], structuredRefs = [], joins = 0, unions = 0, subs = 0, filtered = false, d = 0, agg = false;
     for (var i = 0; i < toks.length; i++) {
         var t = toks[i];
         if (t.v === '(') {
@@ -93,10 +93,27 @@ function refsIn(toks) {
             var n = toks[i + 1];
             if (!n || n.type !== 'word' || n.v === '(' || NOT_TABLE[n.u])
                 continue;
-            refs.push(qname(toks, i + 1));
+            var name = qname(toks, i + 1);
+            refs.push(name);
+            /* Build a structured reference with span, role, and resolution. */
+            var nameStart = i + 1, nameEnd = i + 1;
+            while (toks[nameEnd] && (toks[nameEnd].v === '.' ||
+                (toks[nameEnd].type === 'word' && toks[nameEnd - 1] && toks[nameEnd - 1].v === '.')))
+                nameEnd++;
+            if (toks[nameEnd] && toks[nameEnd].type === 'word' &&
+                !(toks[nameEnd - 1] && toks[nameEnd - 1].v === '.'))
+                nameEnd++;
+            var span = null;
+            if (toks[nameStart] && toks[nameEnd - 1])
+                span = { start: toks[nameStart].pos, end: toks[nameEnd - 1].end };
+            structuredRefs.push({
+                name: name, span: span, role: 'read',
+                resolution: name.split('.').length >= 3 ? 'heuristic' : 'exact'
+            });
         }
     }
-    return { refs: refs, joins: joins, unions: unions, subs: subs, filtered: filtered, agg: agg };
+    return { refs: refs, structuredRefs: structuredRefs,
+        joins: joins, unions: unions, subs: subs, filtered: filtered, agg: agg };
 }
 function buildQueryGraph(stmtToks, header, opts) {
     opts = opts || {};
@@ -108,12 +125,14 @@ function buildQueryGraph(stmtToks, header, opts) {
     function add(shape, text, cls, source) {
         var id = 'q' + (++seq);
         nodes.push({ id: id, shape: shape, text: (text && String(text).trim()) || '…',
-            cls: cls, source: source || null });
+            cls: cls, source: source || null,
+            provenance: source ? 'source' : 'synthetic' });
         return id;
     }
     function link(a, b, label) {
         if (a && b && a !== b)
-            edges.push({ from: a, to: b, label: label || '', style: 'solid' });
+            edges.push({ from: a, to: b, label: label || '', style: 'solid',
+                kind: 'dependency' });
     }
     function descr(r) {
         var bits = [];
@@ -250,20 +269,20 @@ function buildObjectQueryGraph(ast, header, opts) {
                 if (!sourceIds[sourceKey]) {
                     sourceIds[sourceKey] = 'oq' + (++seq);
                     nodes.push({ id: sourceIds[sourceKey], shape: n.shape, text: n.text, cls: n.cls,
-                        source: n.source || null });
+                        source: n.source || null, provenance: n.provenance || 'synthetic' });
                 }
                 remap[n.id] = sourceIds[sourceKey];
             }
             else {
                 remap[n.id] = 'oq' + (++seq);
                 nodes.push({ id: remap[n.id], shape: n.shape, text: n.text, cls: n.cls,
-                    source: n.source || null });
+                    source: n.source || null, provenance: n.provenance || 'synthetic' });
             }
         });
         child.edges.forEach(function (e) {
             if (remap[e.from] && remap[e.to] && remap[e.from] !== remap[e.to])
                 edges.push({ from: remap[e.from], to: remap[e.to], label: e.label || '',
-                    style: e.style || 'solid' });
+                    style: e.style || 'solid', kind: e.kind || 'dependency' });
         });
         stats.ctes += child.stats.ctes;
         stats.joins += child.stats.joins;

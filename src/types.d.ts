@@ -5,6 +5,11 @@ type DialectChoice = Dialect | 'auto';
 type DiagramDirection = 'TD' | 'LR';
 type DiagramMode = 'auto' | 'flow' | 'query';
 type DiagnosticSeverity = 'error' | 'warning';
+type DiagnosticScope = 'document' | 'region';
+type NodeProvenance = 'source' | 'external' | 'synthetic';
+type EdgeKind = 'control' | 'exception' | 'data' | 'dependency' | 'call';
+type QueryReferenceRole = 'read' | 'write' | 'call' | 'produce';
+type QueryResolution = 'exact' | 'heuristic' | 'opaque';
 
 interface SourceSpan {
   start: number;
@@ -16,6 +21,7 @@ interface Diagnostic {
   code: string;
   message: string;
   span: SourceSpan | null;
+  scope?: DiagnosticScope;
 }
 
 type TokenType = 'word' | 'op' | 'str' | 'num' | 'dollar';
@@ -256,6 +262,9 @@ interface GraphNode {
   cls: string;
   source: SourceSpan | null;
   objectId?: string | null;
+  provenance?: NodeProvenance;
+  reason?: string;
+  sources?: SourceSpan[];
 }
 
 interface GraphEdge {
@@ -263,6 +272,7 @@ interface GraphEdge {
   to: string;
   label: string;
   style: string;
+  kind?: EdgeKind;
 }
 
 interface GraphStats {
@@ -276,8 +286,16 @@ interface Graph {
   empty?: boolean;
 }
 
+interface StructuredQueryReference {
+  name: string;
+  span: SourceSpan | null;
+  role: QueryReferenceRole;
+  resolution: QueryResolution;
+}
+
 interface QueryReferenceInfo {
   refs: string[];
+  structuredRefs?: StructuredQueryReference[];
   joins: number;
   unions: number;
   subs: number;
@@ -321,6 +339,22 @@ interface DrawioPosition {
   h: number;
 }
 
+interface TokenAttribution {
+  total: number;
+  resolved: number;
+  ignored: number;
+  unresolved: number;
+  opaque: number;
+  ignoredCategories: Record<string, number>;
+}
+
+interface ConstructCoverage {
+  constructs: number;
+  resolved: number;
+  opaque: number;
+  byKind: Record<string, {detected: number; resolved: number; opaque: number}>;
+}
+
 interface AnalysisResult {
   dialect: Dialect;
   detected: DialectDetection;
@@ -336,6 +370,8 @@ interface AnalysisResult {
   graph: Graph;
   stats: GraphStats;
   mermaid: string;
+  attribution?: TokenAttribution;
+  constructCoverage?: ConstructCoverage;
 }
 
 interface WorkspaceFile {
@@ -414,6 +450,7 @@ interface ExpectedGraphWire {
   toOccurrence?: number;
   label?: string;
   style?: 'solid' | 'dotted';
+  kind?: EdgeKind;
 }
 
 interface ExpectedGraphNode {

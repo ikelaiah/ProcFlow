@@ -191,6 +191,19 @@
         record('Multi-object estate and dependencies', false, String(err && err.stack || err));
     }
     try {
+        var alterSource = 'CREATE OR ALTER PROCEDURE dbo.pasted_once AS BEGIN SELECT 1; END';
+        var replaceSource = 'CREATE OR REPLACE FUNCTION public.pasted_once() RETURNS integer ' +
+            'LANGUAGE plpgsql AS $$ BEGIN RETURN 1; END; $$;';
+        var alterEstate = analyseEstate([{ name: 'Pasted SQL', text: alterSource }], { dialect: 'tsql', mode: 'auto', group: false, sources: true });
+        var replaceEstate = analyseEstate([{ name: 'Pasted SQL', text: replaceSource }], { dialect: 'plpgsql', mode: 'auto', group: false, sources: true });
+        record('CREATE OR ALTER/REPLACE remains one clean pasted object', alterEstate.objects.length === 1 && alterEstate.objects[0].source === alterSource &&
+            replaceEstate.objects.length === 1 && replaceEstate.objects[0].source === replaceSource, JSON.stringify({ alter: alterEstate.objects.map(function (o) { return o.source; }),
+            replace: replaceEstate.objects.map(function (o) { return o.source; }) }));
+    }
+    catch (err) {
+        record('CREATE OR ALTER/REPLACE remains one clean pasted object', false, String(err && err.stack || err));
+    }
+    try {
         var escaped = analyse('SELECT \'<tag>&"\' value FROM dbo.source;', { dialect: 'tsql', mode: 'auto', group: false, sources: true });
         var xml = toDrawio(escaped.graph, { title: 'A&B', dir: 'TD' });
         var doc = new DOMParser().parseFromString(xml, 'application/xml');
@@ -198,6 +211,73 @@
     }
     catch (err) {
         record('draw.io XML remains well formed', false, String(err && err.stack || err));
+    }
+    /* v1.1.0: semantic edge kinds, node provenance, token attribution, construct coverage. */
+    try {
+        var semantic = analyse('CREATE PROC dbo.semantic AS BEGIN\n' +
+            '  BEGIN TRY\n' +
+            '    UPDATE dbo.Work SET Status = 1;\n' +
+            "    THROW 50001, 'stop', 1;\n" +
+            '  END TRY\n' +
+            '  BEGIN CATCH\n' +
+            '    INSERT INTO dbo.ErrorLog(ErrorNumber) VALUES (ERROR_NUMBER());\n' +
+            '  END CATCH;\n' +
+            'END', { dialect: 'tsql', mode: 'flow', group: false, sources: true, fanIn: true });
+        var allEdgesHaveKind = semantic.graph.edges.every(function (e) { return !!e.kind; });
+        var allNodesHaveProvenance = semantic.graph.nodes.every(function (n) { return !!n.provenance; });
+        var hasExceptionEdge = semantic.graph.edges.some(function (e) { return e.kind === 'exception'; });
+        var hasControlEdge = semantic.graph.edges.some(function (e) { return e.kind === 'control'; });
+        var hasDataEdge = semantic.graph.edges.some(function (e) { return e.kind === 'data'; });
+        var hasAttribution = !!semantic.attribution && semantic.attribution.total > 0;
+        var hasConstructCoverage = !!semantic.constructCoverage && semantic.constructCoverage.constructs > 0;
+        record('v1.1.0 semantic edge kinds and node provenance', allEdgesHaveKind && allNodesHaveProvenance && hasExceptionEdge && hasControlEdge && hasDataEdge, JSON.stringify({ edges: semantic.graph.edges.map(function (e) { return e.kind; }),
+            nodes: semantic.graph.nodes.map(function (n) { return n.provenance; }) }));
+        record('v1.1.0 token attribution and construct coverage', hasAttribution && hasConstructCoverage, JSON.stringify({ attribution: semantic.attribution, constructCoverage: semantic.constructCoverage }));
+    }
+    catch (err) {
+        record('v1.1.0 semantic edge kinds and node provenance', false, String(err && err.stack || err));
+        record('v1.1.0 token attribution and construct coverage', false, String(err && err.stack || err));
+    }
+    try {
+        var structured = analyse('SELECT id FROM dbo.student s JOIN dbo.school sc ON sc.id=s.school_id;', { dialect: 'tsql', mode: 'query', group: false, sources: true });
+        var info = refsIn(structured.ast[0].toks);
+        var hasStructuredRefs = !!info.structuredRefs && info.structuredRefs.length >= 2;
+        var refsHaveSpans = hasStructuredRefs && info.structuredRefs.every(function (r) {
+            return !!r.span && r.span.start >= 0 && r.span.end > r.span.start;
+        });
+        var refsHaveRoles = hasStructuredRefs && info.structuredRefs.every(function (r) {
+            return r.role === 'read' && (r.resolution === 'exact' || r.resolution === 'heuristic');
+        });
+        record('v1.1.0 structured query references with spans and roles', hasStructuredRefs && refsHaveSpans && refsHaveRoles, JSON.stringify(info.structuredRefs));
+    }
+    catch (err) {
+        record('v1.1.0 structured query references with spans and roles', false, String(err && err.stack || err));
+    }
+    try {
+        var provenance = analyse('CREATE PROC dbo.provenance AS BEGIN\n' +
+            '  SELECT 1;\n' +
+            '  EXEC dbo.child;\n' +
+            'END', { dialect: 'tsql', mode: 'flow', group: false, sources: true });
+        var mermaid = toMermaid(provenance.graph, 'TD');
+        var hasProvenanceComment = /%% proc>flow provenance/.test(mermaid);
+        var drawio = toDrawio(provenance.graph, { title: 'provenance', dir: 'TD' });
+        var hasDrawioMeta = /data-procflow=/.test(drawio);
+        var hasDrawioKind = /data-procflow-kind=/.test(drawio);
+        record('v1.1.0 export provenance metadata (Mermaid + draw.io)', hasProvenanceComment && hasDrawioMeta && hasDrawioKind, JSON.stringify({ mermaidHasComment: hasProvenanceComment,
+            drawioHasMeta: hasDrawioMeta, drawioHasKind: hasDrawioKind }));
+    }
+    catch (err) {
+        record('v1.1.0 export provenance metadata (Mermaid + draw.io)', false, String(err && err.stack || err));
+    }
+    try {
+        var scoped = analyse('SELECT 1; /* open', { dialect: 'tsql', mode: 'auto', group: false, sources: true });
+        var regionScoped = scoped.diagnostics.filter(function (d) { return d.scope === 'region'; });
+        var documentScoped = scoped.diagnostics.filter(function (d) { return d.scope === 'document'; });
+        var allScoped = scoped.diagnostics.every(function (d) { return d.scope === 'region' || d.scope === 'document'; });
+        record('v1.1.0 diagnostics carry document/region scope', allScoped && regionScoped.length > 0, JSON.stringify(scoped.diagnostics.map(function (d) { return { code: d.code, scope: d.scope }; })));
+    }
+    catch (err) {
+        record('v1.1.0 diagnostics carry document/region scope', false, String(err && err.stack || err));
     }
     var passed = results.filter(function (r) { return r.pass; }).length;
     document.body.className = passed === results.length ? 'pass' : 'fail';
