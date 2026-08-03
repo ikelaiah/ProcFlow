@@ -25,6 +25,18 @@
             pass: !get('analysis-details').hidden &&
                 get('btn-analysis-details').getAttribute('aria-expanded') === 'true' });
         get('btn-analysis-details').click();
+        var pastedSource = [
+            'CREATE OR ALTER PROCEDURE dbo.pasted_once AS',
+            'BEGIN',
+            '  SELECT 1;',
+            'END'
+        ].join('\n');
+        get('sql').value = pastedSource;
+        get('sql').dispatchEvent(new Event('input'));
+        get('btn-draw').click();
+        results.push({ name: 'single modified CREATE paste remains one clean source',
+            pass: get('object-select').options.length === 1 && get('sql').value === pastedSource,
+            detail: { objectCount: get('object-select').options.length, source: get('sql').value } });
         var source = [
             'CREATE VIEW dbo.export_students AS SELECT id FROM dbo.student;',
             'GO',
@@ -36,6 +48,7 @@
             'END'
         ].join('\n');
         get('sql').value = source;
+        get('sql').dispatchEvent(new Event('input'));
         get('btn-draw').click();
         results.push({ name: 'multi-object picker',
             pass: get('object-select').options.length === 2 && !get('lbl-object').hidden });

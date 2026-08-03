@@ -191,6 +191,19 @@
         record('Multi-object estate and dependencies', false, String(err && err.stack || err));
     }
     try {
+        var alterSource = 'CREATE OR ALTER PROCEDURE dbo.pasted_once AS BEGIN SELECT 1; END';
+        var replaceSource = 'CREATE OR REPLACE FUNCTION public.pasted_once() RETURNS integer ' +
+            'LANGUAGE plpgsql AS $$ BEGIN RETURN 1; END; $$;';
+        var alterEstate = analyseEstate([{ name: 'Pasted SQL', text: alterSource }], { dialect: 'tsql', mode: 'auto', group: false, sources: true });
+        var replaceEstate = analyseEstate([{ name: 'Pasted SQL', text: replaceSource }], { dialect: 'plpgsql', mode: 'auto', group: false, sources: true });
+        record('CREATE OR ALTER/REPLACE remains one clean pasted object', alterEstate.objects.length === 1 && alterEstate.objects[0].source === alterSource &&
+            replaceEstate.objects.length === 1 && replaceEstate.objects[0].source === replaceSource, JSON.stringify({ alter: alterEstate.objects.map(function (o) { return o.source; }),
+            replace: replaceEstate.objects.map(function (o) { return o.source; }) }));
+    }
+    catch (err) {
+        record('CREATE OR ALTER/REPLACE remains one clean pasted object', false, String(err && err.stack || err));
+    }
+    try {
         var escaped = analyse('SELECT \'<tag>&"\' value FROM dbo.source;', { dialect: 'tsql', mode: 'auto', group: false, sources: true });
         var xml = toDrawio(escaped.graph, { title: 'A&B', dir: 'TD' });
         var doc = new DOMParser().parseFromString(xml, 'application/xml');

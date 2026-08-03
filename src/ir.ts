@@ -1248,7 +1248,7 @@ function objectStartAt(toks: Token[], i: number){
      ['ALTER','REPLACE'].indexOf(toks[j+1].u)>=0) j+=2;
   while(toks[j]&&['TEMP','TEMPORARY','MATERIALIZED','UNIQUE','CLUSTERED'].indexOf(toks[j].u)>=0) j++;
   if(!toks[j]||OBJ_KINDS.indexOf(toks[j].u)<0) return null;
-  return {token:i, kind:toks[j].u, pos:t.pos};
+  return {token:j, kind:toks[j].u, pos:t.pos};
 }
 
 function splitSqlObjects(sql: string, fileName?: string): SqlUnit[] {
@@ -1377,6 +1377,9 @@ function analyse(sql: string, opts?: AnalyseOptions): AnalysisResult {
   },0);
   if(dialect==='plpgsql')
     addPgTransactionDiagnostics(ast,header,diagnostics,false);
+  diagnostics.forEach(function(d){
+    if(!d.scope) d.scope='region';
+  });
   var gopts={detail:opts.detail, group:opts.group, dialect:dialect, sources:opts.sources,
              fanIn:opts.fanIn, number:opts.number};
   var graph=buildGraph(ast, header, gopts);
