@@ -80,5 +80,5 @@ uncertain dialect detection reports an explicit tie guardrail.
 - Corpus: tail-unconsumed rate 0.00 %; unattributed-token rate 4.95 % (was
   5.05 % on the prior 90-fixture corpus); no unknown-node fallbacks.
 
-See [RELEASE_NOTE_v1.2.0.md](../RELEASE_NOTE_v1.2.0.md) for the release
+See [RELEASE_NOTE_v1.2.0.md](RELEASE_NOTE_v1.2.0.md) for the release
 summary and [README.md](../README.md) for usage.

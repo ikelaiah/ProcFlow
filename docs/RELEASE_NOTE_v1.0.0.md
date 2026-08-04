@@ -115,5 +115,5 @@ This is the first stable release. There is no data migration: ProcFlow does not
 persist SQL or workspace state. Replace an older extracted copy with the
 complete v1.0.0 archive and open its `index.html`.
 
-See [README.md](README.md) for detailed user workflows, security-review
+See [README.md](../README.md) for detailed user workflows, security-review
 guidance, development instructions, and the post-v1.0.0 roadmap.

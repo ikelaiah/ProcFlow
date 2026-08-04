@@ -43,7 +43,7 @@ The application runs entirely in a browser and works from the local filesystem.
 > source SQL and the target database.
 
 For the first stable release, see
-[RELEASE_NOTE_v1.0.0.md](RELEASE_NOTE_v1.0.0.md). For the v1.1.0 release, see
+[RELEASE_NOTE_v1.0.0.md](docs/RELEASE_NOTE_v1.0.0.md). For the v1.1.0 release, see
 [RELEASE_NOTE_1.1.0.md](docs/RELEASE_NOTE_1.1.0.md). For the v1.2.0 release, see
 [RELEASE_NOTE_1.2.0.md](docs/RELEASE_NOTE_1.2.0.md).
 
@@ -413,7 +413,7 @@ request.
 index.html
 styles.css
 README.md
-RELEASE_NOTE_v1.0.0.md
+ROADMAP.md
 package.json
 package-lock.json
 tsconfig.json
@@ -423,6 +423,14 @@ tsconfig.json
     └── correctness.yml
 assets/
 └── procflow-logo.svg  # adaptive light/dark README wordmark
+docs/
+├── PR_NOTE_1.1.0.md
+├── PR_NOTE_1.2.0.md
+├── RELEASE_NOTE_1.1.0.md
+├── RELEASE_NOTE_1.2.0.md
+├── RELEASE_NOTE_v1.0.0.md
+├── RELEASE_NOTE_v1.1.0.md
+└── RELEASE_NOTE_v1.2.0.md
 scripts/
 └── file-smoke.mjs    # dependency-free local-file release smoke test
 src/
