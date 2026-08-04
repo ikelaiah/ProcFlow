@@ -1,6 +1,6 @@
 # proc>flow v1.2.0 — Trust statement boundaries
 
-**Release date:** 2026-08-04
+**Release date:** 2026-08-05
 
 ProcFlow v1.2.0 hardens how statements and dialect boundaries are decided, so
 the diagram's structure matches the SQL it is given even when semicolons are

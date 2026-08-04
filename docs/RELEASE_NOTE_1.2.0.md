@@ -1,6 +1,6 @@
 # proc>flow v1.2.0 — Trust statement boundaries
 
-**Release date:** 2026-08-04
+**Release date:** 2026-08-05
 
 This release delivers the **Trust statement boundaries** milestone from the
 [ROADMAP.md](../ROADMAP.md) (Workstream A in full, plus the E boundary
