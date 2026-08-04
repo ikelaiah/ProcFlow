@@ -77,7 +77,12 @@ function detectDialect(sql) {
             bv = sc[k];
             best = k;
         }
-    return { dialect: bv === 0 ? 'tsql' : best, scores: sc, score: bv, confident: bv >= 4 };
+    var tied = 0;
+    for (k in sc)
+        if (sc[k] === bv)
+            tied++;
+    return { dialect: bv === 0 ? 'tsql' : best, scores: sc, score: bv, confident: bv >= 4,
+        tied: tied >= 2 };
 }
 /* ---------- parser plumbing ---------- */
 function P(toks, dialect) {
@@ -241,14 +246,19 @@ function parseSqliteRaiseStatement(toks) {
     }
     return null;
 }
+/* Newline is a low-priority recovery hint only: a SOFT keyword may start a new
+   statement when the surrounding grammar completes the previous statement,
+   whether or not it opens a line. Semicolons remain authoritative boundaries. */
 function newStatementHere(tok, prev, startWord) {
-    if (!tok.nl || !prev)
+    if (!prev)
         return false;
     if (CONT_M[prev.u] || CONT_OPS_M[prev.v])
         return false;
     var u = tok.u;
     if (u === 'SELECT' && ['INSERT', 'WITH', 'CREATE', 'DECLARE', 'MERGE', 'RETURN'].indexOf(startWord) >= 0)
         return false;
+    if (u === 'RAISE' && prev.u === 'SELECT')
+        return false; /* SQLite: SELECT RAISE(...) is one expression */
     if ((u === 'SET' || u === 'OUTPUT' || u === 'VALUES') && ['UPDATE', 'DELETE', 'MERGE', 'INSERT'].indexOf(startWord) >= 0)
         return false;
     if (['UPDATE', 'DELETE', 'INSERT'].indexOf(u) >= 0 && startWord === 'MERGE')

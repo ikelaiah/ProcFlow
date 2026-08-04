@@ -53,6 +53,7 @@ interface DialectDetection {
   scores: DialectScores;
   score: number;
   confident: boolean;
+  tied?: boolean;
 }
 
 interface ParserState {
@@ -464,6 +465,14 @@ interface GraphFixture extends ProcflowFixture {
     forbidden: ExpectedGraphWire[];
     sourced?: Array<string | ExpectedGraphNode>;
   };
+}
+
+interface RangeFixture {
+  name: string;
+  dialect: Dialect;
+  sql: string;
+  statements: string[];
+  diagnostic?: string;
 }
 
 interface Db2GraphFixture extends GraphFixture {}

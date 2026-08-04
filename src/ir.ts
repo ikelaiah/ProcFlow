@@ -1355,6 +1355,12 @@ function analyse(sql: string, opts?: AnalyseOptions): AnalysisResult {
   diagnostics=diagnostics.concat(p.diagnostics||[]);
   var remaining=bodyToks.slice(p.i).filter(function(t){return t.v!==';';});
   if(remaining.length){
+    if(['END','ELSE','ELSEIF','ELSIF','WHEN','EXCEPTION','THEN','UNTIL'].
+         indexOf(remaining[0].u)>=0){
+      diagnostics.push({severity:'warning',code:'unexpected_end',
+        message:'Block-terminating keyword "'+remaining[0].u+'" appears without a matching opener. The diagram may be incomplete.',
+        span:{start:remaining[0].pos,end:remaining[0].end}, scope:'region'});
+    }
     diagnostics.push({severity:'error',code:'unconsumed_input',
       message:'Parser stopped before '+remaining.length+' token'+(remaining.length===1?' was':'s were')+
         ' consumed. The diagram may be incomplete.',
@@ -1369,6 +1375,10 @@ function analyse(sql: string, opts?: AnalyseOptions): AnalysisResult {
       message:'Dialect detection is uncertain; select the dialect manually if the diagram looks wrong.',
       span:{start:0,end:Math.min(String(sql||'').length,1)},
       scope:'document'});
+    if(det.tied)
+      diagnostics.push({severity:'warning',code:'dialect_ambiguous',
+        message:'Dialect detection is ambiguous: several dialects scored equally. Select the dialect manually.',
+        span:null, scope:'document'});
   }
   walkAst(ast,function(st){
     if(st.type==='dynamic') diagnostics.push({severity:'warning',code:'dynamic_sql',
@@ -1402,37 +1412,34 @@ function analyse(sql: string, opts?: AnalyseOptions): AnalysisResult {
   var attribution: TokenAttribution={total:totalTokens,resolved:0,ignored:0,
     unresolved:0,opaque:0,ignoredCategories:{}};
   var attributed: boolean[]=new Array(totalTokens).fill(false);
-  function markAttributed(start: number, end: number): void {
+  function markAttributed(toks?: Token[] | null): void {
+    if(!toks||!toks.length) return;
     for(var ai=0;ai<totalTokens;ai++){
-      var tok=bodyToks[ai];
-      if(tok&&tok.pos>=start&&tok.end<=end) attributed[ai]=true;
+      if(attributed[ai]) continue;
+      for(var ti=0;ti<toks.length;ti++)
+        if(toks[ti]===bodyToks[ai]){ attributed[ai]=true; break; }
     }
   }
   walkAst(ast,function(st){
     if('toks' in st&&st.toks&&st.toks.length){
-      var span=spanOfTokens(st.toks);
-      if(span) markAttributed(span.start,span.end);
+      markAttributed(st.toks);
       if(st.type==='dynamic'||st.type==='unknown') attribution.opaque+=st.toks.length;
       else attribution.resolved+=st.toks.length;
     }
     if(st.type==='if'&&st.cond&&st.cond.length){
-      var cspan=spanOfTokens(st.cond);
-      if(cspan) markAttributed(cspan.start,cspan.end);
+      markAttributed(st.cond);
       attribution.resolved+=st.cond.length;
     }
     if((st.type==='while'||st.type==='repeat')&&st.cond&&st.cond.length){
-      var wspan=spanOfTokens(st.cond);
-      if(wspan) markAttributed(wspan.start,wspan.end);
+      markAttributed(st.cond);
       attribution.resolved+=st.cond.length;
     }
     if(st.type==='for'&&st.head&&st.head.length){
-      var fspan=spanOfTokens(st.head);
-      if(fspan) markAttributed(fspan.start,fspan.end);
+      markAttributed(st.head);
       attribution.resolved+=st.head.length;
     }
     if(st.type==='case'&&st.sel&&st.sel.length){
-      var sspan=spanOfTokens(st.sel);
-      if(sspan) markAttributed(sspan.start,sspan.end);
+      markAttributed(st.sel);
       attribution.resolved+=st.sel.length;
     }
   },0);

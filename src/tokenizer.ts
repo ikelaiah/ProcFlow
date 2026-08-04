@@ -81,8 +81,25 @@ function tokenize(sql: string): TokenList {
       while(i<n&&/[A-Za-z_@#$0-9]/.test(sql[i])) i++;
       type = start===i ? 'op' : 'word';
       if(type==='op') i++;
-    } else if(/[0-9]/.test(c)){
-      while(i<n&&/[0-9.eE]/.test(sql[i])) i++;
+    } else if(/[0-9]/.test(c)||(c==='.'&&/[0-9]/.test(sql[i+1]||''))){
+      var isHex=false;
+      if(c==='0'&&(sql[i+1]==='x'||sql[i+1]==='X')){ isHex=true; i+=2; }
+      else if(c==='.') i++;
+      if(isHex){
+        while(i<n&&/[0-9a-fA-F]/.test(sql[i])) i++;
+      } else {
+        while(i<n&&/[0-9]/.test(sql[i])) i++;
+        if(sql[i]==='.'&&sql[i+1]!=='.'){ i++; while(i<n&&/[0-9]/.test(sql[i])) i++; }
+        if(sql[i]==='e'||sql[i]==='E'){
+          var ex=i+1;
+          if(sql[ex]==='+'||sql[ex]==='-') ex++;
+          if(/[0-9]/.test(sql[ex]||'')){ i=ex; while(i<n&&/[0-9]/.test(sql[i])) i++; }
+        }
+      }
+      while(i<n&&sql[i]==='_'&&/[0-9a-fA-F]/.test(sql[i+1]||'')){
+        i+=2;
+        while(i<n&&/[0-9a-fA-F]/.test(sql[i])) i++;
+      }
       type='num';
     } else {
       var two=sql.substr(i,2);
