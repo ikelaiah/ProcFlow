@@ -80,6 +80,50 @@
     }
   });
 
+  PROCFLOW_RANGE_FIXTURES.forEach(function(rangeFixture){
+    try{
+      var rangeResult=analyse(rangeFixture.sql,
+        {dialect:rangeFixture.dialect,mode:'auto',group:false,sources:true});
+      var rangeSpans: Array<{start:number; end:number; text: string}>=[],
+          rangeWalkDepth=0;
+      function walkRange(list: any): void {
+        (list||[]).forEach(function(st){
+          if(st.type==='stmt'&&st.toks&&st.toks.length){
+            var fs=st.toks[0], fe=st.toks[st.toks.length-1];
+            rangeSpans.push({start:fs.pos,end:fe.end,
+                             text:rangeFixture.sql.slice(fs.pos,fe.end)});
+          } else if(st.type==='block') walkRange(st.body);
+          else if(st.type==='if'){
+            if(st.then) walkRange([st.then]); if(st.else) walkRange([st.else]);
+          } else if(st.type==='case'){
+            st.branches.forEach(function(b){ walkRange(b.body); });
+            if(st.else) walkRange(st.else);
+          } else if(['while','for','loop','repeat'].indexOf(st.type)>=0&&st.body)
+            walkRange([st.body]);
+          else if(st.type==='try'){
+            walkRange(st.body);
+            st.handlers.forEach(function(h){ walkRange(h.body); });
+          } else if(st.type==='handler'&&st.body) walkRange([st.body]);
+        });
+      }
+      walkRange(rangeResult.ast);
+      var rangeTexts=rangeSpans.map(function(s){return s.text;});
+      var sameRanges=rangeTexts.length===rangeFixture.statements.length&&
+        rangeTexts.every(function(t,i){return t===rangeFixture.statements[i];});
+      var rangesInBounds=rangeSpans.every(function(s){
+        return s.start>=0&&s.end>s.start&&s.end<=rangeFixture.sql.length;
+      });
+      var rangeDiag=!rangeFixture.diagnostic||
+        rangeResult.diagnostics.some(function(d){return d.code===rangeFixture.diagnostic;});
+      record(rangeFixture.name+' · statement ranges',
+        sameRanges&&rangesInBounds&&rangeDiag,
+        JSON.stringify({expected:rangeFixture.statements,actual:rangeTexts,
+                        stats:rangeResult.stats}));
+    }catch(err){
+      record(rangeFixture.name+' · statement ranges',false,String(err&&err.stack||err));
+    }
+  });
+
   record('T-SQL fixture corpus has at least 50 cases',
     (window.PROCFLOW_TSQL_FIXTURE_COUNT||0)>=50,
     'Found '+(window.PROCFLOW_TSQL_FIXTURE_COUNT||0)+' T-SQL fixtures.');
@@ -290,6 +334,106 @@
       JSON.stringify(scoped.diagnostics.map(function(d){return {code:d.code,scope:d.scope};})));
   }catch(err){
     record('v1.1.0 diagnostics carry document/region scope',
+      false,String(err&&err.stack||err));
+  }
+
+  /* v1.2.0: statement boundaries are grammar-driven; semicolons authoritative. */
+  try{
+    var nt=tokenize('SELECT 1_000, 0x1F, 0x1_000, 1., .5, 1.5, dbo.t;');
+    var numForms=[{v:'1_000',t:'num'},{v:'0x1F',t:'num'},{v:'0x1_000',t:'num'},
+      {v:'1.',t:'num'},{v:'.5',t:'num'},{v:'1.5',t:'num'}];
+    var numberLexing=numForms.every(function(exp){
+      return nt.some(function(t){return t.v===exp.v&&t.type===exp.t;});
+    });
+    var dottedName=nt.some(function(t){return t.v==='dbo'&&t.type==='word';})&&
+      nt.some(function(t){return t.v==='t'&&t.type==='word';});
+    record('v1.2.0 number lexing (0x, separators, 1., .5)',
+      numberLexing&&dottedName,
+      JSON.stringify(nt.map(function(t){return t.v+'['+t.type+']';})));
+  }catch(err){
+    record('v1.2.0 number lexing (0x, separators, 1., .5)',
+      false,String(err&&err.stack||err));
+  }
+
+  try{
+    var amb=analyse('SELECT 1;',{dialect:'auto',mode:'auto',group:false,sources:true});
+    var ambiguous=amb.detected.tied===true&&
+      amb.diagnostics.some(function(d){
+        return d.code==='dialect_ambiguous'&&d.scope==='document';
+      })&&amb.diagnostics.some(function(d){return d.code==='dialect_low_confidence';});
+    record('v1.2.0 dialect_ambiguous guardrail on low-confidence tie',
+      ambiguous,
+      JSON.stringify({detected:amb.detected,diagnostics:amb.diagnostics}));
+  }catch(err){
+    record('v1.2.0 dialect_ambiguous guardrail on low-confidence tie',
+      false,String(err&&err.stack||err));
+  }
+
+  try{
+    function spanValid(span: SourceSpan | null): boolean {
+      return !!span&&span.start>=0&&span.end>span.start;
+    }
+    var unbalanced=analyse('SELECT (1;',{dialect:'tsql',mode:'auto',group:false,sources:true});
+    var strayEnd=analyse('END SELECT 1;',{dialect:'tsql',mode:'auto',group:false,sources:true});
+    var missingEnd=analyse('CREATE PROC dbo.bad AS BEGIN SELECT 1;',
+      {dialect:'tsql',mode:'auto',group:false,sources:true});
+    var hasParenDiag=unbalanced.diagnostics.some(function(d){
+      return d.code==='unclosed_parenthesis'&&d.scope==='region'&&spanValid(d.span);
+    });
+    var hasStrayDiag=strayEnd.diagnostics.some(function(d){
+      return d.code==='unexpected_end'&&d.scope==='region'&&spanValid(d.span);
+    });
+    var hasMissingDiag=missingEnd.diagnostics.some(function(d){
+      return d.code==='missing_end'&&d.scope==='region';
+    });
+    record('v1.2.0 bracket and BEGIN/END balance diagnostics',
+      hasParenDiag&&hasStrayDiag&&hasMissingDiag,
+      JSON.stringify({unbalanced:unbalanced.diagnostics,
+                      strayEnd:strayEnd.diagnostics,
+                      missingEnd:missingEnd.diagnostics}));
+  }catch(err){
+    record('v1.2.0 bracket and BEGIN/END balance diagnostics',
+      false,String(err&&err.stack||err));
+  }
+
+  try{
+    var headerSql='CREATE VIEW dbo.schemabound WITH SCHEMABINDING, VIEW_METADATA AS SELECT id FROM dbo.t;';
+    var headerWith=analyse(headerSql,
+      {dialect:'tsql',mode:'auto',group:false,sources:true});
+    var irWith=buildObjectIR(headerWith,
+      {id:'f',name:headerWith.header.name,kind:headerWith.header.kind,file:'f',sql:headerSql});
+    var viewHeaderOk=headerWith.header.name==='dbo.schemabound'&&
+      headerWith.header.kind==='VIEW'&&has(irWith.reads,'dbo.t');
+    var altPlans=[
+      'ALTER PROCEDURE dbo.ap AS BEGIN SELECT 1; END',
+      'ALTER VIEW dbo.av AS SELECT id FROM dbo.t;',
+      'ALTER FUNCTION dbo.af() RETURNS int AS BEGIN RETURN 1; END'
+    ].map(function(sql){
+      return analyse(sql,{dialect:'tsql',mode:'auto',group:false,sources:true}).header;
+    });
+    var altHeaderOk=altPlans[0].kind==='PROCEDURE'&&altPlans[0].name==='dbo.ap'&&
+      altPlans[1].kind==='VIEW'&&altPlans[1].name==='dbo.av'&&
+      altPlans[2].kind==='FUNCTION'&&altPlans[2].name==='dbo.af';
+    var noGoSource=
+      'CREATE PROC dbo.first_obj AS BEGIN SELECT 1; END\n'+
+      'CREATE PROC dbo.second_obj AS BEGIN SELECT 2; END';
+    var noGoEstate=analyseEstate([{name:'no-go.sql',text:noGoSource}],
+      {dialect:'tsql',mode:'auto',group:false,sources:true});
+    var noGoOk=noGoEstate.objects.length===2&&
+      /first_obj/i.test(noGoEstate.objects[0].name)&&
+      /second_obj/i.test(noGoEstate.objects[1].name);
+    record('v1.2.0 findBody: CREATE VIEW … WITH header',
+      viewHeaderOk,JSON.stringify({header:headerWith.header,ir:irWith}));
+    record('v1.2.0 findBody: ALTER object headers',
+      altHeaderOk,JSON.stringify(altPlans));
+    record('v1.2.0 findBody: multi-object script without GO',
+      noGoOk,JSON.stringify(noGoEstate.objects.map(function(o){return o.name;})));
+  }catch(err){
+    record('v1.2.0 findBody: CREATE VIEW … WITH header',
+      false,String(err&&err.stack||err));
+    record('v1.2.0 findBody: ALTER object headers',
+      false,String(err&&err.stack||err));
+    record('v1.2.0 findBody: multi-object script without GO',
       false,String(err&&err.stack||err));
   }
 

@@ -69,6 +69,16 @@
                 failures.push({ case: i, reason: 'diagnostics missing' });
             else if (!graphInvariant(a, sql))
                 failures.push({ case: i, reason: 'graph or source-span invariant failed' });
+            else if (!a.graph.edges.every(function (e) { return !!e.kind; }))
+                failures.push({ case: i, reason: 'edge is missing a recognised semantic kind' });
+            else if (!a.graph.nodes.every(function (n) { return !!n.provenance; }))
+                failures.push({ case: i, reason: 'node is missing provenance' });
+            else if (a.attribution &&
+                (a.attribution.resolved + a.attribution.ignored +
+                    a.attribution.unresolved + a.attribution.opaque) !== a.attribution.total)
+                failures.push({ case: i, reason: 'token attribution does not account for every token' });
+            else if (a.attribution && a.attribution.total !== a.totalTokens)
+                failures.push({ case: i, reason: 'token attribution total does not match body tokens' });
             else if (stableSummary(a) !== stableSummary(b))
                 failures.push({ case: i, reason: 'analysis is not deterministic' });
             else if (!/^flowchart (TD|LR)/.test(a.mermaid))
