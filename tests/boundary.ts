@@ -30,7 +30,13 @@ var PROCFLOW_RANGE_FIXTURES: RangeFixture[] = [
     statements:['UPDATE audit SET x = 1','UPDATE item SET y = 2'] },
   { name:'View body with WITH schema-binding header', dialect:'tsql',
     sql:'CREATE VIEW dbo.v WITH SCHEMABINDING, VIEW_METADATA AS SELECT id FROM dbo.t;',
-    statements:['SELECT id FROM dbo.t'] }
+    statements:['SELECT id FROM dbo.t'] },
+  { name:'T-SQL mixed one-line and block IF', dialect:'tsql',
+    sql:'CREATE PROC dbo.p AS BEGIN IF @a = 1 SELECT 1; ELSE BEGIN SELECT 2; SELECT 3; END SET @done = 1 END',
+    statements:['SELECT 1','SELECT 2','SELECT 3','SET @done = 1'] },
+  { name:'DB2 mixed one-line and block IF', dialect:'db2',
+    sql:'CREATE PROCEDURE APP.P() LANGUAGE SQL BEGIN IF V = 1 THEN SET V_A = 1; ELSE BEGIN SET V_B = 2; END; END IF; END',
+    statements:['SET V_A = 1','SET V_B = 2'] }
 ];
 
 var PROCFLOW_BOUNDARY_FIXTURES: ProcflowFixture[] = [

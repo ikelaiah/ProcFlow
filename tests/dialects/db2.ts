@@ -141,6 +141,41 @@ var PROCFLOW_DB2_GRAPH_FIXTURES: Db2GraphFixture[] = [
     }
   },
   {
+    name:'DB2 graph · mixed one-line and block IF',
+    dialect:'db2',
+    sql:[
+      'CREATE PROCEDURE APP.MIXED_IF()',
+      'LANGUAGE SQL',
+      'BEGIN',
+      '  IF V_FLAG = 1 THEN',
+      '    SET V_A = 1;',
+      '    CALL APP.LOG_A();',
+      '  ELSE',
+      '    BEGIN',
+      '      SET V_B = 2;',
+      '      CALL APP.LOG_B();',
+      '    END;',
+      '  END IF;',
+      '  SET V_DONE = 1;',
+      'END'
+    ].join('\n'),
+    expect:{mode:'flow',branch:1,call:'APP.LOG_A',noErrors:true,coverageMin:1},
+    graphExpect:{
+      required:[
+        {fromText:'V_FLAG = 1',toText:'SET V_A = 1',label:'yes'},
+        {fromText:'V_FLAG = 1',toText:'SET V_B = 2',label:'no'},
+        {fromText:'CALL APP.LOG_A',toText:'SET V_DONE = 1'},
+        {fromText:'CALL APP.LOG_B',toText:'SET V_DONE = 1'}
+      ],
+      forbidden:[
+        {fromText:'CALL APP.LOG_A',toText:'SET V_B = 2'},
+        {fromText:'SET V_A = 1',toText:'SET V_B = 2'}
+      ],
+      sourced:['V_FLAG = 1','SET V_A = 1','CALL APP.LOG_A','SET V_B = 2',
+        'CALL APP.LOG_B','SET V_DONE = 1']
+    }
+  },
+  {
     name:'DB2 graph · labelled LEAVE and ITERATE',
     dialect:'db2',
     sql:[

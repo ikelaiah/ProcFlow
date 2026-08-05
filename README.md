@@ -45,7 +45,8 @@ The application runs entirely in a browser and works from the local filesystem.
 For the first stable release, see
 [RELEASE_NOTE_v1.0.0.md](docs/RELEASE_NOTE_v1.0.0.md). For the v1.1.0 release, see
 [RELEASE_NOTE_1.1.0.md](docs/RELEASE_NOTE_1.1.0.md). For the v1.2.0 release, see
-[RELEASE_NOTE_1.2.0.md](docs/RELEASE_NOTE_1.2.0.md).
+[RELEASE_NOTE_1.2.0.md](docs/RELEASE_NOTE_1.2.0.md). For the v1.3.0 release, see
+[RELEASE_NOTE_1.3.0.md](docs/RELEASE_NOTE_1.3.0.md).
 
 ## Start here
 
@@ -61,7 +62,7 @@ For the first stable release, see
 
 ## 60-second quick start
 
-1. Download the `v1.2.0` archive from
+1. Download the `v1.3.0` archive from
    [GitHub Releases](https://github.com/ikelaiah/ProcFlow/releases) or clone
    this repository.
 2. Extract the complete archive. Keep `index.html`, `styles.css`, `dist/`, and
@@ -128,7 +129,7 @@ statements.
    analysis to another engineer.
 
 ProcFlow imports SQL text, not report-definition files. SSRS/RDL import is on
-the roadmap; for v1.2.0, paste or export the dataset SQL itself.
+the roadmap; for v1.3.0, paste or export the dataset SQL itself.
 
 ## What ProcFlow can show
 
@@ -186,7 +187,7 @@ than silently disappearing from the diagram.
 
 ## Supported SQL
 
-ProcFlow v1.2.0 recognises:
+ProcFlow v1.3.0 recognises:
 
 - Microsoft T-SQL
 - IBM DB2 SQL PL
@@ -197,13 +198,16 @@ Supported inputs include procedures, functions, triggers, views, plain SQL
 statements, report dataset queries, and multi-object scripts where those object
 types apply to the selected dialect.
 
-Dialect-specific v1.2.0 coverage includes:
+Dialect-specific v1.3.0 coverage includes:
 
-- **T-SQL:** semicolon-free statements with grammar-driven boundaries, `TRY`/
+- **T-SQL:** mixed one-line and block `IF`/`WHILE` control flow (single
+  statement bodies and `BEGIN`/`END` bodies in one AST), semicolon-free
+  statements with grammar-driven boundaries, `TRY`/
   `CATCH`, `THROW`, `RAISERROR` severity, `XACT_STATE()`,
   `@@TRANCOUNT`, nested transaction depth, savepoints, `SET XACT_ABORT`, and
   invalid transaction-action termination.
-- **DB2 SQL PL:** scoped handlers, cursors, `NOT FOUND` flow, and labelled loop
+- **DB2 SQL PL:** mixed `THEN` and `BEGIN`/`END` `IF` forms, scoped handlers,
+  cursors, `NOT FOUND` flow, and labelled loop
   control.
 - **PL/pgSQL:** `EXCEPTION` condition matching, transactional exception scopes,
   and rethrow propagation.
@@ -246,7 +250,7 @@ endorsed by draw.io.
 
 ### Quick answers
 
-| Question | ProcFlow v1.2.0 behavior |
+| Question | ProcFlow v1.3.0 behavior |
 |---|---|
 | Is SQL uploaded? | No. Analysis and rendering happen in the browser tab. |
 | Does it connect to a database? | No. There is no driver, connection string, or query execution. |
@@ -280,7 +284,7 @@ network-submission code. The only bundled third-party runtime is the pinned
 Mermaid 10.9.1 renderer. Its MIT licence is stored at
 `vendor/mermaid/LICENSE`.
 
-The SHA-256 of `vendor/mermaid/mermaid.min.js` in v1.2.0 is:
+The SHA-256 of `vendor/mermaid/mermaid.min.js` in v1.3.0 is:
 
 ```text
 61B335A46DF05A7CE1C98378F60E5F3E77A7FB608A1056997E8A649304A936D6
@@ -291,7 +295,7 @@ so the release checksum remains reproducible across operating systems.
 
 ### Guidance for security review
 
-1. Review and pin the `v1.2.0` tag or its exact commit.
+1. Review and pin the `v1.3.0` tag or its exact commit.
 2. Verify the vendored Mermaid checksum.
 3. Review the runtime files listed above.
 4. Open the reviewed files locally or serve them from an approved internal
@@ -330,7 +334,7 @@ and contains no automatic data-submission path.
   be detected.
 - Temporary-table, synonym, linked-server, and cross-database resolution is
   lightweight.
-- SSRS/RDL files are not imported in v1.2.0.
+- SSRS/RDL files are not imported in v1.3.0.
 - Large draw.io exports can require manual rearrangement.
 
 Always confirm critical dependencies, execution paths, transaction behavior,
@@ -396,9 +400,9 @@ Then open:
 - `http://127.0.0.1:8000/tests/ui.html` — browser interaction and local-runtime
   tests
 
-The v1.2.0 baseline is:
+The v1.3.0 baseline is:
 
-- 156 golden and boundary assertions
+- 164 golden and boundary assertions
 - 400 deterministic mutation cases
 - 13 browser interaction tests
 
@@ -426,8 +430,10 @@ assets/
 docs/
 ├── PR_NOTE_1.1.0.md
 ├── PR_NOTE_1.2.0.md
+├── PR_NOTE_1.3.0.md
 ├── RELEASE_NOTE_1.1.0.md
 ├── RELEASE_NOTE_1.2.0.md
+├── RELEASE_NOTE_1.3.0.md
 ├── RELEASE_NOTE_v1.0.0.md
 ├── RELEASE_NOTE_v1.1.0.md
 └── RELEASE_NOTE_v1.2.0.md
@@ -487,12 +493,12 @@ Then verify:
 2. `git status --short` shows only the intended release changes.
 3. Generated `dist/` files match their TypeScript sources.
 4. The Mermaid SHA-256 matches the value in this README and the workflow.
-5. `RELEASE_NOTE_1.2.0.md` matches the final tag contents.
+5. `RELEASE_NOTE_1.3.0.md` matches the final tag contents.
 6. The complete archive opens locally with `index.html`.
-7. The tag is named `v1.2.0`.
+7. The tag is named `v1.3.0`.
 
-The release can then be created manually from the `v1.2.0` tag using
-[RELEASE_NOTE_1.2.0.md](docs/RELEASE_NOTE_1.2.0.md).
+The release can then be created manually from the `v1.3.0` tag using
+[RELEASE_NOTE_1.3.0.md](docs/RELEASE_NOTE_1.3.0.md).
 
 ## Roadmap after v1.0.0
 
