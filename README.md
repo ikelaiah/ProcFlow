@@ -436,7 +436,8 @@ docs/
 ├── RELEASE_NOTE_1.3.0.md
 ├── RELEASE_NOTE_v1.0.0.md
 ├── RELEASE_NOTE_v1.1.0.md
-└── RELEASE_NOTE_v1.2.0.md
+├── RELEASE_NOTE_v1.2.0.md
+└── RELEASE_NOTE_v1.3.0.md
 scripts/
 └── file-smoke.mjs    # dependency-free local-file release smoke test
 src/
