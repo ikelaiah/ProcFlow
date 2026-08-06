@@ -395,6 +395,122 @@ var PROCFLOW_TSQL_GRAPH_FIXTURES = [
         }
     },
     {
+        name: 'T-SQL graph · mixed one-line and block IF',
+        dialect: 'tsql',
+        sql: [
+            'CREATE PROCEDURE dbo.mixed_if AS',
+            'BEGIN',
+            '  IF @flag = 1',
+            '    SELECT id FROM dbo.a;',
+            '  ELSE',
+            '  BEGIN',
+            '    SELECT id FROM dbo.b;',
+            '    UPDATE dbo.b SET seen = 1;',
+            '  END;',
+            '  SET @done = 1;',
+            'END'
+        ].join('\n'),
+        expect: { mode: 'flow', branch: 1, read: 'dbo.a', read2: 'dbo.b', write: 'dbo.b',
+            noErrors: true, coverageMin: 1 },
+        graphExpect: {
+            required: [
+                { fromText: '@flag = 1', toText: 'SELECT … FROM dbo.a', label: 'yes' },
+                { fromText: '@flag = 1', toText: 'SELECT … FROM dbo.b', label: 'no' },
+                { fromText: 'SELECT … FROM dbo.a', toText: 'SET @done = 1' },
+                { fromText: 'UPDATE dbo.b', toText: 'SET @done = 1' }
+            ],
+            forbidden: [
+                { fromText: 'SELECT … FROM dbo.a', toText: 'SELECT … FROM dbo.b' },
+                { fromText: 'UPDATE dbo.b', toText: 'SELECT … FROM dbo.b' }
+            ],
+            sourced: ['@flag = 1', 'SELECT … FROM dbo.a', 'SELECT … FROM dbo.b',
+                'UPDATE dbo.b', 'SET @done = 1']
+        }
+    },
+    {
+        name: 'T-SQL graph · mixed one-line and block WHILE',
+        dialect: 'tsql',
+        sql: [
+            'CREATE PROCEDURE dbo.mixed_while AS',
+            'BEGIN',
+            '  SET @i = 0;',
+            '  WHILE @i < 5',
+            '    SET @i = @i + 1;',
+            '  WHILE @i < 10',
+            '  BEGIN',
+            '    SET @i = @i + 2;',
+            '    IF @i = 9',
+            '      SET @done = 1;',
+            '  END;',
+            '  SET @finished = 1;',
+            'END'
+        ].join('\n'),
+        expect: { mode: 'flow', loop: 2, branch: 1, noErrors: true, coverageMin: 1 },
+        graphExpect: {
+            required: [
+                { fromText: '@i < 5', toText: 'SET @i = @i + 1', label: 'yes' },
+                { fromText: 'SET @i = @i + 1', toText: '@i < 5' },
+                { fromText: '@i < 10', toText: 'SET @i = @i + 2', label: 'yes' },
+                { fromText: 'SET @i = @i + 2', toText: '@i = 9' },
+                { fromText: '@i = 9', toText: 'SET @done = 1', label: 'yes' },
+                { fromText: '@i < 10', toText: 'SET @finished = 1', label: 'done' }
+            ],
+            forbidden: [
+                { fromText: 'SET @i = @i + 1', toText: 'SET @finished = 1' },
+                { fromText: 'SET @done = 1', toText: 'SET @finished = 1' }
+            ],
+            sourced: ['SET @i = 0', '@i < 5', 'SET @i = @i + 1', 'SET @i = @i + 2',
+                '@i = 9', 'SET @done = 1', 'SET @finished = 1']
+        }
+    },
+    {
+        name: 'T-SQL graph · unresolved GOTO target gets an explicit node',
+        dialect: 'tsql',
+        sql: [
+            'CREATE PROCEDURE dbo.unresolved_goto AS',
+            'BEGIN',
+            '  GOTO missing_label;',
+            '  SET @unreachable = 1;',
+            'END'
+        ].join('\n'),
+        expect: { mode: 'flow', diagnostic: 'goto_unresolved', noErrors: true, coverageMin: 1 },
+        graphExpect: {
+            required: [
+                { fromText: 'GOTO missing_label', toText: 'Unresolved label: missing_label', style: 'dotted' }
+            ],
+            forbidden: [
+                { fromText: 'GOTO missing_label', toText: 'End' },
+                { fromText: 'GOTO missing_label', toText: 'SET @unreachable = 1' }
+            ],
+            sourced: ['GOTO missing_label']
+        }
+    },
+    {
+        name: 'T-SQL graph · forward GOTO and label carry source spans',
+        dialect: 'tsql',
+        sql: [
+            'CREATE PROCEDURE dbo.forward_goto AS',
+            'BEGIN',
+            '  GOTO done;',
+            '  SET @unreachable = 1;',
+            'done:',
+            '  RETURN;',
+            'END'
+        ].join('\n'),
+        expect: { mode: 'flow', exit: 1, noErrors: true, coverageMin: 1 },
+        graphExpect: {
+            required: [
+                { fromText: 'GOTO done', toText: 'done:', style: 'dotted' },
+                { fromText: 'RETURN', toText: 'End' }
+            ],
+            forbidden: [
+                { fromText: 'SET @unreachable = 1', toText: 'RETURN' },
+                { fromText: 'GOTO done', toText: 'RETURN' }
+            ],
+            sourced: ['GOTO done', 'done:', 'RETURN']
+        }
+    },
+    {
         name: 'T-SQL graph · unresolved named rollback stays conservative',
         dialect: 'tsql',
         sql: [

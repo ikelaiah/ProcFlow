@@ -65,6 +65,27 @@ function splitCTEs(toks) {
     res.finalStart = i;
     return res;
 }
+/* Return the query tokens that follow a DECLARE … CURSOR FOR (T-SQL) or a
+   FOR … CURSOR FOR (DB2) declaration, so cursor queries can join the query
+   graph. Falls back to the full token list when no CURSOR/FOR pair is found. */
+function queryTokensBehindCursor(toks) {
+    if (!toks || !toks.length)
+        return toks || [];
+    var cursor = -1;
+    for (var k = 0; k < toks.length; k++)
+        if (toks[k].u === 'CURSOR') {
+            cursor = k;
+            break;
+        }
+    if (cursor < 0)
+        return toks;
+    var f = cursor + 1;
+    while (f < toks.length && toks[f].u !== 'FOR')
+        f++;
+    if (f >= toks.length)
+        return toks;
+    return toks.slice(f + 1);
+}
 function refsIn(toks) {
     var refs = [], structuredRefs = [], joins = 0, unions = 0, subs = 0, filtered = false, d = 0, agg = false;
     for (var i = 0; i < toks.length; i++) {
@@ -228,8 +249,19 @@ function buildObjectQueryGraph(ast, header, opts) {
                 var split = splitCTEs(st.toks);
                 var finalToks = st.toks.slice(split.finalStart);
                 var head = finalToks[0] ? finalToks[0].u : '';
-                if (split.ctes.length || QUERY_HEAD[head])
-                    statements.push(st.toks);
+                var isCursor = head === 'DECLARE' && st.toks.some(function (x) { return x.u === 'CURSOR'; });
+                if (split.ctes.length || QUERY_HEAD[head] || isCursor) {
+                    if (isCursor) {
+                        var cq = queryTokensBehindCursor(st.toks);
+                        var qh = cq[0] ? cq[0].u : '';
+                        if (cq.length && QUERY_HEAD[qh])
+                            statements.push(cq);
+                        else
+                            statements.push(st.toks);
+                    }
+                    else
+                        statements.push(st.toks);
+                }
             }
             if (st.type === 'block')
                 collect(st.body);
@@ -243,8 +275,15 @@ function buildObjectQueryGraph(ast, header, opts) {
                 st.branches.forEach(function (b) { collect(b.body); });
                 collect(st.else);
             }
-            else if (['while', 'for', 'loop', 'repeat'].indexOf(st.type) >= 0 && st.body)
+            else if (['while', 'for', 'loop', 'repeat'].indexOf(st.type) >= 0 && st.body) {
+                if (st.type === 'for' && st.head && st.head.some(function (x) { return x.u === 'CURSOR'; })) {
+                    var fq = queryTokensBehindCursor(st.head);
+                    var fh = fq[0] ? fq[0].u : '';
+                    if (fq.length && QUERY_HEAD[fh])
+                        statements.push(fq);
+                }
                 collect([st.body]);
+            }
             else if (st.type === 'try') {
                 collect(st.body);
                 st.handlers.forEach(function (h) { collect(h.body); });
