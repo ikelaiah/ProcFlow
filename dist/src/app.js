@@ -285,7 +285,7 @@
             confidence = Math.min(confidence, r.confidence);
             consumed += r.consumedTokens;
             total += r.totalTokens;
-            diagnostics += r.diagnostics.length;
+            diagnostics += r.diagnostics.filter(function (d) { return d.severity !== 'info'; }).length;
         });
         return { confidence: confidence, coverage: total ? consumed / total : 1, diagnostics: diagnostics };
     }
@@ -390,7 +390,7 @@
             : '');
         $('proc-name').textContent = result.header.name || '';
         setStats(result.mode, st);
-        setAnalysisHealth(result.confidence, result.coverage, result.diagnostics.length);
+        setAnalysisHealth(result.confidence, result.coverage, result.diagnostics.filter(function (d) { return d.severity !== 'info'; }).length);
         out.textContent = result.mermaid;
         lastCode = result.mermaid;
         lastDialect = result.dialect;

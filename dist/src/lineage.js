@@ -1,8 +1,8 @@
 "use strict";
 /* proc>flow: query and CTE lineage */
 /* ---------- query structure (CTE lineage) ---------- */
-var NOT_TABLE = S(['SELECT', 'LATERAL', 'ONLY', 'TABLE', 'UNNEST', 'VALUES', 'FINAL', 'OLD', 'NEW',
-    'XMLTABLE', 'JSON_TABLE', 'GENERATE_SERIES', 'DUAL']);
+/* Tabular functions that act as table-valued sources in a FROM clause. */
+var TABULAR_FUNCS = S(['UNNEST', 'XMLTABLE', 'JSON_TABLE', 'GENERATE_SERIES']);
 function splitCTEs(toks) {
     var res = { ctes: [], finalStart: 0 };
     if (!toks.length)
@@ -86,52 +86,106 @@ function queryTokensBehindCursor(toks) {
         return toks;
     return toks.slice(f + 1);
 }
+/* Keywords that terminate a comma-separated FROM/JOIN source list. */
+var FROM_CLAUSE_END = S(['WHERE', 'GROUP', 'HAVING', 'ORDER', 'LIMIT', 'OFFSET',
+    'FETCH', 'RETURNING', 'UNION', 'EXCEPT', 'INTERSECT',
+    'INTO', 'FOR', 'ON']);
 function refsIn(toks) {
-    var refs = [], structuredRefs = [], joins = 0, unions = 0, subs = 0, filtered = false, d = 0, agg = false;
-    for (var i = 0; i < toks.length; i++) {
+    var refs = [], structuredRefs = [], joins = 0, unions = 0, subs = 0, filtered = false, agg = false, d = 0;
+    var fromDepth = -1, inList = false;
+    function clauseSpan(i0, i1) {
+        if (i1 <= i0 || !toks[i0] || !toks[i1 - 1])
+            return null;
+        return { start: toks[i0].pos, end: toks[i1 - 1].end };
+    }
+    function qnameEnd(i) {
+        if (!toks[i] || toks[i].v === '(' || toks[i].type !== 'word')
+            return i;
+        var k = i + 1;
+        while (toks[k] && toks[k].v === '.' && toks[k + 1] && toks[k + 1].type === 'word')
+            k += 2;
+        return k;
+    }
+    function resolutionOf(name, kind) {
+        if (kind === 'opaque')
+            return 'opaque';
+        if (kind === 'heuristic')
+            return 'heuristic';
+        return name.split('.').length >= 3 ? 'heuristic' : 'exact';
+    }
+    function addSource(start, end, name, kind) {
+        if (!name)
+            return;
+        refs.push(name);
+        structuredRefs.push({ name: name, span: clauseSpan(start, end), role: 'read',
+            resolution: resolutionOf(name, kind) });
+    }
+    function readSourceAt(s0, apply) {
+        var st = toks[s0];
+        if (!st || st.v === '(' || st.type !== 'word')
+            return;
+        if (st.u === 'LATERAL' || st.u === 'VALUES')
+            return; /* inner subquery handled by the scan; VALUES is literal */
+        if (TABULAR_FUNCS[st.u] > 0) {
+            addSource(s0, s0 + 1, st.v, 'opaque');
+            return;
+        }
+        var e = qnameEnd(s0);
+        addSource(s0, e, qname(toks, s0), apply ? 'heuristic' : undefined);
+    }
+    var i = 0;
+    while (i < toks.length) {
         var t = toks[i];
         if (t.v === '(') {
             d++;
             if (toks[i + 1] && toks[i + 1].u === 'SELECT')
                 subs++;
+            i++;
             continue;
         }
         if (t.v === ')') {
             d--;
+            if (inList && d < fromDepth) {
+                inList = false;
+                fromDepth = -1;
+            }
+            i++;
             continue;
         }
-        if (t.type !== 'word')
+        if (t.v === ',') {
+            if (inList && d === fromDepth)
+                readSourceAt(i + 1);
+            i++;
             continue;
-        if (t.u === 'JOIN')
+        }
+        if (t.type !== 'word') {
+            i++;
+            continue;
+        }
+        var u = t.u;
+        if (u === 'JOIN') {
             joins++;
-        else if (t.u === 'UNION')
-            unions++;
-        else if (t.u === 'WHERE' && d === 0)
-            filtered = true;
-        else if ((t.u === 'GROUP' || t.u === 'DISTINCT') && d === 0)
-            agg = true;
-        if (t.u === 'FROM' || t.u === 'JOIN') {
-            var n = toks[i + 1];
-            if (!n || n.type !== 'word' || n.v === '(' || NOT_TABLE[n.u])
-                continue;
-            var name = qname(toks, i + 1);
-            refs.push(name);
-            /* Build a structured reference with span, role, and resolution. */
-            var nameStart = i + 1, nameEnd = i + 1;
-            while (toks[nameEnd] && (toks[nameEnd].v === '.' ||
-                (toks[nameEnd].type === 'word' && toks[nameEnd - 1] && toks[nameEnd - 1].v === '.')))
-                nameEnd++;
-            if (toks[nameEnd] && toks[nameEnd].type === 'word' &&
-                !(toks[nameEnd - 1] && toks[nameEnd - 1].v === '.'))
-                nameEnd++;
-            var span = null;
-            if (toks[nameStart] && toks[nameEnd - 1])
-                span = { start: toks[nameStart].pos, end: toks[nameEnd - 1].end };
-            structuredRefs.push({
-                name: name, span: span, role: 'read',
-                resolution: name.split('.').length >= 3 ? 'heuristic' : 'exact'
-            });
+            fromDepth = d;
+            inList = true;
         }
+        else if (u === 'UNION')
+            unions++;
+        else if (u === 'WHERE' && d === 0)
+            filtered = true;
+        else if ((u === 'GROUP' || u === 'DISTINCT') && d === 0)
+            agg = true;
+        if (u === 'FROM' || u === 'JOIN' || u === 'APPLY' || u === 'USING') {
+            fromDepth = d;
+            inList = true;
+            readSourceAt(i + 1, u === 'APPLY');
+            i++;
+            continue;
+        }
+        if (inList && d === fromDepth && FROM_CLAUSE_END[u] > 0) {
+            inList = false;
+            fromDepth = -1;
+        }
+        i++;
     }
     return { refs: refs, structuredRefs: structuredRefs,
         joins: joins, unions: unions, subs: subs, filtered: filtered, agg: agg };
@@ -142,7 +196,8 @@ function buildQueryGraph(stmtToks, header, opts) {
     var split = splitCTEs(stmtToks);
     var finalToks = stmtToks.slice(split.finalStart);
     var nodes = [], edges = [], seq = 0, srcIds = {}, cteIds = {}, byName = {};
-    var stats = { ctes: split.ctes.length, tables: 0, joins: 0, unions: 0, subs: 0, depth: 0 };
+    var stats = { ctes: split.ctes.length, tables: 0, joins: 0, unions: 0,
+        subs: 0, depth: 0, recursive: 0 };
     function add(shape, text, cls, source) {
         var id = 'q' + (++seq);
         nodes.push({ id: id, shape: shape, text: (text && String(text).trim()) || '…',
@@ -175,7 +230,12 @@ function buildQueryGraph(stmtToks, header, opts) {
         stats.unions += c.info.unions;
         stats.subs += c.info.subs;
         var d = descr(c.info);
-        cteIds[c.name.toUpperCase()] = add('rect', c.name + (d ? '\u0001' + d : ''), 'cte', spanOfTokens(c.body));
+        var isRecursive = c.info.refs.some(function (r) {
+            return r.toUpperCase() === c.name.toUpperCase();
+        });
+        if (isRecursive)
+            stats.recursive = (stats.recursive || 0) + 1;
+        cteIds[c.name.toUpperCase()] = add('rect', c.name + (d ? '\u0001' + d : '') + (isRecursive ? '\u0001recursive CTE' : ''), 'cte', spanOfTokens(c.body));
         byName[c.name.toUpperCase()] = c;
     });
     var fi = refsIn(finalToks);
@@ -294,7 +354,8 @@ function buildObjectQueryGraph(ast, header, opts) {
     }
     collect(ast);
     var nodes = [], edges = [], seq = 0, sourceIds = {};
-    var stats = { ctes: 0, tables: 0, joins: 0, unions: 0, subs: 0, depth: 0, parts: 0 };
+    var stats = { ctes: 0, tables: 0, joins: 0, unions: 0, subs: 0, depth: 0, parts: 0,
+        recursive: 0 };
     statements.forEach(function (toks) {
         var split = splitCTEs(toks);
         var finalToks = toks.slice(split.finalStart);
@@ -328,6 +389,7 @@ function buildObjectQueryGraph(ast, header, opts) {
         stats.unions += child.stats.unions;
         stats.subs += child.stats.subs;
         stats.depth = Math.max(stats.depth, child.stats.depth);
+        stats.recursive = (stats.recursive || 0) + (child.stats.recursive || 0);
     });
     stats.tables = Object.keys(sourceIds).length;
     stats.parts = stats.ctes + stats.joins + stats.unions + stats.subs + statements.length;
