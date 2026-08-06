@@ -539,6 +539,133 @@ var PROCFLOW_TSQL_GRAPH_FIXTURES: GraphFixture[] = [
         'SET @done = 1'
       ]
     }
+  },
+  {
+    name:'T-SQL graph · temp table producer to consumer data edges',
+    dialect:'tsql',
+    sql:[
+      'CREATE PROCEDURE dbo.stage_flow AS',
+      'BEGIN',
+      '  SELECT id INTO #stage FROM dbo.source;',
+      '  UPDATE #stage SET id = id + 1;',
+      '  SELECT id FROM #stage;',
+      'END'
+    ].join('\n'),
+    expect:{mode:'flow',write:'#stage',read:'dbo.source',resultSets:1,
+      noErrors:true,coverageMin:1},
+    graphExpect:{
+      required:[
+        {fromText:'SELECT … INTO #stage',toText:'UPDATE #stage',
+         label:'#stage',kind:'data'},
+        {fromText:'UPDATE #stage',toText:'SELECT … FROM #stage',
+         label:'#stage',kind:'data'},
+        {fromText:'SELECT … FROM #stage',toText:'End'}
+      ],
+      forbidden:[
+        {fromText:'SELECT … INTO #stage',toText:'SELECT … FROM #stage',
+         label:'#stage',kind:'data'},
+        {fromText:'SELECT … INTO #stage',toText:'End'}
+      ],
+      sourced:['SELECT … INTO #stage','UPDATE #stage','SELECT … FROM #stage']
+    }
+  },
+  {
+    name:'T-SQL graph · temp table branch merge stays conservative',
+    dialect:'tsql',
+    sql:[
+      'CREATE PROCEDURE dbo.stage_merge AS',
+      'BEGIN',
+      '  SELECT id INTO #s FROM dbo.a;',
+      '  IF @flag = 1',
+      '    INSERT INTO #s(id) SELECT id FROM dbo.b;',
+      '  SELECT id FROM #s;',
+      'END'
+    ].join('\n'),
+    expect:{mode:'flow',branch:1,write:'#s',read:'dbo.a',read2:'dbo.b',
+      diagnostic:'temp_flow_ambiguous',noErrors:true,coverageMin:1},
+    graphExpect:{
+      required:[
+        {fromText:'@flag = 1',toText:'INSERT INTO #s',label:'yes'},
+        {fromText:'INSERT INTO #s',toText:'SELECT … FROM #s'}
+      ],
+      forbidden:[
+        {fromText:'SELECT … INTO #s',toText:'SELECT … FROM #s',
+         label:'#s',kind:'data'},
+        {fromText:'INSERT INTO #s',toText:'SELECT … FROM #s',
+         label:'#s',kind:'data'}
+      ],
+      sourced:['SELECT … INTO #s','INSERT INTO #s','SELECT … FROM #s']
+    }
+  },
+  {
+    name:'T-SQL graph · savepoint-only recovery inside CATCH',
+    dialect:'tsql',
+    sql:[
+      'CREATE PROCEDURE dbo.savepoint_recovery AS',
+      'BEGIN',
+      '  BEGIN TRY',
+      '    BEGIN TRANSACTION;',
+      '    SAVE TRANSACTION stage_save;',
+      "    UPDATE dbo.Work SET Status = 'staged';",
+      '  END TRY',
+      '  BEGIN CATCH',
+      '    ROLLBACK TRANSACTION stage_save;',
+      '    THROW;',
+      '  END CATCH;',
+      'END'
+    ].join('\n'),
+    expect:{mode:'flow',cat:1,exit:1,noErrors:true,coverageMin:1},
+    graphExpect:{
+      required:[
+        {fromText:'BEGIN CATCH',
+         toText:'ROLLBACK TRANSACTION stage_save — roll back to savepoint stage_save; depth unchanged'},
+        {fromText:'ROLLBACK TRANSACTION stage_save — roll back to savepoint stage_save; depth unchanged',
+         toText:'THROW'}
+      ],
+      forbidden:[
+        {fromText:'BEGIN CATCH',
+         toText:'ROLLBACK TRANSACTION stage_save — named target unresolved'}
+      ],
+      sourced:[
+        'SAVE TRANSACTION stage_save — create savepoint stage_save',
+        'ROLLBACK TRANSACTION stage_save — roll back to savepoint stage_save; depth unchanged'
+      ]
+    }
+  },
+  {
+    name:'T-SQL graph · SET XACT_ABORT inside CATCH is scoped',
+    dialect:'tsql',
+    sql:[
+      'CREATE PROCEDURE dbo.abort_in_catch AS',
+      'BEGIN',
+      '  BEGIN TRY',
+      "    UPDATE dbo.Work SET Status = 'started';",
+      '  END TRY',
+      '  BEGIN CATCH',
+      '    SET XACT_ABORT ON;',
+      '    IF @@TRANCOUNT > 0',
+      '      ROLLBACK TRANSACTION;',
+      '    THROW;',
+      '  END CATCH;',
+      'END'
+    ].join('\n'),
+    expect:{mode:'flow',branch:1,cat:1,exit:1,noErrors:true,coverageMin:1},
+    graphExpect:{
+      required:[
+        {fromText:'BEGIN CATCH',
+         toText:'SET XACT_ABORT ON — runtime errors abort transactions · set inside CATCH'},
+        {fromText:'SET XACT_ABORT ON — runtime errors abort transactions · set inside CATCH',
+         toText:'@@TRANCOUNT > 0 · transaction active?'}
+      ],
+      forbidden:[
+        {fromText:'BEGIN CATCH',
+         toText:'SET XACT_ABORT ON — runtime errors abort transactions · set inside CATCH',
+         style:'dotted'}
+      ],
+      sourced:[
+        'SET XACT_ABORT ON — runtime errors abort transactions · set inside CATCH'
+      ]
+    }
   }
 ];
 

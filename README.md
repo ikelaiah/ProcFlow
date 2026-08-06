@@ -47,7 +47,8 @@ For the first stable release, see
 [RELEASE_NOTE_1.1.0.md](docs/RELEASE_NOTE_1.1.0.md). For the v1.2.0 release, see
 [RELEASE_NOTE_1.2.0.md](docs/RELEASE_NOTE_1.2.0.md). For the v1.3.0 release, see
 [RELEASE_NOTE_1.3.0.md](docs/RELEASE_NOTE_1.3.0.md). For the v1.4.0 release, see
-[RELEASE_NOTE_v1.4.0.md](docs/RELEASE_NOTE_v1.4.0.md).
+[RELEASE_NOTE_v1.4.0.md](docs/RELEASE_NOTE_v1.4.0.md). For the v1.5.0 release, see
+[RELEASE_NOTE_v1.5.0.md](docs/RELEASE_NOTE_v1.5.0.md).
 
 ## Start here
 
@@ -63,7 +64,7 @@ For the first stable release, see
 
 ## 60-second quick start
 
-1. Download the `v1.4.0` archive from
+1. Download the `v1.5.0` archive from
    [GitHub Releases](https://github.com/ikelaiah/ProcFlow/releases) or clone
    this repository.
 2. Extract the complete archive. Keep `index.html`, `styles.css`, `dist/`, and
@@ -130,7 +131,7 @@ statements.
    analysis to another engineer.
 
 ProcFlow imports SQL text, not report-definition files. SSRS/RDL import is on
-the roadmap; for v1.4.0, paste or export the dataset SQL itself.
+the roadmap; for v1.5.0, paste or export the dataset SQL itself.
 
 ## What ProcFlow can show
 
@@ -144,7 +145,8 @@ the roadmap; for v1.4.0, paste or export the dataset SQL itself.
 - statements and result sets
 - procedure and function calls
 - table reads and writes
-- temporary-table transformations
+- temporary-table transformations, with producer→consumer data-flow edges on
+  provably linear paths
 - transactions and savepoints
 - exception handling and T-SQL `TRY`/`CATCH`
 - dynamic SQL as an explicit opaque step
@@ -171,15 +173,20 @@ the roadmap; for v1.4.0, paste or export the dataset SQL itself.
 - object → table write
 
 Known imported objects are linked. Selecting one can open its internal logic.
+Unmatched three-/four-part names keep their complete identity as
+`external: [server].[database].[schema].[object]` nodes rather than collapsing
+to a bare last-part match.
 
 ## Reading the analysis safely
 
-The analysis panel provides three release-safety signals:
+The analysis panel provides four release-safety signals:
 
 - **Confidence** combines dialect certainty, parser coverage, and diagnostics.
 - **Coverage** is the percentage of body tokens consumed by the parser.
 - **Diagnostics** reports uncertain dialects, balance errors, missing block
   terminators, unconsumed input, invalid actions, and opaque dynamic SQL.
+- **Constructs** reports how many branches, loops, handlers, CTEs, source
+  references, and temp-flow links were detected, resolved, or left opaque.
 
 Use this rule of thumb:
 
@@ -195,7 +202,7 @@ than silently disappearing from the diagram.
 
 ## Supported SQL
 
-ProcFlow v1.4.0 recognises:
+ProcFlow v1.5.0 recognises:
 
 - Microsoft T-SQL
 - IBM DB2 SQL PL
@@ -206,7 +213,7 @@ Supported inputs include procedures, functions, triggers, views, plain SQL
 statements, report dataset queries, and multi-object scripts where those object
 types apply to the selected dialect.
 
-Dialect-specific v1.4.0 coverage includes:
+Dialect-specific v1.5.0 coverage includes:
 
 - **T-SQL:** mixed one-line and block `IF`/`WHILE` control flow (single
   statement and `BEGIN`/`END` bodies in one AST), labelled `GOTO` and labels
@@ -215,7 +222,10 @@ Dialect-specific v1.4.0 coverage includes:
   graph, concise `GRANT`/`WAITFOR`/`KILL`/cursor-operation labels, semicolon-free
   statements with grammar-driven boundaries, `TRY`/`CATCH`, `THROW`,
   `RAISERROR` severity, `XACT_STATE()`, `@@TRANCOUNT`, nested transaction depth,
-  savepoints, `SET XACT_ABORT`, and invalid transaction-action termination.
+  savepoints (including savepoint-only recovery declared in `TRY` and rolled
+  back in `CATCH`), `SET XACT_ABORT` (annotated when set inside a `CATCH`),
+  invalid transaction-action termination, and temporary-table
+  producer→consumer data-flow edges with conservative branch merges.
 - **DB2 SQL PL:** mixed `THEN` and `BEGIN`/`END` `IF` forms, `BEGIN ATOMIC`
   rollback scope, labelled loop control and `LEAVE`/`ITERATE` target validation,
   `FOR … CURSOR FOR` queries in the query graph, scoped handlers, and
@@ -266,7 +276,7 @@ endorsed by draw.io.
 
 ### Quick answers
 
-| Question | ProcFlow v1.4.0 behavior |
+| Question | ProcFlow v1.5.0 behavior |
 |---|---|
 | Is SQL uploaded? | No. Analysis and rendering happen in the browser tab. |
 | Does it connect to a database? | No. There is no driver, connection string, or query execution. |
@@ -300,7 +310,7 @@ network-submission code. The only bundled third-party runtime is the pinned
 Mermaid 10.9.1 renderer. Its MIT licence is stored at
 `vendor/mermaid/LICENSE`.
 
-The SHA-256 of `vendor/mermaid/mermaid.min.js` in v1.4.0 is:
+The SHA-256 of `vendor/mermaid/mermaid.min.js` in v1.5.0 is:
 
 ```text
 61B335A46DF05A7CE1C98378F60E5F3E77A7FB608A1056997E8A649304A936D6
@@ -311,7 +321,7 @@ so the release checksum remains reproducible across operating systems.
 
 ### Guidance for security review
 
-1. Review and pin the `v1.4.0` tag or its exact commit.
+1. Review and pin the `v1.5.0` tag or its exact commit.
 2. Verify the vendored Mermaid checksum.
 3. Review the runtime files listed above.
 4. Open the reviewed files locally or serve them from an approved internal
@@ -347,9 +357,9 @@ and contains no automatic data-submission path.
   splits.
 - Query lineage is object-level rather than column-level.
 - Some vendor-specific table expressions might not be detected.
-- Temporary-table, synonym, linked-server, and cross-database resolution is
-  lightweight.
-- SSRS/RDL files are not imported in v1.4.0.
+- Temporary-table data flow is shown within one object; cross-object temp
+  flow, synonym, linked-server, and cross-database resolution is lightweight.
+- SSRS/RDL files are not imported in v1.5.0.
 - Large draw.io exports can require manual rearrangement.
 
 Always confirm critical dependencies, execution paths, transaction behavior,
@@ -415,11 +425,11 @@ Then open:
 - `http://127.0.0.1:8000/tests/ui.html` — browser interaction and local-runtime
   tests
 
-The v1.4.0 baseline is:
+The v1.5.0 baseline is:
 
-- 188 golden and boundary assertions
+- 199 golden and boundary assertions
 - 400 deterministic mutation cases
-- 13 browser interaction tests
+- 14 browser interaction tests
 
 GitHub Actions installs dependencies, type-checks, builds, verifies generated
 files, runs the local-file smoke test, checks that the runtime remains
@@ -447,6 +457,7 @@ docs/
 ├── PR_NOTE_1.2.0.md
 ├── PR_NOTE_1.3.0.md
 ├── PR_NOTE_1.4.0.md
+├── PR_NOTE_1.5.0.md
 ├── RELEASE_NOTE_1.1.0.md
 ├── RELEASE_NOTE_1.2.0.md
 ├── RELEASE_NOTE_1.3.0.md
@@ -454,7 +465,8 @@ docs/
 ├── RELEASE_NOTE_v1.1.0.md
 ├── RELEASE_NOTE_v1.2.0.md
 ├── RELEASE_NOTE_v1.3.0.md
-└── RELEASE_NOTE_v1.4.0.md
+├── RELEASE_NOTE_v1.4.0.md
+└── RELEASE_NOTE_v1.5.0.md
 scripts/
 └── file-smoke.mjs    # dependency-free local-file release smoke test
 src/
@@ -511,12 +523,12 @@ Then verify:
 2. `git status --short` shows only the intended release changes.
 3. Generated `dist/` files match their TypeScript sources.
 4. The Mermaid SHA-256 matches the value in this README and the workflow.
-5. `RELEASE_NOTE_v1.4.0.md` matches the final tag contents.
+5. `RELEASE_NOTE_v1.5.0.md` matches the final tag contents.
 6. The complete archive opens locally with `index.html`.
-7. The tag is named `v1.4.0`.
+7. The tag is named `v1.5.0`.
 
-The release can then be created manually from the `v1.4.0` tag using
-[RELEASE_NOTE_v1.4.0.md](docs/RELEASE_NOTE_v1.4.0.md).
+The release can then be created manually from the `v1.5.0` tag using
+[RELEASE_NOTE_v1.5.0.md](docs/RELEASE_NOTE_v1.5.0.md).
 
 ## Roadmap after v1.0.0
 

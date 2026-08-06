@@ -235,6 +235,12 @@ interface TsqlTransactionDepth {
   max: number | null;
 }
 
+interface TempTableDef {
+  id: string;
+  name: string;
+  multi: boolean;
+}
+
 interface FlowContext {
   parent: FlowContext | null;
   loop?: LoopFlowContext | null;
@@ -245,11 +251,15 @@ interface FlowContext {
   xactAbort?: boolean;
   savepoints?: StringSet;
   pgSubtransaction?: boolean;
+  temps?: Record<string, TempTableDef>;
+  inCatch?: boolean;
 }
 
 interface EmitResult {
   entry: string | null;
   exits: FlowExit[];
+  endTemps?: Record<string, TempTableDef> | null;
+  endSavepoints?: StringSet | null;
 }
 
 interface SqlHeader {

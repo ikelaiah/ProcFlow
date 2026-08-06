@@ -78,6 +78,11 @@
       pass:get('coverage-val').textContent==='100%'&&
         /%$/.test(get('confidence-val').textContent)&&
         /^\d+$/.test(get('diagnostic-val').textContent)});
+    results.push({name:'construct coverage display',
+      pass:/^\d+\/\d+$/.test(get('construct-val').textContent)&&
+        /\d+ detected · \d+ resolved · \d+ opaque/.test(get('construct-note').textContent),
+      detail:{val:get('construct-val').textContent,
+        note:get('construct-note').textContent}});
     var view=get('opt-view');
     view.value='flow';
     view.dispatchEvent(new Event('change'));
