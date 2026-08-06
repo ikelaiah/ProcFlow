@@ -409,6 +409,105 @@
         record('v1.2.0 findBody: ALTER object headers', false, String(err && err.stack || err));
         record('v1.2.0 findBody: multi-object script without GO', false, String(err && err.stack || err));
     }
+    /* v1.3.0: procedural control flow — labelled/GOTO spans, unresolved labels,
+       cursor query graphs, DB2 ATOMIC scope, extended summarise, export parity. */
+    function spanOk31(span) {
+        return !!span && span.start >= 0 && span.end > span.start;
+    }
+    try {
+        var unresDiag = analyse('CREATE PROC dbo.und AS BEGIN GOTO nope; END', { dialect: 'tsql', mode: 'flow', group: false, sources: true });
+        var hasGotoDiag = unresDiag.diagnostics.some(function (d) {
+            return d.code === 'goto_unresolved' && d.scope === 'region' && spanOk31(d.span);
+        });
+        var hasUnresNode = unresDiag.graph.nodes.some(function (n) {
+            return /Unresolved label: nope/.test(n.text);
+        });
+        record('v1.3.0 goto_unresolved region diagnostic and unresolved-label node', hasGotoDiag && hasUnresNode, JSON.stringify(unresDiag.diagnostics));
+    }
+    catch (err) {
+        record('v1.3.0 goto_unresolved region diagnostic and unresolved-label node', false, String(err && err.stack || err));
+    }
+    try {
+        var spanSrc = 'CREATE PROC dbo.span AS BEGIN GOTO done; done: RETURN; END';
+        var spanGoto = analyse(spanSrc, { dialect: 'tsql', mode: 'flow', group: false, sources: true });
+        var gotoSpans = spanGoto.graph.nodes.filter(function (n) { return /^GOTO done/.test(n.text); })
+            .every(function (n) { return spanOk31(n.source); });
+        var labelSpans = spanGoto.graph.nodes.filter(function (n) { return /^done:/.test(n.text); })
+            .every(function (n) { return spanOk31(n.source); });
+        record('v1.3.0 labelled loop-control and GOTO carry source spans', gotoSpans && labelSpans, JSON.stringify(spanGoto.graph.nodes.map(function (n) { return { text: n.text, src: n.source }; })));
+    }
+    catch (err) {
+        record('v1.3.0 labelled loop-control and GOTO carry source spans', false, String(err && err.stack || err));
+    }
+    try {
+        var cursorSource = 'CREATE PROC dbo.cursor_view AS BEGIN\n' +
+            '  DECLARE c CURSOR FOR SELECT id FROM dbo.account;\n' +
+            '  OPEN c;\n' +
+            'END';
+        var cursorQ = analyse(cursorSource, { dialect: 'tsql', mode: 'query', group: false, sources: true });
+        var cursorSrcs = cursorQ.graph.nodes.filter(function (n) { return n.cls === 'src'; })
+            .map(function (n) { return n.text; });
+        var db2ForSql = 'CREATE PROCEDURE APP.CURVIEW() LANGUAGE SQL BEGIN\n' +
+            '  FOR V AS CUR CURSOR FOR SELECT ID FROM APP.ACCOUNT DO\n' +
+            '    SET V_DONE = V_DONE + 1;\n' +
+            '  END FOR;\n' +
+            'END';
+        var db2For = analyse(db2ForSql, { dialect: 'db2', mode: 'query', group: false, sources: true });
+        var db2Srcs = db2For.graph.nodes.filter(function (n) { return n.cls === 'src'; })
+            .map(function (n) { return n.text; });
+        record('v1.3.0 cursor query bodies appear in query graphs (T-SQL + DB2)', has(cursorSrcs, 'dbo.account') && has(db2Srcs, 'APP.ACCOUNT') &&
+            cursorQ.graph.stats.tables >= 1 && db2For.graph.stats.tables >= 1, JSON.stringify({ tsql: cursorSrcs, db2: db2Srcs }));
+    }
+    catch (err) {
+        record('v1.3.0 cursor query bodies appear in query graphs (T-SQL + DB2)', false, String(err && err.stack || err));
+    }
+    try {
+        var sumSql = 'CREATE PROCEDURE dbo.summarise AS BEGIN\n' +
+            '  GRANT REFERENCES ON dbo.Orders TO app_role;\n' +
+            "  WAITFOR DELAY '00:00:02';\n" +
+            '  KILL 42;\n' +
+            '  DECLARE c CURSOR FOR SELECT id FROM dbo.Orders;\n' +
+            '  OPEN c;\n' +
+            '  FETCH NEXT FROM c INTO @id;\n' +
+            '  DEALLOCATE c;\n' +
+            'END';
+        var sumR = analyse(sumSql, { dialect: 'tsql', mode: 'flow', group: false, sources: true });
+        var sumLabels = ['GRANT … ON dbo.Orders', 'WAITFOR', 'KILL 42', 'OPEN c',
+            'FETCH FROM c', 'DEALLOCATE c'];
+        var sumOk = sumLabels.every(function (label) {
+            return !!matchingNode(sumR.graph, label);
+        });
+        record('v1.3.0 extended summarise label set (GRANT, WAITFOR, KILL, cursor)', sumOk, JSON.stringify(sumR.graph.nodes.map(function (n) { return n.text; })));
+    }
+    catch (err) {
+        record('v1.3.0 extended summarise label set (GRANT, WAITFOR, KILL, cursor)', false, String(err && err.stack || err));
+    }
+    try {
+        var ux = analyse('CREATE PROC dbo.ux AS BEGIN GOTO nope; END', { dialect: 'tsql', mode: 'flow', group: false, sources: true });
+        var uxMermaid = toMermaid(ux.graph, 'TD');
+        var uxXml = toDrawio(ux.graph, { title: 'ux', dir: 'TD' });
+        var uxDoc = new DOMParser().parseFromString(uxXml, 'application/xml');
+        var atomicSql = 'CREATE PROCEDURE APP.AX() LANGUAGE SQL BEGIN\n' +
+            '  BEGIN ATOMIC\n' +
+            '    DECLARE EXIT HANDLER FOR SQLEXCEPTION\n' +
+            '      SET V_ERR = 1;\n' +
+            '    UPDATE APP.T SET X = 1;\n' +
+            '  END;\n' +
+            'END';
+        var ax = analyse(atomicSql, { dialect: 'db2', mode: 'flow', group: false, sources: true });
+        var axMermaid = toMermaid(ax.graph, 'TD');
+        var axXml = toDrawio(ax.graph, { title: 'ax', dir: 'TD' });
+        var axDoc = new DOMParser().parseFromString(axXml, 'application/xml');
+        record('v1.3.0 F export parity for unresolved-label and ATOMIC nodes', !uxDoc.querySelector('parsererror') && !axDoc.querySelector('parsererror') &&
+            /flowchart/.test(uxMermaid) && /flowchart/.test(axMermaid) &&
+            /data-procflow=/.test(uxXml) && /data-procflow=/.test(axXml), JSON.stringify({ ux: uxDoc.querySelector('parsererror') &&
+                uxDoc.querySelector('parsererror').textContent,
+            ax: axDoc.querySelector('parsererror') &&
+                axDoc.querySelector('parsererror').textContent }));
+    }
+    catch (err) {
+        record('v1.3.0 F export parity for unresolved-label and ATOMIC nodes', false, String(err && err.stack || err));
+    }
     var passed = results.filter(function (r) { return r.pass; }).length;
     document.body.className = passed === results.length ? 'pass' : 'fail';
     document.getElementById('summary').textContent = passed + '/' + results.length + ' tests passed';

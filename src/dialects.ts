@@ -316,8 +316,10 @@ function parseStatement(p: ParserState): AstNode | null {
       if(st2) st2.label=t.v;
       return st2;
     }
+    var lbStart=p.i, lbColon=peek(p,1);
     p.i+=2;
-    return {type:'label', label:t.v};
+    return {type:'label', label:t.v, span:{start:t.pos,end:lbColon.end},
+            toks:p.t.slice(lbStart,lbStart+2)};
   }
 
   if(t.type==='word'&&u==='BEGIN'){
@@ -335,13 +337,15 @@ function parseStatement(p: ParserState): AstNode | null {
       return {type:'stmt', toks:readTokens(p,'stmt')};
     }
     p.i++;
-    eat(p,'ATOMIC'); eat(p,'NOT'); eat(p,'ATOMIC');
+    var db2Atomic=false;
+    if(eat(p,'ATOMIC')) db2Atomic=true;
+    else { eat(p,'NOT'); eat(p,'ATOMIC'); }
     var body=parseBlock(p,[]);
     var hs: Array<{cond: TokenList; body: AstNode[]}>= [];
     if(at(p,'EXCEPTION')){ p.i++; hs=parseHandlers(p); }
     eatEnd(p,null);
     if(hs.length) return {type:'try', body:body, handlers:hs};
-    return {type:'block', body:body};
+    return {type:'block', body:body, atomic:(db2Atomic?true:undefined)};
   }
 
   if(t.type==='word'&&u==='IF'){
@@ -477,21 +481,29 @@ function parseStatement(p: ParserState): AstNode | null {
   /* loop control: BREAK / LEAVE / EXIT [label] [WHEN cond] ; CONTINUE / ITERATE */
   if(t.type==='word'&&(u==='BREAK'||u==='LEAVE'||u==='EXIT'||u==='CONTINUE'||u==='ITERATE')){
     var isBreak = (u==='BREAK'||u==='LEAVE'||u==='EXIT');
+    var ctlStart=p.i;
     p.i++;
     var target=null, when=null, nt=peek(p);
     if(nt&&nt.type==='word'&&nt.u!=='WHEN'&&nt.v!==';'){ target=nt.v; p.i++; }
     if(eat(p,'WHEN')) when=readTokens(p,'cond');
+    var ctlBeforeSemi=p.i;
     skipSemis(p);
-    var controlEnd=p.t[p.i-1]||t;
+    var controlEnd=p.t[ctlBeforeSemi-1]||t;
     return {type: isBreak?'break':'continue', target:target, when:when, word:t.v,
-            span:{start:t.pos,end:controlEnd.end}};
+            span:{start:t.pos,end:controlEnd.end},
+            toks:p.t.slice(ctlStart,ctlBeforeSemi)};
   }
 
   if(t.type==='word'&&u==='GOTO'){
+    var gStart=p.i;
     p.i++;
-    var g=peek(p)?peek(p).v:'?';
+    var gtok=peek(p);
+    var g=gtok?gtok.v:'?';
+    var gAfter=p.i+1;
     p.i++; skipSemis(p);
-    return {type:'goto', label:g};
+    var gEnd=gtok||t;
+    return {type:'goto', label:g, span:{start:t.pos,end:gEnd.end},
+            toks:p.t.slice(gStart,gAfter)};
   }
 
   var toks=readTokens(p,'stmt');

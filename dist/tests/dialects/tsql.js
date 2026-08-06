@@ -464,6 +464,53 @@ var PROCFLOW_TSQL_GRAPH_FIXTURES = [
         }
     },
     {
+        name: 'T-SQL graph · unresolved GOTO target gets an explicit node',
+        dialect: 'tsql',
+        sql: [
+            'CREATE PROCEDURE dbo.unresolved_goto AS',
+            'BEGIN',
+            '  GOTO missing_label;',
+            '  SET @unreachable = 1;',
+            'END'
+        ].join('\n'),
+        expect: { mode: 'flow', diagnostic: 'goto_unresolved', noErrors: true, coverageMin: 1 },
+        graphExpect: {
+            required: [
+                { fromText: 'GOTO missing_label', toText: 'Unresolved label: missing_label', style: 'dotted' }
+            ],
+            forbidden: [
+                { fromText: 'GOTO missing_label', toText: 'End' },
+                { fromText: 'GOTO missing_label', toText: 'SET @unreachable = 1' }
+            ],
+            sourced: ['GOTO missing_label']
+        }
+    },
+    {
+        name: 'T-SQL graph · forward GOTO and label carry source spans',
+        dialect: 'tsql',
+        sql: [
+            'CREATE PROCEDURE dbo.forward_goto AS',
+            'BEGIN',
+            '  GOTO done;',
+            '  SET @unreachable = 1;',
+            'done:',
+            '  RETURN;',
+            'END'
+        ].join('\n'),
+        expect: { mode: 'flow', exit: 1, noErrors: true, coverageMin: 1 },
+        graphExpect: {
+            required: [
+                { fromText: 'GOTO done', toText: 'done:', style: 'dotted' },
+                { fromText: 'RETURN', toText: 'End' }
+            ],
+            forbidden: [
+                { fromText: 'SET @unreachable = 1', toText: 'RETURN' },
+                { fromText: 'GOTO done', toText: 'RETURN' }
+            ],
+            sourced: ['GOTO done', 'done:', 'RETURN']
+        }
+    },
+    {
         name: 'T-SQL graph · unresolved named rollback stays conservative',
         dialect: 'tsql',
         sql: [

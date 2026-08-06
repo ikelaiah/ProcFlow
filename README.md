@@ -137,6 +137,9 @@ the roadmap; for v1.3.0, paste or export the dataset SQL itself.
 
 - `IF`, `ELSE`, and `CASE` decisions
 - loops, loop exits, and early returns
+- labelled loop-control and `GOTO`, with source span selection and explicit
+  "Unresolved label" nodes for missing targets
+- cursor operations and the query behind a cursor
 - statements and result sets
 - procedure and function calls
 - table reads and writes
@@ -201,16 +204,19 @@ types apply to the selected dialect.
 Dialect-specific v1.3.0 coverage includes:
 
 - **T-SQL:** mixed one-line and block `IF`/`WHILE` control flow (single
-  statement bodies and `BEGIN`/`END` bodies in one AST), semicolon-free
-  statements with grammar-driven boundaries, `TRY`/
-  `CATCH`, `THROW`, `RAISERROR` severity, `XACT_STATE()`,
-  `@@TRANCOUNT`, nested transaction depth, savepoints, `SET XACT_ABORT`, and
-  invalid transaction-action termination.
-- **DB2 SQL PL:** mixed `THEN` and `BEGIN`/`END` `IF` forms, scoped handlers,
-  cursors, `NOT FOUND` flow, and labelled loop
-  control.
+  statement and `BEGIN`/`END` bodies in one AST), labelled `GOTO` and labels
+  with source spans plus a `goto_unresolved` diagnostic and explicit
+  "Unresolved label" node, cursor queries (`DECLARE … CURSOR FOR`) in the query
+  graph, concise `GRANT`/`WAITFOR`/`KILL`/cursor-operation labels, semicolon-free
+  statements with grammar-driven boundaries, `TRY`/`CATCH`, `THROW`,
+  `RAISERROR` severity, `XACT_STATE()`, `@@TRANCOUNT`, nested transaction depth,
+  savepoints, `SET XACT_ABORT`, and invalid transaction-action termination.
+- **DB2 SQL PL:** mixed `THEN` and `BEGIN`/`END` `IF` forms, `BEGIN ATOMIC`
+  rollback scope, labelled loop control and `LEAVE`/`ITERATE` target validation,
+  `FOR … CURSOR FOR` queries in the query graph, scoped handlers, and
+  `NOT FOUND` flow.
 - **PL/pgSQL:** `EXCEPTION` condition matching, transactional exception scopes,
-  and rethrow propagation.
+  rethrow propagation, and labelled loop-control target validation.
 - **SQLite:** trigger `RAISE` actions, termination behavior, trigger `WHEN`,
   conditional `WHERE`, and searched `CASE` paths.
 
@@ -402,7 +408,7 @@ Then open:
 
 The v1.3.0 baseline is:
 
-- 164 golden and boundary assertions
+- 181 golden and boundary assertions
 - 400 deterministic mutation cases
 - 13 browser interaction tests
 

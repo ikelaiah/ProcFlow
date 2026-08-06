@@ -257,6 +257,41 @@ function summarise(toks, max) {
     else if (head === 'RAISE' || head === 'SIGNAL' || head === 'RESIGNAL' || head === 'RAISERROR') {
         out = clip(joinToks(toks, max), max);
     }
+    else if (head === 'GRANT' || head === 'REVOKE' || head === 'DENY') {
+        var onIx = -1, gd0 = 0;
+        for (var gg = 0; gg < toks.length; gg++) {
+            if (toks[gg].v === '(')
+                gd0++;
+            else if (toks[gg].v === ')')
+                gd0--;
+            else if (gd0 === 0 && toks[gg].u === 'ON') {
+                onIx = gg;
+                break;
+            }
+        }
+        if (onIx > 0)
+            out = head + ' … ON ' + v(onIx + 1);
+        else
+            out = clip(joinToks(toks, max), max);
+    }
+    else if (head === 'WAITFOR') {
+        out = 'WAITFOR ' + clip(joinToks(toks.slice(1), max - 8), max);
+    }
+    else if (head === 'KILL') {
+        out = 'KILL ' + v(1);
+    }
+    else if (head === 'OPEN' || head === 'CLOSE' || head === 'DEALLOCATE' || head === 'ALLOCATE') {
+        out = head + ' ' + v(1);
+    }
+    else if (head === 'FETCH') {
+        var fx = -1;
+        for (var ff = 1; ff < toks.length; ff++)
+            if (toks[ff].u === 'FROM') {
+                fx = ff;
+                break;
+            }
+        out = fx > 0 ? ('FETCH FROM ' + v(fx + 1)) : clip(joinToks(toks, max), max);
+    }
     if (!out)
         out = joinToks(toks, max);
     return clip(out, max);
@@ -877,7 +912,30 @@ function buildGraph(ast, header, opts) {
     }
     function emitOne(st, ctx, depth) {
         switch (st.type) {
-            case 'block': return emitList(st.body, ctx, depth);
+            case 'block': {
+                if (st.atomic && dialect === 'db2') {
+                    var am = add('marker', 'BEGIN ATOMIC · rollback scope', 'try');
+                    var innerA = emitList(st.body, ctx, depth + 1);
+                    if (innerA.entry)
+                        link(am, innerA.entry);
+                    var ao = [];
+                    var rb = null;
+                    for (var ai0 = 0; ai0 < innerA.exits.length; ai0++) {
+                        var ex0 = innerA.exits[ai0];
+                        var nd0 = nodes.filter(function (n) { return n.id === ex0.id; })[0];
+                        var unwind = nd0 && (/Exit compound block/.test(nd0.text) || /Undo and exit/.test(nd0.text));
+                        if (unwind) {
+                            if (!rb)
+                                rb = add('round', 'Implicit rollback · ATOMIC block', 'err');
+                            link(ex0.id, rb, ex0.label || 'undo');
+                        }
+                        else
+                            ao.push(ex0);
+                    }
+                    return { entry: am, exits: ao };
+                }
+                return emitList(st.body, ctx, depth);
+            }
             case 'stmt': {
                 stats.stmt++;
                 var statementKind = kindOf(st);
@@ -1218,6 +1276,10 @@ function buildGraph(ast, header, opts) {
                         else
                             link(dq, L.cond, 'yes');
                     }
+                    else if (st.target) {
+                        var uq = add('rect', 'Unresolved label: ' + st.target, 'flowctl');
+                        link(dq, uq, 'goto', 'dotted');
+                    }
                     return { entry: dq, exits: [{ id: dq, label: 'no' }] };
                 }
                 var bn = add('rect', word, 'flowctl', st.span);
@@ -1227,16 +1289,20 @@ function buildGraph(ast, header, opts) {
                     else
                         link(bn, L.cond, 'continue');
                 }
+                else if (st.target) {
+                    var ub = add('rect', 'Unresolved label: ' + st.target, 'flowctl');
+                    link(bn, ub, 'goto', 'dotted');
+                }
                 return { entry: bn, exits: [] };
             }
             case 'label': {
-                var lb = add('marker', st.label + ':', 'flowctl');
+                var lb = add('marker', st.label + ':', 'flowctl', st.span);
                 labels[st.label.toUpperCase()] = lb;
                 return { entry: lb, exits: [{ id: lb }] };
             }
             case 'goto': {
-                var g = add('rect', 'GOTO ' + st.label, 'flowctl');
-                gotos.push({ from: g, to: st.label.toUpperCase() });
+                var g = add('rect', 'GOTO ' + st.label, 'flowctl', st.span);
+                gotos.push({ from: g, to: st.label.toUpperCase(), label: st.label });
                 return { entry: g, exits: [] };
             }
         }
@@ -1272,6 +1338,12 @@ function buildGraph(ast, header, opts) {
     for (var g2 = 0; g2 < gotos.length; g2++)
         if (labels[gotos[g2].to])
             link(gotos[g2].from, labels[gotos[g2].to], 'goto', 'dotted');
+    for (var g3 = 0; g3 < gotos.length; g3++) {
+        if (!labels[gotos[g3].to]) {
+            var gun = add('rect', 'Unresolved label: ' + gotos[g3].label, 'flowctl');
+            link(gotos[g3].from, gun, 'goto', 'dotted');
+        }
+    }
     if (number) {
         var step = 0;
         nodes.forEach(function (n) {
@@ -1426,6 +1498,12 @@ function buildObjectIR(result, unit) {
             if (facts.resultSet)
                 resultSets.push({ statement: statements.length - 1, span: item.span });
         }
+        else if (st.type === 'for' && st.head && st.head.some(function (x) { return x.u === 'CURSOR'; })) {
+            var cq = queryTokensBehindCursor(st.head);
+            var cf = statementFacts(cq);
+            reads = reads.concat(cf.reads);
+            calls = calls.concat(cf.calls);
+        }
     }, 0);
     return {
         id: unit && unit.id || '', name: result.header.name || (unit && unit.name) || 'Script',
@@ -1532,6 +1610,51 @@ function analyseEstate(files, opts) {
     return { objects: objects, graph: graph, stats: graph.stats,
         diagnostics: objects.reduce(function (a, o) { return a.concat(o.diagnostics); }, []) };
 }
+function unresolvedControlTargets(ast) {
+    var allLabels = {};
+    walkAst(ast, function (st) {
+        if (st.type === 'label' && st.label)
+            allLabels[st.label.toUpperCase()] = 1;
+    }, 0);
+    var out = [];
+    function scan(list, loops) {
+        (list || []).forEach(function (st) {
+            if ((st.type === 'break' || st.type === 'continue') && st.target) {
+                var hit = loops.some(function (l) { return l === String(st.target).toUpperCase(); });
+                if (!hit)
+                    out.push({ kind: st.type, label: st.target, span: st.span || null });
+            }
+            else if (st.type === 'goto' && st.label) {
+                if (!allLabels[String(st.label).toUpperCase()])
+                    out.push({ kind: 'goto', label: st.label, span: st.span || null });
+            }
+            else if (st.type === 'block')
+                scan(st.body, loops);
+            else if (['while', 'for', 'loop', 'repeat'].indexOf(st.type) >= 0 && st.body) {
+                scan([st.body], st.label ? loops.concat([String(st.label).toUpperCase()]) : loops);
+            }
+            else if (st.type === 'if') {
+                if (st.then)
+                    scan([st.then], loops);
+                if (st.else)
+                    scan([st.else], loops);
+            }
+            else if (st.type === 'case') {
+                st.branches.forEach(function (b) { scan(b.body, loops); });
+                if (st.else)
+                    scan(st.else, loops);
+            }
+            else if (st.type === 'try') {
+                scan(st.body, loops);
+                st.handlers.forEach(function (h) { scan(h.body, loops); });
+            }
+            else if (st.type === 'handler' && st.body)
+                scan([st.body], loops);
+        });
+    }
+    scan(ast, []);
+    return out;
+}
 function analyse(sql, opts) {
     opts = opts || {};
     sql = String(sql || '');
@@ -1556,7 +1679,7 @@ function analyse(sql, opts) {
         bodyToks = toks.slice(header.index < 0 ? 0 : header.index);
     var p = P(bodyToks, dialect);
     var ast = parseBlock(p, []);
-    while (ast.length === 1 && ast[0].type === 'block')
+    while (ast.length === 1 && ast[0].type === 'block' && !ast[0].atomic)
         ast = ast[0].body;
     diagnostics = diagnostics.concat(p.diagnostics || []);
     var remaining = bodyToks.slice(p.i).filter(function (t) { return t.v !== ';'; });
@@ -1592,6 +1715,15 @@ function analyse(sql, opts) {
                 message: 'Dynamic SQL is opaque and its internal reads, writes, calls, and branches are not resolved.',
                 span: spanOfTokens(st.toks), scope: 'region' });
     }, 0);
+    unresolvedControlTargets(ast).forEach(function (u) {
+        diagnostics.push({ severity: 'warning', code: 'goto_unresolved',
+            message: u.kind === 'goto'
+                ? 'GOTO target "' + u.label + '" is not declared anywhere in this object; adding an unresolved-label node.'
+                : (u.kind === 'break'
+                    ? 'Break target "' + u.label + '" is not an enclosing loop label; adding an unresolved-label node.'
+                    : 'Continue target "' + u.label + '" is not an enclosing loop label; adding an unresolved-label node.'),
+            span: u.span, scope: 'region' });
+    });
     if (dialect === 'plpgsql')
         addPgTransactionDiagnostics(ast, header, diagnostics, false);
     diagnostics.forEach(function (d) {

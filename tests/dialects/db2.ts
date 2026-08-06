@@ -127,7 +127,7 @@ var PROCFLOW_DB2_GRAPH_FIXTURES: Db2GraphFixture[] = [
         {fromText:'SET V_DONE = 1',toText:'Resume after raising statement'},
         {fromText:'FETCH C1 INTO V_ID',toText:'CONTINUE HANDLER FOR NOT FOUND',
          label:'NOT FOUND',style:'dotted'},
-        {fromText:'FETCH NEXT FROM C1 INTO V_ID',toText:'CONTINUE HANDLER FOR NOT FOUND',
+        {fromText:'FETCH FROM C1',toText:'CONTINUE HANDLER FOR NOT FOUND',
          label:'NOT FOUND',style:'dotted'},
         {fromText:'Resume after raising statement',toText:'V_DONE = 0',
          label:'resume',style:'dotted'}
@@ -208,6 +208,87 @@ var PROCFLOW_DB2_GRAPH_FIXTURES: Db2GraphFixture[] = [
         {fromText:'LEAVE OUTER_LOOP',toText:'V_OUTER < 10'}
       ],
       sourced:['ITERATE OUTER_LOOP','LEAVE OUTER_LOOP','LEAVE INNER_LOOP']
+    }
+  },
+  {
+    name:'DB2 graph · unresolved LEAVE target gets an explicit node',
+    dialect:'db2',
+    sql:[
+      'CREATE PROCEDURE APP.UNRESOLVED_LEAVE()',
+      'LANGUAGE SQL',
+      'BEGIN',
+      '  OUTER_LOOP: LOOP',
+      '    LEAVE NO_SUCH_LOOP;',
+      '  END LOOP OUTER_LOOP;',
+      '  SET V_DONE = 1;',
+      'END'
+    ].join('\n'),
+    expect:{mode:'flow',loop:1,diagnostic:'goto_unresolved',noErrors:true,coverageMin:1},
+    graphExpect:{
+      required:[
+        {fromText:'LEAVE NO_SUCH_LOOP',toText:'Unresolved label: NO_SUCH_LOOP',style:'dotted'}
+      ],
+      forbidden:[
+        {fromText:'LEAVE NO_SUCH_LOOP',toText:'SET V_DONE = 1'},
+        {fromText:'LEAVE NO_SUCH_LOOP',toText:'OUTER_LOOP'}
+      ],
+      sourced:['LEAVE NO_SUCH_LOOP']
+    }
+  },
+  {
+    name:'DB2 graph · ATOMIC block rollback scope on EXIT handler',
+    dialect:'db2',
+    sql:[
+      'CREATE PROCEDURE APP.ATOMIC_SCOPE()',
+      'LANGUAGE SQL',
+      'BEGIN',
+      '  BEGIN ATOMIC',
+      '    DECLARE EXIT HANDLER FOR SQLEXCEPTION',
+      '      SET V_ERR = 1;',
+      '    UPDATE APP.WORK SET X = 1;',
+      '    SET V_OK = 1;',
+      '  END;',
+      '  SET V_DONE = 1;',
+      'END'
+    ].join('\n'),
+    expect:{mode:'flow',cat:1,noErrors:true,coverageMin:1},
+    graphExpect:{
+      required:[
+        {fromText:'BEGIN ATOMIC · rollback scope',toText:'UPDATE APP.WORK'},
+        {fromText:'UPDATE APP.WORK',toText:'EXIT HANDLER FOR SQLEXCEPTION',style:'dotted'},
+        {fromText:'Exit compound block',toText:'Implicit rollback · ATOMIC block'},
+        {fromText:'SET V_OK = 1',toText:'SET V_DONE = 1'}
+      ],
+      forbidden:[
+        {fromText:'Implicit rollback · ATOMIC block',toText:'SET V_DONE = 1'},
+        {fromText:'SET V_ERR = 1',toText:'SET V_DONE = 1'}
+      ],
+      sourced:['UPDATE APP.WORK','EXIT HANDLER FOR SQLEXCEPTION','SET V_OK = 1','SET V_DONE = 1']
+    }
+  },
+  {
+    name:'DB2 graph · ATOMIC block stops continuation after terminal error',
+    dialect:'db2',
+    sql:[
+      'CREATE PROCEDURE APP.ATOMIC_STOP()',
+      'LANGUAGE SQL',
+      'BEGIN ATOMIC',
+      '  UPDATE APP.WORK SET X = 1;',
+      '  SIGNAL SQLSTATE \'75001\';',
+      '  UPDATE APP.UNREACHABLE SET X = 2;',
+      'END'
+    ].join('\n'),
+    expect:{mode:'flow',exit:1,noErrors:true,coverageMin:1},
+    graphExpect:{
+      required:[
+        {fromText:'BEGIN ATOMIC · rollback scope',toText:'UPDATE APP.WORK'},
+        {fromText:'UPDATE APP.WORK',toText:'SIGNAL SQLSTATE'}
+      ],
+      forbidden:[
+        {fromText:'SIGNAL SQLSTATE',toText:'UPDATE APP.UNREACHABLE'},
+        {fromText:'UPDATE APP.UNREACHABLE',toText:'End'}
+      ],
+      sourced:['UPDATE APP.WORK','SIGNAL SQLSTATE','UPDATE APP.UNREACHABLE']
     }
   }
 ];

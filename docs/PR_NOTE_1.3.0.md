@@ -1,77 +1,100 @@
-# PR: v1.3.0 — Trust procedural control flow (slice 1)
+# PR: v1.3.0 — Trust procedural control flow
 
 ## Summary
 
-This PR delivers the **first vertical slice** of the **v1.3.0 — Trust procedural
-control flow** milestone from `ROADMAP.md` (Workstream B): mixed one-line and
-block `IF`/`WHILE` forms parse into a single control-flow AST. It lands the
-exact graph-edge and range fixtures the Workstream B acceptance criteria call
-for, plus a runnable example. No production parser code changed: the existing
-`parseStatement` (`src/dialects.ts:347` `IF`, `:388` `WHILE`) already handled
-both the single-statement form and the `BEGIN`/`END` (or `THEN`/`DO`) block form,
-and this release now locks that behaviour in with failing-before-then-green
-fixtures so it cannot silently regress.
+This PR implements the **v1.3.0 — Trust procedural control flow** milestone from
+`ROADMAP.md`: Workstream B in full, plus the E procedural diagnostics and F
+export-parity fixtures each construct requires. Procedural control flow is now
+resolved, validated, and exported consistently across T-SQL, DB2, and PL/pgSQL.
+The golden suite grows from 164 to 181; fuzz and UI suites stay green.
 
 ## What's included
 
-### Mixed one-line + block `IF`/`WHILE`
+### Mixed one-line + block `IF`/`WHILE` (one AST)
 
-One AST now models a whole procedure regardless of whether each `IF`/`WHILE`
-uses a one-line statement body or a `BEGIN … END` block, and regardless of
-mixing the two within a procedure:
+Single-statement bodies and `BEGIN`/`END` (or `THEN`/`DO`) block bodies mix
+freely in one procedure and parse into a single control-flow AST. Conditions
+branch `yes`/`no`; loop bodies wire back to the loop condition. Locked in by
+graph-edge fixtures in `tests/dialects/tsql.ts`, `tests/dialects/db2.ts`, and
+`tests/boundary.ts` (`src/dialects.ts:347` `IF`, `:388` `WHILE`).
 
-- `IF cond SELECT …;` (single statement) and `IF cond BEGIN … END ELSE …`
-  (block) — including mixed nesting, e.g. a one-line `IF` inside an
-  `IF`-block's `ELSE` branch.
-- `WHILE cond SET @i = @i + 1;` (single statement) and
-  `WHILE cond BEGIN … IF … END` (block with a nested one-line `IF`).
-- DB2 `IF … THEN … ELSE BEGIN … END; END IF;` mixed forms.
+### Labelled loop-control + `GOTO` hardening
 
-Accepted via `EMIT`-level graph-edge assertions: each condition branches
-`yes`/`no` and loop bodies wire back to the loop condition, and outer block
-exits flow to the next statement rather than a wrong neighbour.
+- Labels, `GOTO`, and loop-control statements now carry source spans and token
+  attribution (`src/types.d.ts`, `src/dialects.ts`).
+- Targets are validated against enclosing loop labels and declared labels
+  (forward `GOTO` supported). Unresolved targets raise `goto_unresolved`
+  (region scope, valid span) and render an explicit **"Unresolved label"** node
+  instead of a silent drop (`src/ir.ts` `buildGraph`, `analyse`,
+  `unresolvedControlTargets`).
 
-### Fixtures
+### Cursor queries in query graphs
 
-- `tests/dialects/tsql.ts` — 2 new `graphExpect` fixtures: mixed one-line and
-  block `IF`, and mixed one-line and block `WHILE`.
-- `tests/dialects/db2.ts` — 1 new `graphExpect` fixture: DB2 mixed
-  `THEN`-statement and `BEGIN`-block `IF`.
-- `tests/boundary.ts` — 2 new `PROCFLOW_RANGE_FIXTURES` asserting the exact
-  source ranges of the statements inside a mixed T-SQL `IF` and a mixed DB2
-  `IF`.
+`queryTokensBehindCursor` (`src/lineage.ts`) extracts the query after a
+T-SQL `DECLARE … CURSOR FOR` or DB2 `FOR … CURSOR FOR`; `buildObjectQueryGraph`
+collects those query bodies so their source tables appear in Query structure
+view. Object-level cursor reads are preserved, and DB2 `FOR` cursor reads are
+now captured in `buildObjectIR` (`src/ir.ts`).
 
-All new fixtures fail on the pre-slice parser state only if behaviour differs;
-here they passed immediately, confirming the parser already produced the
-correct single AST.
+### DB2 `ATOMIC` rollback scope
 
-### Example
+`BEGIN ATOMIC` is tracked in `parseStatement` and rendered as
+`BEGIN ATOMIC · rollback scope`; EXIT/UNDO-handler exits route to an
+`Implicit rollback · ATOMIC block` terminal. The scope survives the body unwrap
+so `CREATE PROCEDURE … BEGIN ATOMIC … END` is preserved. `NOT`/`ATOMIC` remain
+ignored syntax for attribution.
 
-- `examples/dbo.v130_demo.sql` — a single procedure that exercises all five
-  mixed forms (one-line `IF`, block `IF/ELSE`, mixed-nested `IF`, one-line
-  `WHILE`, block `WHILE` with a nested one-line `IF`). Parses with coverage
-  `1.0`, no diagnostics, `branch:5`, `loop:2`.
+### Extended `summarise` label set
+
+`GRANT`/`REVOKE`/`DENY` (`GRANT … ON <object>`), `WAITFOR`, `KILL`, and cursor
+operations `OPEN`/`CLOSE`/`FETCH`/`DEALLOCATE` (`FETCH FROM c`) now produce
+concise node labels (`src/ir.ts` `summarise`).
+
+### E diagnostics + F export parity
+
+- `goto_unresolved` is region-scoped with a valid span; asserted in
+  `tests/tests.ts`.
+- Each new construct (unresolved-label node, DB2 `ATOMIC` marker) is covered by
+  `toMermaid`/`toDrawio` export-parity tests (well-formed XML, provenance/kind
+  metadata), plus the existing draw.io/Mermaid golden checks.
+- Cursor query graphs and the extended label set are asserted directly in the
+  new v1.3.0 block of `tests/tests.ts`.
+
+### Other
+
+- `examples/dbo.v130_demo.sql` demonstrates all four headline outcomes.
+- README and `package.json` bumped to v1.3.0.
+
+## Not changed
+
+- Existing golden structure is preserved. The only re-labelling is the DB2
+  `FETCH NEXT FROM c …` window reading `FETCH FROM c` under the new cursor-ops
+  `summarise` rule; its graph edges are unchanged.
+- 1.1.0/1.2.0 boundary, lexing, and transaction semantics are untouched.
+- The local-only security model is unchanged.
+
+## Fixtures
+
+- `tests/dialects/tsql.ts` — resolved/unresolved `GOTO`, label-sourced ranges
+- `tests/dialects/db2.ts` — unresolved `LEAVE`; DB2 `ATOMIC` scope; updated
+  cursor-ops label
+- `tests/dialects/plpgsql.ts` — unresolved `EXIT` loop target
+- `tests/tests.ts` — v1.3.0 assertion block (diagnostics, spans, cursor query
+  graphs, `summarise`, export parity)
 
 ## Verification
 
 - `npm run typecheck` — passes
 - `npm run build` — passes
 - `npm run test:file` — passes
-- Golden suite — 164/164 (159 prior + 5 new records; no prior golden changed)
-- Fuzz suite — 400 deterministic mutation cases pass
+- Golden suite — 181/181 (was 164)
+- Fuzz suite — 400 deterministic mutation cases
 - UI suite — 13/13
-- Local-only URL check — clean
+- Local-only URL check clean; `dist/` committed in sync
 
-## Deferred within v1.3.0 (remaining Workstream B, next slices)
+## Deferred (per roadmap)
 
-Scheduled in `docs/v1.3.0-implementation-plan.md`:
-
-- Labelled loop-control and `GOTO` hardening (source spans, target validation,
-  `goto_unresolved` diagnostic, "unresolved label" node)
-- Cursor query bodies in query graphs (DB2 `FOR`, T-SQL `DECLARE … CURSOR`)
-- DB2 `ATOMIC` block rollback scope
-- Extended `summarise` label set
-- E procedural diagnostics and F export-parity fixtures for the new constructs
-
-Workstreams C/D, confidence re-score, layout, catalogue, columns, and RDL
-remain deferred per `ROADMAP.md@269`.
+- Workstream C (query lineage accuracy) → v1.4.0
+- Workstream D (data flow / dependency accuracy) → v1.5.0
+- Confidence re-score → v1.6.0; layout replacement → v1.7.0
+- Catalogue, columns, and RDL → v1.9.0+

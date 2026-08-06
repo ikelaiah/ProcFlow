@@ -72,6 +72,7 @@ interface AstBase {
 interface BlockNode extends AstBase {
   type: 'block';
   body: AstNode[];
+  atomic?: boolean;
 }
 
 interface StatementNode extends AstBase {
@@ -149,16 +150,21 @@ interface LoopControlNode extends AstBase {
   when: TokenList | null;
   word: string;
   span: SourceSpan;
+  toks: TokenList;
 }
 
 interface LabelNode extends AstBase {
   type: 'label';
   label: string;
+  span: SourceSpan;
+  toks: TokenList;
 }
 
 interface GotoNode extends AstBase {
   type: 'goto';
   label: string;
+  span: SourceSpan;
+  toks: TokenList;
 }
 
 interface BatchSeparatorNode extends AstBase {

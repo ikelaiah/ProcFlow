@@ -337,6 +337,30 @@ var PROCFLOW_PLPGSQL_GRAPH_FIXTURES = [
                 'UPDATE app.orders'
             ]
         }
+    },
+    {
+        name: 'PL/pgSQL graph · unresolved EXIT target gets an explicit node',
+        dialect: 'plpgsql',
+        sql: [
+            'CREATE FUNCTION app.bad_exit() RETURNS void LANGUAGE plpgsql AS $$',
+            'BEGIN',
+            '  LOOP',
+            '    EXIT missing_loop;',
+            '  END LOOP;',
+            'END;',
+            '$$;'
+        ].join('\n'),
+        expect: { mode: 'flow', loop: 1, diagnostic: 'goto_unresolved', noErrors: true, coverageMin: 1 },
+        graphExpect: {
+            required: [
+                { fromText: 'EXIT missing_loop', toText: 'Unresolved label: missing_loop', style: 'dotted' }
+            ],
+            forbidden: [
+                { fromText: 'EXIT missing_loop', toText: 'loop' },
+                { fromText: 'EXIT missing_loop', toText: 'End' }
+            ],
+            sourced: ['EXIT missing_loop']
+        }
     }
 ];
 PROCFLOW_GRAPH_FIXTURES =
