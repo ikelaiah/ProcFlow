@@ -57,6 +57,12 @@ function toMermaid(graph: Graph, dir?: DiagramDirection): string {
     var arrow=e.style==='dotted' ? '-.->' : '-->';
     L.push('  '+e.from+' '+arrow+(e.label?'|'+escLabel(e.label)+'|':'')+' '+e.to);
   });
+  /* Data-flow edges get a distinct style derived from the semantic edge kind. */
+  var dataIdx: number[]=[];
+  graph.edges.forEach(function(e,i){ if(e.kind==='data') dataIdx.push(i); });
+  if(dataIdx.length)
+    L.push('  linkStyle '+dataIdx.join(',')+' stroke:'+CANONICAL_EDGE_COLOR.data+
+           ',stroke-width:2px;');
   /* Provenance metadata as a Mermaid comment block. */
   L.push(provenanceComment(graph));
   var styles: Record<string, string>={
@@ -204,6 +210,7 @@ function toDrawio(graph: Graph, opts?: DrawioOptions): string {
     var style='edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;'+
       'html=0;endArrow=block;endFill=1;strokeColor='+edgeColor+';fontColor=#334155;';
     if(e.style==='dotted'||CANONICAL_EDGE_STYLE[kind]==='dotted') style+='dashed=1;';
+    if(kind==='data') style+='strokeWidth=2;';
     var kindAttr=e.kind?' data-procflow-kind="'+xmlAttr(e.kind)+'"':'';
     L.push('        <mxCell id="pf-e'+(i+1)+'" value="'+xmlAttr(e.label||'')+
       '" style="'+xmlAttr(style)+'" edge="1" parent="1" source="pf-'+xmlAttr(e.from)+

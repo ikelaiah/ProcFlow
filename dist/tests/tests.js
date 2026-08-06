@@ -71,7 +71,8 @@
         return graph.edges.some(function (edge) {
             return edge.from === from.id && edge.to === to.id &&
                 (expected.label === undefined || edge.label === expected.label) &&
-                (expected.style === undefined || edge.style === expected.style);
+                (expected.style === undefined || edge.style === expected.style) &&
+                (expected.kind === undefined || edge.kind === expected.kind);
         });
     }
     PROCFLOW_GRAPH_FIXTURES.forEach(function (fixture) {
@@ -262,11 +263,16 @@
     catch (err) {
         record('draw.io XML remains well formed', false, String(err && err.stack || err));
     }
-    /* v1.1.0: semantic edge kinds, node provenance, token attribution, construct coverage. */
+    /* v1.1.0: semantic edge kinds, node provenance, token attribution, construct coverage.
+       v1.5.0 accuracy correction: sequential control edges leaving io nodes were
+       previously classified as semantic 'data' edges; 'data' is now reserved for
+       explicit producer→consumer temp-table edges and dependency-graph writes,
+       so this fixture stages through #work to assert a genuine data edge. */
     try {
         var semantic = analyse('CREATE PROC dbo.semantic AS BEGIN\n' +
+            '  SELECT id INTO #work FROM dbo.Queue;\n' +
             '  BEGIN TRY\n' +
-            '    UPDATE dbo.Work SET Status = 1;\n' +
+            '    UPDATE #work SET Status = 1;\n' +
             "    THROW 50001, 'stop', 1;\n" +
             '  END TRY\n' +
             '  BEGIN CATCH\n' +
@@ -622,6 +628,69 @@
     }
     catch (err) {
         record('v1.4.0 F export parity for query graph constructs', false, String(err && err.stack || err));
+    }
+    /* v1.5.0: data flow and internal resilience — Workstream D temp-table
+       producer→consumer data edges, conservative external nodes, F data-flow
+       rendering, E construct-coverage counts. */
+    var STAGE_FLOW_150 = [
+        'CREATE PROCEDURE dbo.stage_flow AS',
+        'BEGIN',
+        '  SELECT id INTO #stage FROM dbo.source;',
+        '  UPDATE #stage SET id = id + 1;',
+        '  SELECT id FROM #stage;',
+        'END'
+    ].join('\n');
+    try {
+        var extEstate150 = analyseEstate([{ name: 'ext.sql', text: [
+                    'CREATE PROCEDURE dbo.nightly_sync AS',
+                    'BEGIN',
+                    '  EXEC remotesrv.salesdb.dbo.pull_orders;',
+                    '  SELECT id INTO #orders FROM linksrv.warehouse.dbo.orders;',
+                    'END'
+                ].join('\n') }], { dialect: 'tsql', mode: 'auto', group: false, sources: true });
+        var extTexts150 = extEstate150.graph.nodes.map(function (n) { return n.text; });
+        var extNodes150 = extEstate150.graph.nodes.filter(function (n) {
+            return n.text.indexOf('external: ') === 0;
+        });
+        var extOk150 = has(extTexts150, 'external: remotesrv.salesdb.dbo.pull_orders') &&
+            has(extTexts150, 'external: linksrv.warehouse.dbo.orders') &&
+            extNodes150.length >= 2 &&
+            extNodes150.every(function (n) { return n.provenance === 'external'; });
+        record('v1.5.0 external nodes keep complete three-/four-part names', extOk150, JSON.stringify(extEstate150.graph.nodes.map(function (n) {
+            return { text: n.text, provenance: n.provenance };
+        })));
+    }
+    catch (err) {
+        record('v1.5.0 external nodes keep complete three-/four-part names', false, String(err && err.stack || err));
+    }
+    try {
+        var df150 = analyse(STAGE_FLOW_150, { dialect: 'tsql', mode: 'flow', group: false, sources: true });
+        var dfDataEdges150 = df150.graph.edges.filter(function (e) { return e.kind === 'data'; });
+        var dfMermaid150 = toMermaid(df150.graph, 'TD');
+        var dfXml150 = toDrawio(df150.graph, { title: 'df', dir: 'TD' });
+        var dfDoc150 = new DOMParser().parseFromString(dfXml150, 'application/xml');
+        record('v1.5.0 F data-flow edge rendering in both exporters', dfDataEdges150.length >= 2 &&
+            /linkStyle [0-9,]+ stroke:#54c39b/.test(dfMermaid150) &&
+            !dfDoc150.querySelector('parsererror') &&
+            /data-procflow-kind="data"/.test(dfXml150) && /strokeWidth=2/.test(dfXml150), JSON.stringify({ dataEdges: dfDataEdges150.length,
+            parsererror: dfDoc150.querySelector('parsererror') &&
+                dfDoc150.querySelector('parsererror').textContent }));
+    }
+    catch (err) {
+        record('v1.5.0 F data-flow edge rendering in both exporters', false, String(err && err.stack || err));
+    }
+    try {
+        var cc150 = analyse(STAGE_FLOW_150, { dialect: 'tsql', mode: 'flow', group: false, sources: true });
+        var cov150 = cc150.constructCoverage;
+        var ccOk150 = !!cov150 && cov150.constructs > 0 && cov150.resolved > 0 &&
+            cov150.opaque === 0 &&
+            !!cov150.byKind.source_ref && cov150.byKind.source_ref.detected >= 2 &&
+            !!cov150.byKind.temp_flow && cov150.byKind.temp_flow.detected === 2 &&
+            cov150.byKind.temp_flow.resolved === 2;
+        record('v1.5.0 construct coverage detected/resolved/opaque counts', ccOk150, JSON.stringify(cov150));
+    }
+    catch (err) {
+        record('v1.5.0 construct coverage detected/resolved/opaque counts', false, String(err && err.stack || err));
     }
     var passed = results.filter(function (r) { return r.pass; }).length;
     document.body.className = passed === results.length ? 'pass' : 'fail';

@@ -275,6 +275,36 @@
         $('analysis-health').setAttribute('data-band', score >= 0.85 ? 'high' : score >= 0.6 ? 'medium' : 'low');
         $('analysis-health').title = 'Confidence combines dialect certainty, parser coverage, and error diagnostics.';
     }
+    function mergeConstructCoverage(acc, cc) {
+        if (!cc)
+            return;
+        acc.constructs += cc.constructs;
+        acc.resolved += cc.resolved;
+        acc.opaque += cc.opaque;
+        Object.keys(cc.byKind || {}).forEach(function (k) {
+            var into = acc.byKind[k] = acc.byKind[k] || { detected: 0, resolved: 0, opaque: 0 };
+            var from = cc.byKind[k];
+            into.detected += from.detected;
+            into.resolved += from.resolved;
+            into.opaque += from.opaque;
+        });
+    }
+    function setConstructCoverage(cc) {
+        var val = $('construct-val'), note = $('construct-note');
+        if (!cc || !cc.constructs) {
+            val.textContent = '—';
+            note.textContent = '';
+            return;
+        }
+        val.textContent = cc.resolved + '/' + cc.constructs;
+        val.title = 'Constructs detected by the parser, and how many resolved cleanly.';
+        var kinds = Object.keys(cc.byKind || {}).map(function (k) {
+            var c = cc.byKind[k];
+            return k + ' ' + c.resolved + '/' + c.detected + (c.opaque ? ' · ' + c.opaque + ' opaque' : '');
+        });
+        note.textContent = 'Constructs: ' + cc.constructs + ' detected · ' + cc.resolved +
+            ' resolved · ' + cc.opaque + ' opaque' + (kinds.length ? ' — ' + kinds.join(', ') : '');
+    }
     function estateHealth(currentEstate) {
         var objects = currentEstate && currentEstate.objects || [];
         if (!objects.length)
@@ -323,6 +353,7 @@
             stage.classList.add('empty-stage');
             setStats('flow', { stmt: 0, branch: 0, loop: 0, cat: 0, exit: 0, depth: 0, cc: 1 });
             setAnalysisHealth(0, 0, 0);
+            setConstructCoverage(null);
             $('proc-name').textContent = '';
             $('lbl-object').hidden = true;
             lastCode = '';
@@ -359,6 +390,11 @@
             setStats('dependencies', estate.stats);
             var health = estateHealth(estate);
             setAnalysisHealth(health.confidence, health.coverage, health.diagnostics);
+            var estateCoverage = { constructs: 0, resolved: 0, opaque: 0, byKind: {} };
+            (estate.objects || []).forEach(function (o) {
+                mergeConstructCoverage(estateCoverage, o.result && o.result.constructCoverage);
+            });
+            setConstructCoverage(estateCoverage);
             showDiagnostics(estate.diagnostics);
             out.textContent = dependencyCode;
             lastCode = dependencyCode;
@@ -391,6 +427,7 @@
         $('proc-name').textContent = result.header.name || '';
         setStats(result.mode, st);
         setAnalysisHealth(result.confidence, result.coverage, result.diagnostics.filter(function (d) { return d.severity !== 'info'; }).length);
+        setConstructCoverage(result.constructCoverage || null);
         out.textContent = result.mermaid;
         lastCode = result.mermaid;
         lastDialect = result.dialect;

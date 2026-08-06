@@ -376,11 +376,13 @@ function tsqlTranCountTest(toks: TokenList) {
 }
 
 /* ---------- graph builder ---------- */
-function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {dialect?: Dialect}): Graph {
+function buildGraph(ast: AstNode[], header: SqlHeader,
+    opts?: AnalyseOptions & {dialect?: Dialect; diagnostics?: Diagnostic[]}): Graph {
   opts=opts||{};
   var detail=opts.detail||'summary', group=opts.group!==false;
   var dialect=opts.dialect||'tsql';
   var fanIn=opts.fanIn===true, number=opts.number===true;
+  var diagnosticsOut: Diagnostic[]=opts.diagnostics||[];
   var guarded: StringSet={};                       /* nodes already wired to an inner handler */
   var unreachable: StringSet={};                   /* parsed nodes with no incoming control path */
   var PROTECTABLE: string[]=['stmt','io','call','tran','cursor','opaque'];
@@ -390,14 +392,16 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
   var pgErrors: Record<string, PgErrorCondition | null>={};
   var maxLen = detail==='full' ? 110 : 52;
   var nodes: GraphNode[]=[], edges: GraphEdge[]=[], seq=0;
-  var stats: GraphStats={stmt:0, branch:0, loop:0, cat:0, exit:0, depth:0, opaque:0};
+  var stats: GraphStats={stmt:0, branch:0, loop:0, cat:0, exit:0, depth:0, opaque:0, dataflow:0};
   var labels: Record<string, string>={}, gotos: Array<{from: string; to: string; label: string}>=[];
   var constructCounts: Record<string, {detected: number; resolved: number; opaque: number}>={};
 
   function edgeKindFor(cls: string, style: string): EdgeKind {
     if(style==='dotted') return 'exception';
     if(cls==='call') return 'call';
-    if(cls==='io'||cls==='src') return 'data';
+    /* Sequential edges are control flow even when they leave an io/src node;
+       'data' is reserved for explicit producer→consumer and dependency-graph
+       write edges. */
     return 'control';
   }
   function add(shape: string, text: unknown, cls: string, source?: SourceSpan | null): string {
@@ -407,11 +411,12 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
                 provenance:source?'source':'synthetic'});
     return id;
   }
-  function link(from: string | null, to: string | null, label?: string, style?: string): void {
+  function link(from: string | null, to: string | null, label?: string,
+      style?: string, kind?: EdgeKind): void {
     if(!from||!to) return;
     var fromNode=nodes.filter(function(n){return n.id===from;})[0];
-    var kind=fromNode?edgeKindFor(fromNode.cls,style||'solid'):'control';
-    edges.push({from:from, to:to, label:label||'', style:style||'solid', kind:kind});
+    var edgeKind=kind||(fromNode?edgeKindFor(fromNode.cls,style||'solid'):'control');
+    edges.push({from:from, to:to, label:label||'', style:style||'solid', kind:edgeKind});
   }
   function trackConstruct(kind: string, resolved: boolean, opaque?: boolean): void {
     var c=constructCounts[kind]=constructCounts[kind]||{detected:0,resolved:0,opaque:0};
@@ -475,6 +480,80 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
       ctx=ctx.parent;
     }
     return false;
+  }
+  function currentInCatch(ctx: FlowContext | null): boolean {
+    while(ctx){
+      if(ctx.inCatch) return true;
+      ctx=ctx.parent;
+    }
+    return false;
+  }
+
+  /* ---------- temp-table data flow (Workstream D) ----------
+     A consumer wires to its unique reaching definition: the most recent write
+     on a provably linear path. Conditional writes and branch merges mark the
+     definition ambiguous (`multi`), and consumers of an ambiguous temp table
+     stay unwired with an informational `temp_flow_ambiguous` annotation. */
+  var ambiguousTemps: StringSet={};
+  function isTempName(name: string): boolean { return name.charAt(0)==='#'; }
+  function lookupTemp(ctx: FlowContext | null, name: string): TempTableDef | null {
+    var key=name.toUpperCase();
+    while(ctx){
+      if(ctx.temps&&ctx.temps[key]) return ctx.temps[key];
+      ctx=ctx.parent;
+    }
+    return null;
+  }
+  function noteAmbiguousTemp(def: TempTableDef, span: SourceSpan | null): void {
+    var key=def.name.toUpperCase();
+    if(ambiguousTemps[key]) return;
+    ambiguousTemps[key]=1;
+    diagnosticsOut.push({severity:'info',code:'temp_flow_ambiguous',
+      message:'Temporary table '+def.name+' has more than one possible producer '+
+        '(conditional write or branch merge); data-flow edges to its consumers are not drawn.',
+      span:span, scope:'region'});
+  }
+  function dataEdge(fromId: string, toId: string, name: string): void {
+    if(fromId===toId) return;
+    link(fromId,toId,name,'solid','data');
+    stats.dataflow++;
+  }
+  /* Wire a statement's temp-table reads (and read-modify writes) from their
+     reaching definitions; return the writes the statement performs. */
+  function flowTempFacts(st: StatementNode, nodeId: string,
+      ctx: FlowContext | null): Record<string, TempTableDef> | null {
+    var facts=statementFacts(st.toks), span=spanOfTokens(st.toks);
+    var writes: Record<string, TempTableDef> | null=null;
+    facts.reads.forEach(function(name){
+      if(!isTempName(name)) return;
+      var def=lookupTemp(ctx,name);
+      if(!def) return;
+      if(def.multi){ noteAmbiguousTemp(def,span); return; }
+      dataEdge(def.id,nodeId,def.name);
+    });
+    facts.writes.forEach(function(name){
+      if(!isTempName(name)) return;
+      var def=lookupTemp(ctx,name);
+      if(def&&def.multi) noteAmbiguousTemp(def,span);
+      else if(def) dataEdge(def.id,nodeId,def.name);
+      writes=writes||{};
+      writes[name.toUpperCase()]={id:nodeId,name:name,multi:false};
+    });
+    return writes;
+  }
+  /* Copy a branch's writes into a merge map, flagged ambiguous. */
+  function mergeTempsMulti(acc: Record<string, TempTableDef>,
+      from?: Record<string, TempTableDef> | null): void {
+    if(!from) return;
+    Object.keys(from).forEach(function(k){
+      if(!acc[k]) acc[k]={id:from[k].id,name:from[k].name,multi:true};
+    });
+  }
+  function ambiguousCopy(from?: Record<string, TempTableDef> | null): Record<string, TempTableDef> | null {
+    if(!from||!Object.keys(from).length) return null;
+    var out: Record<string, TempTableDef>={};
+    mergeTempsMulti(out,from);
+    return out;
   }
   function withTsqlState(ctx: FlowContext | null, states: number,
       tranDepth: TsqlTransactionDepth): FlowContext {
@@ -582,10 +661,12 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
   function tsqlStatementText(st: StatementNode, ctx: FlowContext | null): string {
     if(kindOf(st)==='tran') return tsqlTransactionText(st,ctx);
     if(st.toks.length>=3&&st.toks[0].u==='SET'&&st.toks[1].u==='XACT_ABORT'){
+      var catchNote=currentInCatch(ctx)
+        ?' · set inside CATCH; applies to later statements':'';
       if(st.toks[2].u==='ON')
-        return textOf(st)+' — runtime errors abort transactions';
+        return textOf(st)+' — runtime errors abort transactions'+catchNote;
       if(st.toks[2].u==='OFF')
-        return textOf(st)+' — statement errors may leave transaction active';
+        return textOf(st)+' — statement errors may leave transaction active'+catchNote;
     }
     return textOf(st);
   }
@@ -735,17 +816,56 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
         if(run.length>1){
           var runSpan={start:run[0].toks[0].pos,
                        end:run[run.length-1].toks[run[run.length-1].toks.length-1].end};
-          var id=add('rect', run.map(textOf).join('\u0001'), 'stmt', runSpan);
+          var id=add('rect', run.map(textOf).join(''), 'stmt', runSpan);
           stats.stmt+=run.length;
+          if(statementReachable){
+            /* Temp flow across a grouped run: reads wire from pre-run
+               definitions; writes become the run's reaching definitions. */
+            var runReads: StringSet={}, runWrites: Record<string, TempTableDef>={};
+            run.forEach(function(rst){
+              var facts=statementFacts(rst.toks);
+              facts.reads.forEach(function(n){
+                if(isTempName(n)) runReads[n.toUpperCase()]=1;
+              });
+              facts.writes.forEach(function(n){
+                if(isTempName(n))
+                  runWrites[n.toUpperCase()]={id:id,name:n,multi:false};
+              });
+            });
+            Object.keys(runReads).forEach(function(k){
+              if(runWrites[k]) return;
+              var def=lookupTemp(local,k);
+              if(!def) return;
+              if(def.multi) noteAmbiguousTemp(def,runSpan);
+              else dataEdge(def.id,id,def.name);
+            });
+            Object.keys(runWrites).forEach(function(k){
+              var def=lookupTemp(local,k);
+              if(def&&def.multi) noteAmbiguousTemp(def,runSpan);
+              else if(def) dataEdge(def.id,id,def.name);
+            });
+            if(Object.keys(runWrites).length){
+              local.temps=local.temps||{};
+              Object.keys(runWrites).forEach(function(k){
+                (local.temps as Record<string, TempTableDef>)[k]=runWrites[k];
+              });
+            }
+          }
           res={entry:id, exits:[{id:id}]};
           i=j;
-        } else { res=emitOne(st, local, depth); i++; }
-      } else { res=emitOne(st, local, depth); i++; }
+        } else { res=emitOne(st, local, depth, statementReachable); i++; }
+      } else { res=emitOne(st, local, depth, statementReachable); i++; }
       if(!statementReachable)
         nodes.slice(mark).forEach(function(node){unreachable[node.id]=1;});
       if(st.type!=='handler'&&statementReachable)
         wireHandlerSources(nodes.slice(mark),local);
       if(!res||!res.entry) continue;
+      if(res.endTemps){
+        local.temps=local.temps||{};
+        Object.keys(res.endTemps).forEach(function(k){
+          (local.temps as Record<string, TempTableDef>)[k]=(res.endTemps as Record<string, TempTableDef>)[k];
+        });
+      }
       if(!entry) entry=res.entry;
       if(!statementReachable) continue;
       if(!reachable) exits=[];
@@ -756,10 +876,12 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
       reachable=exits.length>0;
     }
     exits=exits.concat(local.handlerExits);
-    return {entry:entry, exits:exits};
+    return {entry:entry, exits:exits, endTemps:local.temps||null,
+            endSavepoints:local.savepoints||null};
   }
 
-  function emitOne(st: AstNode, ctx: FlowContext | null, depth: number): EmitResult | null {
+  function emitOne(st: AstNode, ctx: FlowContext | null, depth: number,
+      reachable?: boolean): EmitResult | null {
     switch(st.type){
       case 'block': {
       if((st as any).atomic&&dialect==='db2'){
@@ -777,7 +899,8 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
             link(ex0.id,rb,ex0.label||'undo');
           } else ao.push(ex0);
         }
-        return {entry:am, exits:ao};
+        return {entry:am, exits:ao, endTemps:innerA.endTemps||null,
+                endSavepoints:innerA.endSavepoints||null};
       }
       return emitList(st.body, ctx, depth);
     }
@@ -795,7 +918,9 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
            (dialect==='plpgsql'&&!!pgTransaction&&pgTransaction.invalid));
         var id=add(invalidTransaction?'round':'rect', statementText,
                    invalidTransaction?'err':statementKind, spanOfTokens(st.toks));
-        return {entry:id, exits:invalidTransaction?[]:[{id:id}]};
+        var stmtWrites=reachable===false?null:flowTempFacts(st,id,ctx);
+        return {entry:id, exits:invalidTransaction?[]:[{id:id}],
+                endTemps:stmtWrites};
       }
 
       case 'dynamic': {
@@ -848,7 +973,11 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
         else ex.push({id:c, label:yesLabel});
         if(e&&e.entry){ link(c,e.entry,noLabel); ex=ex.concat(e.exits); }
         else ex.push({id:c, label:noLabel});
-        return {entry:c, exits:ex};
+        var ifTemps: Record<string, TempTableDef>={};
+        mergeTempsMulti(ifTemps,t&&t.endTemps);
+        mergeTempsMulti(ifTemps,e&&e.endTemps);
+        return {entry:c, exits:ex,
+                endTemps:Object.keys(ifTemps).length?ifTemps:null};
       }
 
       case 'case': {
@@ -860,6 +989,7 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
         }
         var selTxt=st.sel&&st.sel.length?joinToks(st.sel,40):'';
         var entry: string | null=null, prev: string | null=null, exits: FlowExit[]=[];
+        var caseTemps: Record<string, TempTableDef>={};
         for(var b=0;b<st.branches.length;b++){
           stats.branch++;
           var br=st.branches[b];
@@ -868,15 +998,18 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
           if(!entry) entry=d;
           if(prev) link(prev, d, 'no');
           var bb=emitList(br.body, ctx, depth+1);
+          mergeTempsMulti(caseTemps,bb.endTemps);
           if(bb.entry){ link(d, bb.entry, 'yes'); exits=exits.concat(bb.exits); }
           else exits.push({id:d, label:'yes'});
           prev=d;
         }
         if(st.else){
           var eb=emitList(st.else, ctx, depth+1);
+          mergeTempsMulti(caseTemps,eb.endTemps);
           if(eb.entry){ link(prev, eb.entry, 'else'); exits=exits.concat(eb.exits); }
         } else if(prev) exits.push({id:prev, label:'no'});
-        return {entry:entry, exits:exits};
+        return {entry:entry, exits:exits,
+                endTemps:Object.keys(caseTemps).length?caseTemps:null};
       }
 
       case 'while':
@@ -896,7 +1029,7 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
         else link(wc, wc, 'loop');
         var outs=inner.loop.breaks.slice();
         if(st.type!=='loop') outs.push({id:wc, label:'done'});
-        return {entry:wc, exits:outs};
+        return {entry:wc, exits:outs, endTemps:ambiguousCopy(body&&body.endTemps)};
       }
 
       case 'repeat': {
@@ -912,7 +1045,8 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
           joinExits(body2.exits, rc);
           link(rc, body2.entry, 'no');
           var repeatExits: FlowExit[]=[{id:rc,label:'yes'}];
-          return {entry:body2.entry,exits:repeatExits.concat(inner2.loop.breaks)};
+          return {entry:body2.entry,exits:repeatExits.concat(inner2.loop.breaks),
+                  endTemps:ambiguousCopy(body2.endTemps)};
         }
         return {entry:rc, exits:[{id:rc, label:'yes'}]};
       }
@@ -930,6 +1064,17 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
         var tb=emitList(st.body, exceptionCtx, depth+1);
         if(tb.entry) link(tstart, tb.entry);
         var exits=tb.entry?tb.exits.slice():[{id:tstart}];
+        /* T-SQL CATCH scope: savepoints declared in the TRY body remain visible
+           to savepoint-only recovery inside the handler, and statements know
+           they run in a CATCH scope. */
+        var handlerCtx: FlowContext | null=exceptionCtx;
+        if(dialect==='tsql'){
+          handlerCtx={parent:ctx,handlers:[],handlerExits:[],inCatch:true};
+          if(tb.endSavepoints&&Object.keys(tb.endSavepoints).length)
+            handlerCtx.savepoints=tb.endSavepoints;
+        }
+        var tryTemps: Record<string, TempTableDef>={};
+        mergeTempsMulti(tryTemps,tb.endTemps);
 
         /* Explicit errors always identify their source; fan-in adds potential raisers. */
         var explicitRaisers: string[]=[], raisers: string[]=[];
@@ -1017,7 +1162,8 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
             rollbackMarker=add('marker',
               'Implicit rollback · '+clip(handlerLabels[hbIndex],32)+
               '\u0001Persistent changes undone · variables preserved','tran');
-          var cb2=emitList(st.handlers[hbIndex].body,exceptionCtx,depth+1);
+          var cb2=emitList(st.handlers[hbIndex].body,handlerCtx,depth+1);
+          mergeTempsMulti(tryTemps,cb2.endTemps);
           if(handlerReachable[hbIndex]&&cb2.entry){
             if(rollbackMarker){
               link(handlerMarkers[hbIndex],rollbackMarker);
@@ -1035,7 +1181,8 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
           }
         }
         Object.keys(handledRaisers).forEach(function(id){guarded[id]=1;});
-        return {entry:tstart, exits:exits};
+        return {entry:tstart, exits:exits,
+                endTemps:Object.keys(tryTemps).length?tryTemps:null};
       }
 
       case 'handler': {
@@ -1063,7 +1210,8 @@ function buildGraph(ast: AstNode[], header: SqlHeader, opts?: AnalyseOptions & {
           if(st.kind!=='CONTINUE')
             ctx.handlerExits.push({id:terminal,label:st.kind==='UNDO'?'undo':'handler exit'});
         }
-        return {entry:null, exits:[]};
+        return {entry:null, exits:[],
+                endTemps:ambiguousCopy(hb&&hb.endTemps)};
       }
 
       case 'return': {
@@ -1320,11 +1468,12 @@ function splitSqlObjects(sql: string, fileName?: string): SqlUnit[] {
 function dependencyGraph(objects: ObjectIR[]): Graph {
   var nodes: GraphNode[]=[], edges: GraphEdge[]=[], ids: Record<string, string>={},
       ext: Record<string, string>={}, seq=0;
-  function add(text: string, cls: string, source?: SourceSpan | null, objectId?: string | null): string {
+  function add(text: string, cls: string, source?: SourceSpan | null,
+      objectId?: string | null, provenance?: NodeProvenance): string {
     var id='d'+(++seq);
     nodes.push({id:id,shape:cls==='src'?'io':'rect',text:text,cls:cls,
-                source:source||null,objectId:objectId||null,
-                provenance:source?'source':(objectId?'external':'synthetic')});
+                 source:source||null,objectId:objectId||null,
+                 provenance:provenance||(source?'source':(objectId?'external':'synthetic'))});
     return id;
   }
   objects.forEach(function(o){
@@ -1335,7 +1484,19 @@ function dependencyGraph(objects: ObjectIR[]): Graph {
     var known=ids[name.toUpperCase()];
     if(known) return known;
     var key=type+':'+name.toUpperCase();
-    if(!ext[key]) ext[key]=add(name,type==='call'?'call':'src',null,null);
+    if(!ext[key]){
+      /* Conservative external nodes: an unmatched three-/four-part name keeps
+         its complete server.database.schema.object identity instead of a bare
+         last-part label. Unmatched object targets are external; temp tables
+         are workspace-internal and remain synthetic. */
+      if(name.charAt(0)==='#'){
+        ext[key]=add(name,'src',null,null,'synthetic');
+      } else {
+        var remote=name.split('.').length>=3;
+        ext[key]=add(remote?'external: '+name:name,
+                     type==='call'?'call':'src',null,null,'external');
+      }
+    }
     return ext[key];
   }
   objects.forEach(function(o){
@@ -1505,7 +1666,7 @@ function analyse(sql: string, opts?: AnalyseOptions): AnalysisResult {
     if(!d.scope) d.scope='region';
   });
   var gopts={detail:opts.detail, group:opts.group, dialect:dialect, sources:opts.sources,
-             fanIn:opts.fanIn, number:opts.number};
+             fanIn:opts.fanIn, number:opts.number, diagnostics:diagnostics};
   var graph=buildGraph(ast, header, gopts);
   var mode=opts.mode||'auto';
   var flat = graph.stats.branch+graph.stats.loop+graph.stats.cat===0;
@@ -1602,6 +1763,9 @@ function analyse(sql: string, opts?: AnalyseOptions): AnalysisResult {
       info.refs.forEach(function(){ trackC('source_ref',true); });
     }
   },0);
+  /* Temp-table producer→consumer data edges resolved in the flow graph. */
+  var tempFlowEdges=(graph.stats&&graph.stats.dataflow)||0;
+  for(var tfi=0;tfi<tempFlowEdges;tfi++) trackC('temp_flow',true);
 
   return {dialect:dialect, detected:det, confidence:confidence,
           dialectConfidence:dialectConfidence, coverage:coverage,
