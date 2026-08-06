@@ -1472,6 +1472,33 @@ function analyse(sql: string, opts?: AnalyseOptions): AnalysisResult {
           : 'Continue target "'+u.label+'" is not an enclosing loop label; adding an unresolved-label node.'),
       span:u.span, scope:'region'});
   });
+  /* Recursive CTEs: a resolved self-reference is an informational annotation;
+     an approximate one (unresolvable inner reference) is a warning. */
+  walkAst(ast,function(st){
+    if(!('toks' in st)||!st.toks) return;
+    var rsplit=splitCTEs(st.toks);
+    rsplit.ctes.forEach(function(c){
+      var cinfo=refsIn(c.body);
+      var selfRef=cinfo.refs.some(function(r){
+        return r.toUpperCase()===c.name.toUpperCase();
+      });
+      if(!selfRef) return;
+      /* An unresolved/opaque source inside the recursion cycle (e.g. a tabular
+         function or dynamic construct) makes the recursion approximate. Plain
+         table references resolve normally. */
+      var approx=(cinfo.structuredRefs||[]).some(function(s){
+        return s.resolution==='opaque';
+      });
+      if(approx)
+        diagnostics.push({severity:'warning',code:'cte_recursion_approx',
+          message:'Recursive CTE "'+c.name+'" contains an opaque source reference; recursion may be approximate.',
+          span:spanOfTokens(c.body), scope:'region'});
+      else
+        diagnostics.push({severity:'info',code:'cte_recursive',
+          message:'Recursive CTE "'+c.name+'" resolved.', span:spanOfTokens(c.body),
+          scope:'region'});
+    });
+  },0);
   if(dialect==='plpgsql')
     addPgTransactionDiagnostics(ast,header,diagnostics,false);
   diagnostics.forEach(function(d){

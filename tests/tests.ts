@@ -558,6 +558,140 @@
       false,String(err&&err.stack||err));
   }
 
+  /* v1.4.0: report every object a query touches — Workstream C structured
+     references, read extraction, recursive CTE annotations, F export parity. */
+  function spanOk40(span: SourceSpan | null): boolean {
+    return !!span&&span.start>=0&&span.end>span.start;
+  }
+  function hasRef40(list: StructuredQueryReference[], name: string): boolean {
+    return (list||[]).some(function(r){return r.name.toUpperCase()===name.toUpperCase();});
+  }
+  function refsOf40(sql: string, dialect: Dialect): QueryReferenceInfo {
+    var a=analyse(sql,{dialect:dialect, mode:'query', group:false, sources:true});
+    var stmt=a.ast.filter(function(n){return n.type==='stmt';})[0] as StatementNode;
+    return refsIn(stmt?stmt.toks:[]);
+  }
+
+  try{
+    var comma40=refsOf40('SELECT * FROM dbo.orders o, dbo.customers c, dbo.items i;','tsql');
+    var commaNames40=comma40.structuredRefs.map(function(r){return r.name;});
+    var commaOk40=commaNames40.length>=3&&
+      hasRef40(comma40.structuredRefs,'dbo.orders')&&
+      hasRef40(comma40.structuredRefs,'dbo.customers')&&
+      hasRef40(comma40.structuredRefs,'dbo.items')&&
+      comma40.structuredRefs.every(function(r){
+        return r.role==='read'&&r.resolution==='exact'&&spanOk40(r.span);
+      });
+    record('v1.4.0 comma-separated sources in refsIn',
+      commaOk40,JSON.stringify(comma40.structuredRefs));
+  }catch(err){
+    record('v1.4.0 comma-separated sources in refsIn',false,String(err&&err.stack||err));
+  }
+
+  try{
+    var apply40=refsOf40('SELECT a.id FROM dbo.a a CROSS APPLY dbo.fn(a.id) f;','tsql');
+    var tab40=refsOf40('SELECT * FROM dbo.doc d, UNNEST(d.ids) AS x(id);','plpgsql');
+    var fnRef40=(apply40.structuredRefs||[]).filter(function(r){
+      return r.name.toUpperCase()==='DBO.FN';})[0];
+    var opaqueRef40=(tab40.structuredRefs||[]).filter(function(r){
+      return r.resolution==='opaque';})[0];
+    var applyOk40=hasRef40(apply40.structuredRefs,'dbo.a')&&
+      !!fnRef40&&fnRef40.resolution==='heuristic'&&spanOk40(fnRef40.span);
+    var tabOk40=!!opaqueRef40&&opaqueRef40.role==='read'&&spanOk40(opaqueRef40.span);
+    record('v1.4.0 APPLY and tabular functions as structured references',
+      applyOk40&&tabOk40,
+      JSON.stringify({apply:apply40.structuredRefs,tab:tab40.structuredRefs}));
+  }catch(err){
+    record('v1.4.0 APPLY and tabular functions as structured references',
+      false,String(err&&err.stack||err));
+  }
+
+  try{
+    var nodeTexts40=function(sql: string, dialect: Dialect): string[] {
+      var a=analyse(sql,{dialect:dialect, mode:'query', group:false, sources:true});
+      return a.graph.nodes.map(function(n){return n.text;});
+    };
+    var merge40=nodeTexts40('MERGE INTO dbo.target t USING dbo.source s ON s.id=t.id WHEN MATCHED THEN UPDATE SET t.x=s.x;','tsql');
+    var del40=nodeTexts40('DELETE FROM dbo.orders USING dbo.customers WHERE orders.cid=customers.id;','plpgsql');
+    var upd40=nodeTexts40('UPDATE dbo.o SET o.x=s.x FROM dbo.o INNER JOIN dbo.s ON o.id=s.id;','tsql');
+    var readOk40=merge40.some(function(t){return t==='dbo.source';})&&
+      del40.some(function(t){return t==='dbo.customers';})&&
+      upd40.some(function(t){return t==='dbo.s';});
+    record('v1.4.0 read extraction MERGE…USING / DELETE…USING / UPDATE…FROM',
+      readOk40,JSON.stringify({merge:merge40,del:del40,upd:upd40}));
+  }catch(err){
+    record('v1.4.0 read extraction MERGE…USING / DELETE…USING / UPDATE…FROM',
+      false,String(err&&err.stack||err));
+  }
+
+  try{
+    var rec40=analyse('WITH RECURSIVE r(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM r WHERE n<10) SELECT * FROM r;',
+      {dialect:'plpgsql',mode:'query',group:false,sources:true});
+    var recInfo40=rec40.diagnostics.filter(function(d){return d.code==='cte_recursive';})[0];
+    var hasRecInfo40=!!recInfo40&&recInfo40.severity==='info'&&
+      recInfo40.scope==='region'&&spanOk40(recInfo40.span);
+    var noRecWarn40=!rec40.diagnostics.some(function(d){
+      return d.code==='cte_recursion_approx';});
+    var recMarked40=rec40.graph.nodes.some(function(n){
+      return /recursive CTE/.test(n.text);})&&rec40.stats.recursive===1;
+    var approx40=analyse('WITH RECURSIVE r AS (SELECT 1 UNION ALL SELECT n+1 FROM r, GENERATE_SERIES(1,10) WHERE n<10) SELECT * FROM r;',
+      {dialect:'plpgsql',mode:'query',group:false,sources:true});
+    var approxWarn40=approx40.diagnostics.some(function(d){
+      return d.code==='cte_recursion_approx'&&d.severity==='warning'&&spanOk40(d.span);
+    });
+    record('v1.4.0 recursive CTE informational annotation and metadata',
+      hasRecInfo40&&noRecWarn40&&recMarked40,
+      JSON.stringify(rec40.diagnostics));
+    record('v1.4.0 approximate recursion emits a warning', approxWarn40,
+      JSON.stringify(approx40.diagnostics));
+  }catch(err){
+    record('v1.4.0 recursive CTE informational annotation and metadata',
+      false,String(err&&err.stack||err));
+    record('v1.4.0 approximate recursion emits a warning',
+      false,String(err&&err.stack||err));
+  }
+
+  try{
+    var derived40=analyse('SELECT x.id FROM (SELECT id FROM dbo.inner) x;',
+      {dialect:'tsql',mode:'query',group:false,sources:true});
+    var commaQ40=analyse('SELECT * FROM dbo.a, dbo.b;',
+      {dialect:'tsql',mode:'query',group:false,sources:true});
+    var derivedOk40=derived40.graph.nodes.some(function(n){return n.text==='dbo.inner';});
+    var commaQOk40=commaQ40.graph.nodes.some(function(n){return n.text==='dbo.b';})&&
+      commaQ40.graph.stats.tables===2;
+    record('v1.4.0 derived-table and comma inner sources wired in query graph',
+      derivedOk40&&commaQOk40,
+      JSON.stringify({derived:derived40.graph.nodes.map(function(n){return n.text;}),
+                      comma:commaQ40.graph.nodes.map(function(n){return n.text;})}));
+  }catch(err){
+    record('v1.4.0 derived-table and comma inner sources wired in query graph',
+      false,String(err&&err.stack||err));
+  }
+
+  try{
+    var qgSrc40=[
+      'WITH RECURSIVE r(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM r WHERE n<10)',
+      'SELECT a.id, b.id FROM dbo.a a CROSS APPLY dbo.fn(a.id) f, dbo.b b;',
+      'MERGE INTO dbo.target t USING dbo.source s ON s.id=t.id WHEN MATCHED THEN UPDATE SET t.x=s.x;',
+      'SELECT * FROM (SELECT id FROM dbo.inner) x;'
+    ].join('\n');
+    var qg40=analyse(qgSrc40,
+      {dialect:'tsql',mode:'query',group:false,sources:true});
+    var m40=toMermaid(qg40.graph,'TD');
+    var x40=toDrawio(qg40.graph,{title:'q1-4',dir:'TD'});
+    var doc40=new DOMParser().parseFromString(x40,'application/xml');
+    var hasQuerySources40=['dbo.a','dbo.b','dbo.fn','dbo.source','dbo.inner'].every(
+      function(name){return m40.indexOf(name)>=0;});
+    var parity40=!doc40.querySelector('parsererror')&&/flowchart/.test(m40)&&
+      hasQuerySources40&&/data-procflow=/.test(x40)&&/provenance=/.test(x40);
+    record('v1.4.0 F export parity for query graph constructs',
+      parity40,JSON.stringify({parsererror:doc40.querySelector('parsererror')&&
+        doc40.querySelector('parsererror').textContent}));
+  }catch(err){
+    record('v1.4.0 F export parity for query graph constructs',
+      false,String(err&&err.stack||err));
+  }
+
   var passed=results.filter(function(r){return r.pass;}).length;
   document.body.className=passed===results.length?'pass':'fail';
   document.getElementById('summary').textContent=passed+'/'+results.length+' tests passed';
