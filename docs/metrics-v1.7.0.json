@@ -4,7 +4,9 @@
   "corpus": {
     "golden": 107,
     "fuzz": 400,
-    "ui": 16
+    "ui": 16,
+    "parity": 10,
+    "layout": 11
   },
   "attributionRate": 1,
   "unresolvedTokenRate": 0.04432,
@@ -14,6 +16,9 @@
   "semanticEdgeCoverage": 1,
   "provenanceRate": 1,
   "regionDiagnosticToSpanRatio": 1,
+  "exportParityPassRate": 1,
+  "exportTraceabilityRate": 1,
+  "layoutBudgetPassRate": 1,
   "aggregate": {
     "totalTokens": 2685,
     "accountedTokens": 2685,

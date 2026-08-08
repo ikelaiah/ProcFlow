@@ -1,4 +1,4 @@
-/* Fixture-corpus metric publishing (v1.6.0).
+/* Fixture-corpus metric publishing (v1.7.0).
    Runs tests/metrics.html headlessly, extracts the deterministic, fixture-only
    metric snapshot, and either writes it (--write) or verifies the checked-in
    snapshot is still current (default). Uses the same browser discovery and
@@ -11,7 +11,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repositoryRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const metricsPage = join(repositoryRoot, "tests", "metrics.html");
-const snapshotFile = join(repositoryRoot, "docs", "metrics-v1.6.0.json");
+const snapshotFile = join(repositoryRoot, "docs", "metrics-v1.7.0.json");
 const writeMode = process.argv.includes("--write");
 const explicitBrowser = (process.env.CHROME_PATH || "").trim();
 

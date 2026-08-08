@@ -198,11 +198,16 @@ function buildQueryGraph(stmtToks, header, opts) {
     var nodes = [], edges = [], seq = 0, srcIds = {}, cteIds = {}, byName = {};
     var stats = { ctes: split.ctes.length, tables: 0, joins: 0, unions: 0,
         subs: 0, depth: 0, recursive: 0 };
-    function add(shape, text, cls, source) {
+    function add(shape, text, cls, source, lines, reason) {
         var id = 'q' + (++seq);
-        nodes.push({ id: id, shape: shape, text: (text && String(text).trim()) || '…',
-            cls: cls, source: source || null,
-            provenance: source ? 'source' : 'synthetic' });
+        var label = (text && String(text).trim()) || '…';
+        var structured = lines && lines.length
+            ? lines.map(function (l) { return String(l).trim(); }).filter(function (l) { return l.length > 0; })
+            : undefined;
+        nodes.push({ id: id, shape: shape, text: structured ? structured.join('\n') : label,
+            cls: cls, source: source || null, lines: structured,
+            provenance: source ? 'source' : 'synthetic',
+            reason: source ? undefined : reason });
         return id;
     }
     function link(a, b, label) {
@@ -235,7 +240,12 @@ function buildQueryGraph(stmtToks, header, opts) {
         });
         if (isRecursive)
             stats.recursive = (stats.recursive || 0) + 1;
-        cteIds[c.name.toUpperCase()] = add('rect', c.name + (d ? '\u0001' + d : '') + (isRecursive ? '\u0001recursive CTE' : ''), 'cte', spanOfTokens(c.body));
+        var cteLines = [c.name];
+        if (d)
+            cteLines.push(d);
+        if (isRecursive)
+            cteLines.push('recursive CTE');
+        cteIds[c.name.toUpperCase()] = add('rect', cteLines.join('\n'), 'cte', spanOfTokens(c.body), cteLines);
         byName[c.name.toUpperCase()] = c;
     });
     var fi = refsIn(finalToks);
@@ -244,11 +254,14 @@ function buildQueryGraph(stmtToks, header, opts) {
     stats.subs += fi.subs;
     var fd = descr(fi);
     var finalLabel = opts.finalLabel || header.name || 'Final SELECT';
-    var finalId = add('round', finalLabel + (fd ? '\u0001' + fd : ''), 'final', spanOfTokens(finalToks));
+    var finalLines = [finalLabel];
+    if (fd)
+        finalLines.push(fd);
+    var finalId = add('round', finalLines.join('\n'), 'final', spanOfTokens(finalToks), finalLines);
     function srcNode(name) {
         var k = name.toUpperCase();
         if (!srcIds[k]) {
-            srcIds[k] = add('io', name, 'src');
+            srcIds[k] = add('io', name, 'src', null, null, 'external source object');
             stats.tables++;
         }
         return srcIds[k];
@@ -369,14 +382,16 @@ function buildObjectQueryGraph(ast, header, opts) {
                 if (!sourceIds[sourceKey]) {
                     sourceIds[sourceKey] = 'oq' + (++seq);
                     nodes.push({ id: sourceIds[sourceKey], shape: n.shape, text: n.text, cls: n.cls,
-                        source: n.source || null, provenance: n.provenance || 'synthetic' });
+                        source: n.source || null, provenance: n.provenance || 'synthetic',
+                        lines: n.lines, reason: n.reason });
                 }
                 remap[n.id] = sourceIds[sourceKey];
             }
             else {
                 remap[n.id] = 'oq' + (++seq);
                 nodes.push({ id: remap[n.id], shape: n.shape, text: n.text, cls: n.cls,
-                    source: n.source || null, provenance: n.provenance || 'synthetic' });
+                    source: n.source || null, provenance: n.provenance || 'synthetic',
+                    lines: n.lines, reason: n.reason });
             }
         });
         child.edges.forEach(function (e) {
@@ -395,7 +410,8 @@ function buildObjectQueryGraph(ast, header, opts) {
     stats.parts = stats.ctes + stats.joins + stats.unions + stats.subs + statements.length;
     if (!nodes.length) {
         nodes.push({ id: 'oq1', shape: 'round', text: 'No query-bearing statements found',
-            cls: 'final', source: null });
+            cls: 'final', source: null, provenance: 'synthetic',
+            reason: 'no query-bearing statements in this object' });
     }
     return { nodes: nodes, edges: edges, stats: stats, empty: statements.length === 0 };
 }

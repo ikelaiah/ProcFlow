@@ -282,6 +282,10 @@ interface GraphNode {
   provenance?: NodeProvenance;
   reason?: string;
   sources?: SourceSpan[];
+  /* Structured label lines (v1.7.0): multi-line labels are carried as an
+     explicit array instead of an embedded \u0001 sentinel. When present,
+     `text` is lines.join('\n') and exporters render from `lines`. */
+  lines?: string[];
 }
 
 interface GraphEdge {
@@ -355,6 +359,28 @@ interface DrawioPosition {
   y: number;
   w: number;
   h: number;
+}
+
+interface DrawioWaypoint {
+  x: number;
+  y: number;
+}
+
+/* Deterministic layered-layout report (v1.7.0 workstream F). Exposed so layout
+   fixtures can assert the overlap, monotonic-spine, label-bound, and crossing
+   budgets against one canonical measurement. */
+interface LayoutAnalysis {
+  ranks: Record<string, number>;
+  order: Record<string, number>;
+  layers: string[][];
+  backEdges: Array<{from: string; to: string}>;
+  positions: Record<string, DrawioPosition>;
+  crossings: number;
+  overlaps: number;
+  backboneEdges: number;
+  monotonicEdges: number;
+  pathEdges: number;
+  warnings: string[];
 }
 
 interface TokenAttribution {
@@ -522,6 +548,18 @@ interface Window {
   PROCFLOW_TSQL_FIXTURE_COUNT?: number;
   PROCFLOW_METRICS_OUTPUT?: string;
   PROCFLOW_METRICS_READY?: boolean;
+  /* v1.7.0 export-parity / layout suite results, published for the golden and
+     metrics pages. */
+  PROCFLOW_PARITY_PASS?: boolean;
+  PROCFLOW_PARITY_RESULT?: {
+    passed: number;
+    total: number;
+    traceabilityPassed: number;
+    traceabilityTotal: number;
+  };
+  PROCFLOW_PARITY_FAILURES?: string[];
+  PROCFLOW_LAYOUT_PASS?: boolean;
+  PROCFLOW_LAYOUT_RESULT?: {passed: number; total: number};
 }
 
 declare var mermaid: Window['mermaid'];

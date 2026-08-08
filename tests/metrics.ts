@@ -1,8 +1,10 @@
-/* v1.6.0 — fixture-corpus metric publishing.
-   Aggregates the "Metrics that matter" over the checked-in golden corpus.
+/* v1.7.0 — fixture-corpus metric publishing.
+   Aggregates the "Metrics that matter" over the checked-in golden corpus,
+   including the v1.7.0 export-parity, export-traceability, and layout-budget
+   pass rates reported by tests/parity.ts.
    Purely deterministic and fixture-only: no user inputs and no runtime
    telemetry are ever collected. scripts/metrics.mjs drives this page to
-   produce or verify docs/metrics-v1.6.0.json. */
+   produce or verify docs/metrics-v1.7.0.json. */
 (function(){
   var corpus=PROCFLOW_FIXTURES||[];
 
@@ -73,7 +75,9 @@
          `npm run metrics:write`; CI then refuses to merge a stale snapshot. */
       golden:corpus.length,
       fuzz:400,
-      ui:16
+      ui:16,
+      parity:window.PROCFLOW_PARITY_RESULT?window.PROCFLOW_PARITY_RESULT.total/2:0,
+      layout:window.PROCFLOW_LAYOUT_RESULT?window.PROCFLOW_LAYOUT_RESULT.total:0
     },
     attributionRate:rate(attributedAll,totalTokens),
     unresolvedTokenRate:rate(unresolvedTokens,totalTokens),
@@ -83,6 +87,20 @@
     semanticEdgeCoverage:rate(kindEdges,edges),
     provenanceRate:rate(provenanceNodes,nodes),
     regionDiagnosticToSpanRatio:rate(regionValidSpan,regionScoped),
+    /* v1.7.0 clear deterministic exports: export-parity, export-traceability,
+       and layout-budget rates come from tests/parity.ts, which parses each
+       Mermaid and draw.io output back to a semantic manifest and compares it
+       with the input Graph at its documented size limits. */
+    exportParityPassRate:window.PROCFLOW_PARITY_RESULT
+      ? rate(window.PROCFLOW_PARITY_RESULT.passed,window.PROCFLOW_PARITY_RESULT.total)
+      : 0,
+    exportTraceabilityRate:window.PROCFLOW_PARITY_RESULT
+      ? rate(window.PROCFLOW_PARITY_RESULT.traceabilityPassed,
+             window.PROCFLOW_PARITY_RESULT.traceabilityTotal)
+      : 1,
+    layoutBudgetPassRate:window.PROCFLOW_LAYOUT_RESULT
+      ? rate(window.PROCFLOW_LAYOUT_RESULT.passed,window.PROCFLOW_LAYOUT_RESULT.total)
+      : 0,
     aggregate:{
       totalTokens:totalTokens,
       accountedTokens:attributedAll,
