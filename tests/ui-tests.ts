@@ -204,6 +204,36 @@
         pass:w.hasSavedWorkspace()===false&&
           /No workspace is saved/i.test(get('ws-status').textContent||''),
         detail:{saved:w.hasSavedWorkspace(),status:get('ws-status').textContent}});
+
+      /* v1.9.0 resolve by catalogue — paste catalogue metadata, Apply, and
+         verify the dependency view shows the verified object (no external
+         label) while an unproven three-part name stays external. */
+      get('opt-scope').value='internal';
+      get('opt-dialect').value='tsql';
+      get('sql').value=[
+        'CREATE PROC dbo.cat_ui AS',
+        'BEGIN',
+        '  SELECT id FROM salesdb.dbo.orders;',
+        '  SELECT id FROM readme.dbo.ghost;',
+        'END'
+      ].join('\n');
+      get('sql').dispatchEvent(new Event('input'));
+      get('catalogue-text').value='salesdb.dbo.orders TABLE';
+      get('btn-catalogue-apply').click();
+      get('opt-scope').value='dependencies';
+      get('opt-scope').dispatchEvent(new Event('change'));
+      var catalogued= get('mermaid-out').textContent;
+      results.push({name:'catalogue verification in the dependency view',
+        pass:catalogued.indexOf('salesdb.dbo.orders')>=0&&
+          catalogued.indexOf('external: salesdb.dbo.orders')<0&&
+          catalogued.indexOf('external: readme.dbo.ghost')>=0&&
+          /Loaded: 1 object/i.test(get('catalogue-status').textContent||''),
+        detail:{code:catalogued.slice(0,160),
+          status:get('catalogue-status').textContent}});
+      get('btn-catalogue-clear').click();
+      results.push({name:'clearing the catalogue resets its status',
+        pass:/No catalogue loaded/i.test(get('catalogue-status').textContent||''),
+        detail:{status:get('catalogue-status').textContent}});
       finish(results);
     },1200);
   });

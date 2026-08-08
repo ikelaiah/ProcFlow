@@ -261,7 +261,19 @@ function buildQueryGraph(stmtToks, header, opts) {
     function srcNode(name) {
         var k = name.toUpperCase();
         if (!srcIds[k]) {
-            srcIds[k] = add('io', name, 'src', null, null, 'external source object');
+            var res = opts.catalogue ? resolveCatalogue(opts.catalogue, name) : { resolution: 'external' };
+            var verified = res.resolution === 'verified';
+            var id = 'q' + (++seq);
+            var label = verified && res.resolvedName ? res.resolvedName : name;
+            /* Verified sources become 'external' nodes with exact identity; conflict
+               stays conservative with a marker; everything unproven stays a synthetic
+               leaf exactly as before the catalogue existed. */
+            srcIds[k] = id;
+            nodes.push({ id: id, shape: 'io', text: label, cls: 'src', source: null,
+                provenance: verified ? 'external' : 'synthetic',
+                resolution: (verified || res.resolution === 'conflict') ? res.resolution : undefined,
+                resolvedName: verified && res.resolvedName ? res.resolvedName : undefined,
+                reason: verified ? undefined : 'external source object' });
             stats.tables++;
         }
         return srcIds[k];
@@ -372,7 +384,7 @@ function buildObjectQueryGraph(ast, header, opts) {
     statements.forEach(function (toks) {
         var split = splitCTEs(toks);
         var finalToks = toks.slice(split.finalStart);
-        var childOpts = { sources: opts.sources };
+        var childOpts = { sources: opts.sources, catalogue: opts.catalogue };
         childOpts.finalLabel = summarise(finalToks, 64);
         var child = buildQueryGraph(toks, { name: '' }, childOpts);
         var remap = {};
@@ -383,7 +395,8 @@ function buildObjectQueryGraph(ast, header, opts) {
                     sourceIds[sourceKey] = 'oq' + (++seq);
                     nodes.push({ id: sourceIds[sourceKey], shape: n.shape, text: n.text, cls: n.cls,
                         source: n.source || null, provenance: n.provenance || 'synthetic',
-                        lines: n.lines, reason: n.reason });
+                        lines: n.lines, reason: n.reason,
+                        resolution: n.resolution, resolvedName: n.resolvedName });
                 }
                 remap[n.id] = sourceIds[sourceKey];
             }
@@ -391,7 +404,8 @@ function buildObjectQueryGraph(ast, header, opts) {
                 remap[n.id] = 'oq' + (++seq);
                 nodes.push({ id: remap[n.id], shape: n.shape, text: n.text, cls: n.cls,
                     source: n.source || null, provenance: n.provenance || 'synthetic',
-                    lines: n.lines, reason: n.reason });
+                    lines: n.lines, reason: n.reason,
+                    resolution: n.resolution, resolvedName: n.resolvedName });
             }
         });
         child.edges.forEach(function (e) {

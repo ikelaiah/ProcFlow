@@ -204,6 +204,16 @@ input[type=checkbox]{accent-color:var(--marigold);width:14px;height:14px}
   color:var(--ink-soft,#9fb2bf);font-size:10.5px;line-height:1.45
 }
 .ws-note.has{border-left:2px solid var(--marigold)}
+/* v1.9.0 — catalogue import panel */
+.catalogue-panel{min-width:300px}
+.catalogue-panel .opt{white-space:normal;display:block}
+#catalogue-text{
+  width:100%;margin-top:4px;padding:6px 7px;border:1px solid var(--rule);
+  border-radius:3px;background:#11222d;color:var(--ink);font-family:var(--mono);
+  font-size:11px;resize:vertical;line-height:1.4
+}
+.catalogue-actions{display:grid;gap:3px;margin:6px 0}
+.catalogue-actions .primary-action{background:#20333f}
 .export-actions{display:grid;gap:3px}
 .menu-action{
   width:100%;padding:8px 9px;border:0;border-radius:3px;background:transparent;

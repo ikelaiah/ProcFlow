@@ -1720,19 +1720,24 @@ function splitSqlObjects(sql, fileName) {
             sql: sql.slice(start, end) };
     });
 }
-function dependencyGraph(objects) {
+function dependencyGraph(objects, opts) {
     var nodes = [], edges = [], ids = {}, ext = {}, seq = 0;
-    function add(text, cls, source, objectId, provenance, lines, reason) {
+    function add(text, cls, source, objectId, provenance, lines, reason, resolution, resolvedName) {
         var id = 'd' + (++seq);
         var structured = lines && lines.length
             ? lines.map(function (l) { return String(l).trim(); }).filter(function (l) { return l.length > 0; })
             : undefined;
-        nodes.push({ id: id, shape: cls === 'src' ? 'io' : 'rect', text: structured ?
+        var node = { id: id, shape: cls === 'src' ? 'io' : 'rect', text: structured ?
                 structured.join('\n') : text, cls: cls,
             source: source || null, objectId: objectId || null,
             lines: structured,
             reason: reason || undefined,
-            provenance: provenance || (source ? 'source' : (objectId ? 'external' : 'synthetic')) });
+            provenance: provenance || (source ? 'source' : (objectId ? 'external' : 'synthetic')) };
+        if (resolution)
+            node.resolution = resolution;
+        if (resolvedName)
+            node.resolvedName = resolvedName;
+        nodes.push(node);
         return id;
     }
     objects.forEach(function (o) {
@@ -1754,7 +1759,19 @@ function dependencyGraph(objects) {
             }
             else {
                 var remote = name.split('.').length >= 3;
-                ext[key] = add(remote ? 'external: ' + name : name, type === 'call' ? 'call' : 'src', null, name, 'external');
+                var cat = opts && opts.catalogue;
+                var res = cat ? resolveCatalogue(cat, name) : { resolution: 'external' };
+                if (res.resolution === 'verified' && res.resolvedName) {
+                    /* The catalogue proves the identity: render the canonical name
+                       (resolved through a synonym or cross-database match) instead of a
+                       bare external label. Still an external object to the estate. */
+                    ext[key] = add(res.resolvedName, type === 'call' ? 'call' : 'src', null, name, 'external', undefined, undefined, 'verified', res.resolvedName);
+                }
+                else {
+                    ext[key] = add(remote ? 'external: ' + name : name, type === 'call' ? 'call' : 'src', null, name, 'external', undefined, res.resolution === 'conflict'
+                        ? 'conflicting catalogue evidence; identity unresolved'
+                        : undefined, res.resolution === 'conflict' ? 'conflict' : undefined, undefined);
+                }
             }
         }
         return ext[key];
@@ -1794,9 +1811,11 @@ function analyseEstate(files, opts) {
         ir.result = result;
         return ir;
     });
-    var graph = dependencyGraph(objects);
+    var graph = dependencyGraph(objects, opts);
+    var catDiags = (opts && opts.catalogueDiagnostics) || [];
     return { objects: objects, graph: graph, stats: graph.stats,
-        diagnostics: objects.reduce(function (a, o) { return a.concat(o.diagnostics); }, []) };
+        diagnostics: objects.reduce(function (a, o) { return a.concat(o.diagnostics); }, [])
+            .concat(catDiags) };
 }
 function unresolvedControlTargets(ast) {
     var allLabels = {};
@@ -2020,6 +2039,35 @@ function analyse(sql, opts) {
                     span: r.span, scope: 'region' });
         });
     }, 0);
+    /* v1.9.0 — catalogue resolution. Document-scoped catalogue parse diagnostics
+       surface alongside the object analysis, and every reference that the
+       catalogue proves (or fails to prove) is called out so a reviewer knows the
+       identity is verified rather than estimated. */
+    if (opts.catalogueDiagnostics)
+        opts.catalogueDiagnostics.forEach(function (d) { diagnostics.push(d); });
+    if (opts.catalogue) {
+        walkAst(ast, function (st) {
+            if (st.type !== 'stmt' || !st.toks || !st.toks.length)
+                return;
+            var cinfo = refsIn(st.toks);
+            (cinfo.structuredRefs || []).forEach(function (r) {
+                var rr = resolveCatalogue(opts.catalogue, r.name);
+                if (rr.resolution === 'conflict') {
+                    diagnostics.push({ severity: 'warning', code: 'catalogue_conflict',
+                        message: 'Reference "' + r.name + '" matches conflicting catalogue entries; its identity is unresolved.',
+                        span: r.span, scope: 'region' });
+                }
+                else if (rr.resolution === 'external') {
+                    var near = suffixCatalogueMatches(opts.catalogue, r.name);
+                    if (near.length)
+                        diagnostics.push({ severity: 'warning', code: 'catalogue_partial',
+                            message: 'Reference "' + r.name + '" is not proven by the catalogue (candidate' +
+                                (near.length > 1 ? 's' : '') + ' "' + near.join('", "') + '" not exact); staying external.',
+                            span: r.span, scope: 'region' });
+                }
+            });
+        }, 0);
+    }
     if (dialect === 'plpgsql')
         addPgTransactionDiagnostics(ast, header, diagnostics, false);
     diagnostics.forEach(function (d) {
@@ -2027,7 +2075,8 @@ function analyse(sql, opts) {
             d.scope = 'region';
     });
     var gopts = { detail: opts.detail, group: opts.group, dialect: dialect, sources: opts.sources,
-        fanIn: opts.fanIn, number: opts.number, diagnostics: diagnostics };
+        fanIn: opts.fanIn, number: opts.number, diagnostics: diagnostics,
+        catalogue: opts.catalogue };
     var graph = buildGraph(ast, header, gopts);
     var mode = opts.mode || 'auto';
     var flat = graph.stats.branch + graph.stats.loop + graph.stats.cat === 0;

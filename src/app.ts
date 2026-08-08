@@ -9,6 +9,11 @@
       lastDirection: DiagramDirection='TD', lastResult: AnalysisResult | null=null,
       estate: EstateResult | null=null, workspaceFiles: WorkspaceFile[] | null=null,
       activeObjectId: string | null=null, renderSeq=0;
+  /* v1.9.0 — the active parsed catalogue plus its raw text and parse
+     diagnostics, so Apply/Clear re-run the analysis with (or without) it. */
+  var currentCatalogue: Catalogue | null=null,
+      currentCatalogueText: string='',
+      currentCatalogueDiagnostics: Diagnostic[]=[];
 
   var SAMPLES = {} as Record<Dialect, string>;
   SAMPLES.tsql = [
@@ -250,8 +255,38 @@
       dialect:$('opt-dialect').value, mode:$('opt-view').value,
       dir:$('opt-dir').value, detail:$('opt-detail').value,
       group:$('opt-group').checked, number:$('opt-number').checked,
-      fanIn:$('opt-fanin').checked, sources:$('opt-sources').checked
+      fanIn:$('opt-fanin').checked, sources:$('opt-sources').checked,
+      catalogue:currentCatalogue||undefined,
+      catalogueDiagnostics:currentCatalogueDiagnostics.slice()
     };
+  }
+
+  /* v1.9.0 — catalogue status panel. */
+  function updateCatalogueStatus(): void {
+    var el=$('catalogue-status');
+    if(!currentCatalogue){
+      el.textContent='No catalogue loaded.';
+      return;
+    }
+    var summary=catalogueSummary(currentCatalogue);
+    var nDiag=currentCatalogueDiagnostics.length;
+    el.textContent='Loaded: '+summary+(nDiag?'; '+nDiag+
+      (nDiag===1?' diagnostic':' diagnostics'):'');
+  }
+
+  /* Apply the current Catalogue panel text: parse it (JSON or line format),
+     store the parsed catalogue plus parse diagnostics, and re-run. */
+  function applyCatalogue(): void {
+    currentCatalogueText=$('catalogue-text').value;
+    if(!currentCatalogueText.trim()){
+      currentCatalogue=null; currentCatalogueDiagnostics=[];
+    } else {
+      var parsed=parseCatalogue(currentCatalogueText);
+      currentCatalogue=parsed.catalogue;
+      currentCatalogueDiagnostics=parsed.diagnostics.slice();
+    }
+    updateCatalogueStatus();
+    run();
   }
 
   /* v1.8.0 dependency filtering — presentation only. currentFilter() reads the
@@ -298,6 +333,16 @@
     $('opt-sources').checked=!!o.sources;
     workspaceFiles=(snap.files&&snap.files.length)?snap.files.slice():null;
     estate=null; activeObjectId=snap.activeObjectId;
+    /* v1.9.0 — restore the catalogue (an analysis input) so an identical
+       analysis is reproduced. */
+    currentCatalogueText=snap.catalogue==null?'':snap.catalogue;
+    $('catalogue-text').value=currentCatalogueText;
+    if(currentCatalogueText.trim()){
+      var parsed=parseCatalogue(currentCatalogueText);
+      currentCatalogue=parsed.catalogue;
+      currentCatalogueDiagnostics=parsed.diagnostics.slice();
+    } else { currentCatalogue=null; currentCatalogueDiagnostics=[]; }
+    updateCatalogueStatus();
     if(workspaceFiles&&workspaceFiles.length) sql.value=workspaceFiles[0].text;
     drawGutter();
     run();
@@ -715,7 +760,7 @@
   $('btn-ws-save').onclick=function(){
     var files=workspaceFiles||[{name:'Pasted SQL',text:sql.value}];
     var snap=buildWorkspaceSnapshot({files:files,options:snapshotOptions(),
-      activeObjectId:activeObjectId});
+      activeObjectId:activeObjectId, catalogue:currentCatalogueText});
     var ok=writeWorkspace(snap);
     updateWsStatus();
     flash($('btn-ws-save'),ok?'Saved':'Save failed');
@@ -755,6 +800,28 @@
     }).catch(function(err){ showMsg('Could not read that workspace file: '+err.message); });
     this.value='';
   };
+
+  /* v1.9.0 — catalogue import (paste or file), Apply, and Clear. Apply parses
+     JSON or the simple line format, stores the parsed catalogue, and re-runs
+     so verified external/source objects resolve immediately. */
+  $('btn-catalogue-import').onclick=function(){ $('catalogue-file-input').click(); };
+  $('catalogue-file-input').onchange=function(){
+    var file=(this.files&&this.files[0]);
+    if(!file) return;
+    file.text().then(function(text){
+      $('catalogue-text').value=text;
+      applyCatalogue();
+    }).catch(function(err){ showMsg('Could not read that catalogue file: '+err.message); });
+    this.value='';
+  };
+  $('btn-catalogue-apply').onclick=applyCatalogue;
+  $('btn-catalogue-clear').onclick=function(){
+    $('catalogue-text').value='';
+    currentCatalogue=null; currentCatalogueDiagnostics=[]; currentCatalogueText='';
+    updateCatalogueStatus();
+    run();
+  };
+  updateCatalogueStatus();
 
   if(typeof mermaid!=='undefined'){
     mermaid.initialize({

@@ -11,7 +11,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repositoryRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const metricsPage = join(repositoryRoot, "tests", "metrics.html");
-const snapshotFile = join(repositoryRoot, "docs", "metrics-v1.8.0.json");
+const snapshotFile = join(repositoryRoot, "docs", "metrics-v1.9.0.json");
 const writeMode = process.argv.includes("--write");
 const explicitBrowser = (process.env.CHROME_PATH || "").trim();
 
