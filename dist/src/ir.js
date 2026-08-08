@@ -1829,6 +1829,64 @@ function unresolvedControlTargets(ast) {
     scan(ast, []);
     return out;
 }
+/* v1.6.0: the UI's analysis-health data-band is derived from the same
+   versioned confidence formula as the headline number, so the two can never
+   disagree about how trustworthy an analysis is. */
+function confidenceBand(confidence) {
+    return confidence >= 0.85 ? 'high' : (confidence >= 0.6 ? 'medium' : 'low');
+}
+/* v1.6.0 confidence re-score: a versioned formula derived from per-region
+   signals. Every statement region is scored by its resolution state:
+     resolved → 1.00   clean, verified construct
+     approx   → 0.75   region-scoped warning (an estimated resolution)
+     opaque   → 0.40   dynamic/unresolved node
+     error    → 0.15   region-scoped error diagnostic
+   The headline number is dialect certainty × token-weighted region quality
+   × a coverage factor (0.6 + 0.4·coverage). Coverage alone can therefore
+   never raise confidence without resolved constructs: 100 % coverage of
+   opaque regions still caps confidence at 0.4. */
+function analyseConfidence(ast, diagnostics, dialectConfidence, coverage) {
+    var regionBreakdown = { total: 0, resolved: 0, approx: 0,
+        opaque: 0, error: 0 };
+    var regionTokens = 0, regionWeighted = 0;
+    var REGION_SCORE = { resolved: 1, approx: 0.75,
+        opaque: 0.4, error: 0.15 };
+    function statusOf(span, node) {
+        if (!span)
+            return 'resolved';
+        function overlaps(severity) {
+            return diagnostics.some(function (d) {
+                return d.scope === 'region' && d.severity === severity && !!d.span &&
+                    d.span.start < span.end && d.span.end > span.start;
+            });
+        }
+        if (overlaps('error'))
+            return 'error';
+        if (node.type === 'dynamic' || node.type === 'unknown')
+            return 'opaque';
+        if (overlaps('warning'))
+            return 'approx';
+        return 'resolved';
+    }
+    walkAst(ast, function (st) {
+        var toks = st.toks;
+        var span = spanOfTokens(toks);
+        if (!toks || !toks.length || !span)
+            return;
+        var status = statusOf(span, st);
+        regionBreakdown.total++;
+        regionBreakdown[status]++;
+        regionTokens += toks.length;
+        regionWeighted += toks.length * REGION_SCORE[status];
+    }, 0);
+    var regionQuality = regionTokens ? regionWeighted / regionTokens : 1;
+    return {
+        confidence: Math.max(0, Math.min(1, dialectConfidence * regionQuality * (0.6 + 0.4 * coverage))),
+        version: '1.6.0',
+        signals: { dialect: dialectConfidence, coverage: coverage,
+            regionQuality: regionQuality, regionBreakdown: regionBreakdown }
+    };
+}
 function analyse(sql, opts) {
     opts = opts || {};
     sql = String(sql || '');
@@ -1874,10 +1932,12 @@ function analyse(sql, opts) {
     var totalTokens = bodyToks.length, consumedTokens = Math.min(p.i, totalTokens);
     var coverage = totalTokens ? consumedTokens / totalTokens : 1;
     if ((!opts.dialect || opts.dialect === 'auto') && !det.confident) {
+        /* Document-scoped findings never fabricate a source span: dialect
+           uncertainty is a property of the whole document, not of its first
+           character. v1.6.0 dropped the artificial one-character span. */
         diagnostics.push({ severity: 'warning', code: 'dialect_low_confidence',
             message: 'Dialect detection is uncertain; select the dialect manually if the diagram looks wrong.',
-            span: { start: 0, end: Math.min(String(sql || '').length, 1) },
-            scope: 'document' });
+            span: null, scope: 'document' });
         if (det.tied)
             diagnostics.push({ severity: 'warning', code: 'dialect_ambiguous',
                 message: 'Dialect detection is ambiguous: several dialects scored equally. Select the dialect manually.',
@@ -1927,6 +1987,25 @@ function analyse(sql, opts) {
                     scope: 'region' });
         });
     }, 0);
+    /* v1.6.0: every approximate resolution carries a region-scoped, span-attached
+       diagnostic. Opaque table expressions (UNNEST, XMLTABLE, JSON_TABLE,
+       GENERATE_SERIES, …) and partially resolved APPLY sources are called out
+       explicitly so a reviewer knows the statement is estimated, not verified. */
+    walkAst(ast, function (st) {
+        if (st.type !== 'stmt' || !st.toks || !st.toks.length)
+            return;
+        var info = refsIn(st.toks);
+        (info.structuredRefs || []).forEach(function (r) {
+            if (r.resolution === 'opaque')
+                diagnostics.push({ severity: 'warning', code: 'source_opaque',
+                    message: 'Opaque table expression "' + r.name + '" cannot be resolved statically; its internal sources and reads are approximate.',
+                    span: r.span, scope: 'region' });
+            else if (r.resolution === 'heuristic' && r.apply)
+                diagnostics.push({ severity: 'warning', code: 'apply_heuristic',
+                    message: 'APPLY target "' + r.name + '" resolves only heuristically; its exact read/write set is approximate.',
+                    span: r.span, scope: 'region' });
+        });
+    }, 0);
     if (dialect === 'plpgsql')
         addPgTransactionDiagnostics(ast, header, diagnostics, false);
     diagnostics.forEach(function (d) {
@@ -1950,8 +2029,8 @@ function analyse(sql, opts) {
     }
     var selected = q || graph, selectedMode = q ? 'query' : 'flow';
     var dialectConfidence = (opts.dialect && opts.dialect !== 'auto') ? 1 : Math.min(1, (det.score || 0) / 7);
-    var hasErrors = diagnostics.some(function (d) { return d.severity === 'error'; });
-    var confidence = Math.max(0, Math.min(1, dialectConfidence * coverage * (hasErrors ? 0.55 : 1)));
+    var conf = analyseConfidence(ast, diagnostics, dialectConfidence, coverage);
+    var confidence = conf.confidence, confidenceFormulaVersion = conf.version, confidenceSignals = conf.signals;
     /* Token attribution: every body token is resolved, deliberately ignored, or opaque/unresolved. */
     var attribution = { total: totalTokens, resolved: 0, ignored: 0,
         unresolved: 0, opaque: 0, ignoredCategories: {} };
@@ -2057,6 +2136,8 @@ function analyse(sql, opts) {
     for (var tfi = 0; tfi < tempFlowEdges; tfi++)
         trackC('temp_flow', true);
     return { dialect: dialect, detected: det, confidence: confidence,
+        confidenceFormulaVersion: confidenceFormulaVersion,
+        confidenceSignals: confidenceSignals,
         dialectConfidence: dialectConfidence, coverage: coverage,
         consumedTokens: consumedTokens, totalTokens: totalTokens,
         diagnostics: diagnostics, header: header, ast: ast, mode: selectedMode,

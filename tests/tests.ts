@@ -769,6 +769,102 @@
       false,String(err&&err.stack||err));
   }
 
+  /* v1.6.0: honest measurement — a versioned confidence formula derived from
+     per-region signals, document-scoped findings with no fabricated spans,
+     region diagnostics for every approximate resolution, and informational
+     annotations that never inflate the findings count. */
+  function findings160(diags: Diagnostic[]): number {
+    return diags.filter(function(d){return d.severity==='warning'||d.severity==='error';}).length;
+  }
+  function spanOk160(span: SourceSpan | null): boolean {
+    return !!span&&span.start>=0&&span.end>span.start;
+  }
+
+  try{
+    var clean160=analyse('CREATE PROC dbo.clean160 AS BEGIN SELECT 1; SELECT 2; END',
+      {dialect:'tsql',mode:'flow',group:false,sources:true});
+    var opaque160=analyse('CREATE PROC dbo.opaque160 AS BEGIN EXEC(\'SELECT 1\'); END',
+      {dialect:'tsql',mode:'flow',group:false,sources:true});
+    var broken160=analyse('END SELECT (1;',
+      {dialect:'tsql',mode:'auto',group:false,sources:true});
+    var cleanSig160=clean160.confidenceSignals;
+    var cleanOk160=clean160.confidenceFormulaVersion==='1.6.0'&&
+      clean160.confidence===1&&cleanSig160.regionQuality===1&&
+      cleanSig160.regionBreakdown.resolved===cleanSig160.regionBreakdown.total&&
+      confidenceBand(clean160.confidence)==='high';
+    var opaqueOk160=!!opaque160.confidenceSignals&&
+      opaque160.confidenceSignals.regionBreakdown.opaque>=1&&
+      opaque160.confidence<clean160.confidence&&
+      opaque160.coverage===1&&opaque160.confidence<=0.4;
+    var brokenOk160=!!broken160.confidenceSignals&&
+      broken160.confidenceSignals.regionBreakdown.error>=1&&
+      broken160.confidence<opaque160.confidence&&
+      confidenceBand(broken160.confidence)==='low';
+    record('v1.6.0 versioned confidence formula from per-region signals',
+      cleanOk160&&opaqueOk160&&brokenOk160,
+      JSON.stringify({clean:cleanSig160,opaque:opaque160.confidenceSignals,
+        broken:broken160.confidenceSignals,
+        confidences:[clean160.confidence,opaque160.confidence,broken160.confidence]}));
+  }catch(err){
+    record('v1.6.0 versioned confidence formula from per-region signals',
+      false,String(err&&err.stack||err));
+  }
+
+  try{
+    var amb160=analyse('SELECT 1;',{dialect:'auto',mode:'auto',group:false,sources:true});
+    var docScoped160=amb160.diagnostics.filter(function(d){return d.scope==='document';});
+    var noFabricatedSpan160=docScoped160.length>0&&
+      docScoped160.every(function(d){return d.span===null;});
+    var aroundOk160=(docScoped160.filter(function(d){
+      return d.code==='dialect_low_confidence'||d.code==='dialect_ambiguous';
+    })).length===docScoped160.length;
+    record('v1.6.0 document-scoped findings carry no fabricated span',
+      noFabricatedSpan160&&aroundOk160,
+      JSON.stringify(docScoped160.map(function(d){return {code:d.code,scope:d.scope,span:d.span};})));
+  }catch(err){
+    record('v1.6.0 document-scoped findings carry no fabricated span',
+      false,String(err&&err.stack||err));
+  }
+
+  try{
+    var opTable160=analyse('SELECT * FROM dbo.doc d, UNNEST(d.ids) AS x(id);',
+      {dialect:'plpgsql',mode:'query',group:false,sources:true});
+    var apply160=analyse('SELECT a.id FROM dbo.a a CROSS APPLY dbo.fn(a.id) f;',
+      {dialect:'tsql',mode:'query',group:false,sources:true});
+    var opDiag160=opTable160.diagnostics.filter(function(d){return d.code==='source_opaque';})[0];
+    var apDiag160=apply160.diagnostics.filter(function(d){return d.code==='apply_heuristic';})[0];
+    record('v1.6.0 opaque table-expression region diagnostic',
+      !!opDiag160&&opDiag160.severity==='warning'&&opDiag160.scope==='region'&&
+        spanOk160(opDiag160.span)&&opTable160.confidence<1,
+      JSON.stringify(opTable160.diagnostics));
+    record('v1.6.0 partially resolved APPLY region diagnostic',
+      !!apDiag160&&apDiag160.severity==='warning'&&apDiag160.scope==='region'&&
+        spanOk160(apDiag160.span)&&apply160.confidence<1,
+      JSON.stringify(apply160.diagnostics));
+  }catch(err){
+    record('v1.6.0 opaque table-expression region diagnostic',
+      false,String(err&&err.stack||err));
+    record('v1.6.0 partially resolved APPLY region diagnostic',
+      false,String(err&&err.stack||err));
+  }
+
+  try{
+    var rec160=analyse('CREATE PROC dbo.rec160 AS BEGIN\n'+
+      '  WITH r(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM r WHERE n<10)\n'+
+      '  SELECT n FROM r;\n'+
+      'END',
+      {dialect:'tsql',mode:'flow',group:false,sources:true});
+    var hasInfo160=rec160.diagnostics.some(function(d){
+      return d.code==='cte_recursive'&&d.severity==='info'&&spanOk160(d.span);
+    });
+    record('v1.6.0 informational annotations do not inflate the findings count',
+      hasInfo160&&findings160(rec160.diagnostics)===0,
+      JSON.stringify(rec160.diagnostics));
+  }catch(err){
+    record('v1.6.0 informational annotations do not inflate the findings count',
+      false,String(err&&err.stack||err));
+  }
+
   var passed=results.filter(function(r){return r.pass;}).length;
   document.body.className=passed===results.length?'pass':'fail';
   document.getElementById('summary').textContent=passed+'/'+results.length+' tests passed';

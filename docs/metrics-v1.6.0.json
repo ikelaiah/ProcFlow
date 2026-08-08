@@ -1,0 +1,23 @@
+{
+  "generator": "proc&gt;flow fixture-corpus metrics (deterministic, fixture-only)",
+  "formulaVersion": "1.6.0",
+  "corpus": {
+    "golden": 107,
+    "fuzz": 400,
+    "ui": 16
+  },
+  "attributionRate": 1,
+  "unresolvedTokenRate": 0.04432,
+  "tailUnconsumedRate": 0,
+  "opaqueDynamicRate": 0.005214,
+  "fallbackRate": 0,
+  "semanticEdgeCoverage": 1,
+  "provenanceRate": 1,
+  "regionDiagnosticToSpanRatio": 1,
+  "aggregate": {
+    "totalTokens": 2685,
+    "accountedTokens": 2685,
+    "statementRegions": 274,
+    "unresolvedRegions": 0
+  }
+}

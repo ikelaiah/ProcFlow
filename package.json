@@ -1,12 +1,14 @@
 {
   "name": "procflow",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "private": true,
   "description": "Local-first SQL control-flow and dependency visualiser",
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "test:file": "node scripts/file-smoke.mjs",
-    "typecheck": "tsc --project tsconfig.json --noEmit"
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "metrics": "node scripts/metrics.mjs",
+    "metrics:write": "node scripts/metrics.mjs --write"
   },
   "devDependencies": {
     "typescript": "5.9.3"

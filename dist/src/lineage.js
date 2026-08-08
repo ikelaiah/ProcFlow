@@ -113,12 +113,12 @@ function refsIn(toks) {
             return 'heuristic';
         return name.split('.').length >= 3 ? 'heuristic' : 'exact';
     }
-    function addSource(start, end, name, kind) {
+    function addSource(start, end, name, kind, apply) {
         if (!name)
             return;
         refs.push(name);
         structuredRefs.push({ name: name, span: clauseSpan(start, end), role: 'read',
-            resolution: resolutionOf(name, kind) });
+            resolution: resolutionOf(name, kind), apply: !!apply });
     }
     function readSourceAt(s0, apply) {
         var st = toks[s0];
@@ -127,11 +127,11 @@ function refsIn(toks) {
         if (st.u === 'LATERAL' || st.u === 'VALUES')
             return; /* inner subquery handled by the scan; VALUES is literal */
         if (TABULAR_FUNCS[st.u] > 0) {
-            addSource(s0, s0 + 1, st.v, 'opaque');
+            addSource(s0, s0 + 1, st.v, 'opaque', false);
             return;
         }
         var e = qnameEnd(s0);
-        addSource(s0, e, qname(toks, s0), apply ? 'heuristic' : undefined);
+        addSource(s0, e, qname(toks, s0), apply ? 'heuristic' : undefined, apply);
     }
     var i = 0;
     while (i < toks.length) {
