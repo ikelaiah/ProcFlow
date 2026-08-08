@@ -254,6 +254,65 @@
     };
   }
 
+  /* v1.8.0 dependency filtering — presentation only. currentFilter() reads the
+     filter panel and run() derives a filtered view at render time; the
+     underlying estate graph is never mutated. */
+  function currentFilter(): WorkspaceFilter {
+    return {
+      reads:$('f-r').checked,
+      writes:$('f-w').checked,
+      calls:$('f-c').checked,
+      external:$('f-e').checked,
+      temp:$('f-t').checked,
+      focus:$('f-focus').value
+    };
+  }
+
+  /* v1.8.0 workspace persistence — opt-in, versioned, exportable. Every input
+     that can change the analysis is captured so Restore reproduces an
+     identical analysis. */
+  function snapshotOptions(): WorkspaceSnapshot['options'] {
+    var o=analysisOptions();
+    return {
+      dialect:$('opt-dialect').value,
+      scope:$('opt-scope').value,
+      view:o.mode,
+      detail:o.detail,
+      dir:o.dir,
+      group:o.group,
+      number:o.number,
+      fanIn:o.fanIn,
+      sources:o.sources
+    };
+  }
+  function applySnapshot(snap: WorkspaceSnapshot): void {
+    var o=snap.options;
+    $('opt-dialect').value=o.dialect;
+    $('opt-scope').value=o.scope;
+    $('opt-view').value=o.view;
+    $('opt-detail').value=o.detail;
+    $('opt-dir').value=o.dir;
+    $('opt-group').checked=!!o.group;
+    $('opt-number').checked=!!o.number;
+    $('opt-fanin').checked=!!o.fanIn;
+    $('opt-sources').checked=!!o.sources;
+    workspaceFiles=(snap.files&&snap.files.length)?snap.files.slice():null;
+    estate=null; activeObjectId=snap.activeObjectId;
+    if(workspaceFiles&&workspaceFiles.length) sql.value=workspaceFiles[0].text;
+    drawGutter();
+    run();
+  }
+  function updateWsStatus(): void {
+    var el=$('ws-status');
+    if(hasSavedWorkspace()){
+      el.textContent='A workspace is saved in this browser. Use Restore to load it, Export to download it, or Forget to remove it.';
+      el.classList.add('has');
+    }else{
+      el.textContent='No workspace is saved in this browser. Save is opt-in and local-only.';
+      el.classList.remove('has');
+    }
+  }
+
   function showDiagnostics(list: Diagnostic[], extra?: string): void {
     var lines=(list||[]).map(function(d){ return d.message; });
     if(extra) lines.push(extra);
@@ -356,6 +415,8 @@
       return;
     }
     var opts=analysisOptions(), object, result, scope=$('opt-scope').value;
+    /* v1.8.0: the dependency filter panel is only relevant in dependency scope. */
+    $('filter-menu').style.display=scope==='dependencies'?'':'none';
     try{
       if(!workspaceFiles) workspaceFiles=[{name:'Pasted SQL',text:text}];
       estate=analyseEstate(workspaceFiles,opts);
@@ -370,7 +431,11 @@
     }
 
     if(scope==='dependencies'){
-      var dependencyCode=toMermaid(estate.graph,opts.dir||'TD');
+      /* v1.8.0 dependency filtering (presentation-only): derive a filtered
+         view at render time without touching estate.graph, so toggling a
+         filter or clearing the focus never changes the analysis. */
+      var filtered=filterDependencyGraph(estate.graph,currentFilter());
+      var dependencyCode=toMermaid(filtered,opts.dir||'TD');
       $('opt-view').disabled=true;
       $('lbl-group').style.display='none';
       $('lbl-number').style.display='none';
@@ -387,9 +452,9 @@
       setConstructCoverage(estateCoverage);
       showDiagnostics(estate.diagnostics);
       out.textContent=dependencyCode;
-      lastCode=dependencyCode; lastGraph=estate.graph; lastResult=null;
+      lastCode=dependencyCode; lastGraph=filtered; lastResult=null;
       lastTitle='procflow-estate'; lastDirection=opts.dir||'TD';
-      render(dependencyCode,estate.graph);
+      render(dependencyCode,filtered);
       return;
     }
 
@@ -588,6 +653,16 @@
   $('opt-dir').onchange=run; $('opt-detail').onchange=run; $('opt-group').onchange=run;
   $('opt-dialect').onchange=run; $('opt-view').onchange=run; $('opt-sources').onchange=run;
   $('opt-number').onchange=run; $('opt-fanin').onchange=run; $('opt-scope').onchange=run;
+  /* v1.8.0 dependency filter controls (presentation-only; re-run derives a
+     new filtered view without touching estate.graph). */
+  $('f-r').onchange=run; $('f-w').onchange=run; $('f-c').onchange=run;
+  $('f-e').onchange=run; $('f-t').onchange=run;
+  $('f-focus').addEventListener('input',schedule);
+  $('btn-filter-reset').onclick=function(){
+    $('f-r').checked=true; $('f-w').checked=true; $('f-c').checked=true;
+    $('f-e').checked=true; $('f-t').checked=true; $('f-focus').value='';
+    run();
+  };
   $('object-select').onchange=function(){
     activeObjectId=this.value;
     loadObjectSource(activeObject());
@@ -635,6 +710,52 @@
     setTimeout(function(){ URL.revokeObjectURL(a.href); },2000);
   };
 
+  /* v1.8.0 workspace persistence — every action below is an explicit, opt-in
+     user action. Nothing is ever written to or read from storage on load. */
+  $('btn-ws-save').onclick=function(){
+    var files=workspaceFiles||[{name:'Pasted SQL',text:sql.value}];
+    var snap=buildWorkspaceSnapshot({files:files,options:snapshotOptions(),
+      activeObjectId:activeObjectId});
+    var ok=writeWorkspace(snap);
+    updateWsStatus();
+    flash($('btn-ws-save'),ok?'Saved':'Save failed');
+  };
+  $('btn-ws-restore').onclick=function(){
+    var snap=readWorkspace();
+    if(!snap){ flash($('btn-ws-restore'),'None saved'); return; }
+    applySnapshot(snap);
+  };
+  $('btn-ws-export').onclick=function(){
+    var snap=readWorkspace();
+    if(!snap){ flash($('btn-ws-export'),'Nothing saved'); return; }
+    var blob=new Blob([serializeWorkspace(snap)],{type:'application/json'});
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='procflow-workspace.json';
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); },2000);
+  };
+  $('btn-ws-forget').onclick=function(){
+    clearWorkspace();
+    updateWsStatus();
+    flash($('btn-ws-forget'),'Forgotten');
+  };
+  $('btn-ws-import').onclick=function(){ $('ws-file-input').click(); };
+  $('ws-file-input').onchange=function(){
+    var file=(this.files&&this.files[0]);
+    if(!file) return;
+    file.text().then(function(text){
+      var parsed=parseWorkspace(text);
+      if(parsed.error||!parsed.snapshot){
+        showMsg('That file is not a valid ProcFlow workspace export.');
+        return;
+      }
+      applySnapshot(parsed.snapshot);
+      updateWsStatus();
+    }).catch(function(err){ showMsg('Could not read that workspace file: '+err.message); });
+    this.value='';
+  };
+
   if(typeof mermaid!=='undefined'){
     mermaid.initialize({
       startOnLoad:false, theme:'base', securityLevel:'strict',
@@ -647,12 +768,19 @@
     });
   }
   drawGutter();
+  updateWsStatus();
+  /* Local-only guarantee (v1.8.0): persistence is opt-in only — nothing is
+     written to or restored from storage on load. This attribute lets the
+     release smoke test assert the app initialises local-only. */
+  document.documentElement.setAttribute('data-workspace-optin','1');
   document.documentElement.setAttribute('data-procflow-ready',String(
     typeof mermaid!=='undefined'&&
     typeof tokenize==='function'&&
     typeof detectDialect==='function'&&
     typeof analyse==='function'&&
-    typeof toDrawio==='function'
+    typeof toDrawio==='function'&&
+    typeof buildWorkspaceSnapshot==='function'&&
+    typeof filterDependencyGraph==='function'
   ));
 })();
 

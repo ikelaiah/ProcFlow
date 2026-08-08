@@ -4,9 +4,10 @@
   "corpus": {
     "golden": 107,
     "fuzz": 400,
-    "ui": 16,
+    "ui": 20,
     "parity": 10,
-    "layout": 11
+    "layout": 11,
+    "workspace": 13
   },
   "attributionRate": 1,
   "unresolvedTokenRate": 0.04432,
@@ -19,6 +20,7 @@
   "exportParityPassRate": 1,
   "exportTraceabilityRate": 1,
   "layoutBudgetPassRate": 1,
+  "workspacePassRate": 1,
   "aggregate": {
     "totalTokens": 2685,
     "accountedTokens": 2685,

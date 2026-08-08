@@ -1,11 +1,12 @@
 "use strict";
-/* v1.7.0 — fixture-corpus metric publishing.
+/* v1.8.0 — fixture-corpus metric publishing.
    Aggregates the "Metrics that matter" over the checked-in golden corpus,
    including the v1.7.0 export-parity, export-traceability, and layout-budget
-   pass rates reported by tests/parity.ts.
+   pass rates reported by tests/parity.ts, plus the v1.8.0 workspace
+   persistence/dependency-filtering pass rate from tests/workspace.ts.
    Purely deterministic and fixture-only: no user inputs and no runtime
    telemetry are ever collected. scripts/metrics.mjs drives this page to
-   produce or verify docs/metrics-v1.7.0.json. */
+   produce or verify docs/metrics-v1.8.0.json. */
 (function () {
     var corpus = PROCFLOW_FIXTURES || [];
     var totalTokens = 0, attributedAll = 0, unresolvedTokens = 0, opaqueTokens = 0, tailUnconsumed = 0;
@@ -84,9 +85,11 @@
                `npm run metrics:write`; CI then refuses to merge a stale snapshot. */
             golden: corpus.length,
             fuzz: 400,
-            ui: 16,
+            ui: 20,
             parity: window.PROCFLOW_PARITY_RESULT ? window.PROCFLOW_PARITY_RESULT.total / 2 : 0,
-            layout: window.PROCFLOW_LAYOUT_RESULT ? window.PROCFLOW_LAYOUT_RESULT.total : 0
+            layout: window.PROCFLOW_LAYOUT_RESULT ? window.PROCFLOW_LAYOUT_RESULT.total : 0,
+            workspace: window.PROCFLOW_WORKSPACE_RESULT
+                ? window.PROCFLOW_WORKSPACE_RESULT.total : 0
         },
         attributionRate: rate(attributedAll, totalTokens),
         unresolvedTokenRate: rate(unresolvedTokens, totalTokens),
@@ -108,6 +111,12 @@
             : 1,
         layoutBudgetPassRate: window.PROCFLOW_LAYOUT_RESULT
             ? rate(window.PROCFLOW_LAYOUT_RESULT.passed, window.PROCFLOW_LAYOUT_RESULT.total)
+            : 0,
+        /* v1.8.0 usable local workspace: persistence round-trip, migration,
+           corrupt recovery, explicit clearing, and presentation-only dependency
+           filtering all pass on the checked-in fixture corpus. */
+        workspacePassRate: window.PROCFLOW_WORKSPACE_RESULT
+            ? rate(window.PROCFLOW_WORKSPACE_RESULT.passed, window.PROCFLOW_WORKSPACE_RESULT.total)
             : 0,
         aggregate: {
             totalTokens: totalTokens,

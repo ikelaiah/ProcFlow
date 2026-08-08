@@ -479,6 +479,41 @@ interface EstateResult {
   diagnostics: Diagnostic[];
 }
 
+/* v1.8.0 — usable local workspace (README post-v1.0.0 item 7).
+   Persistence is opt-in, versioned, and exportable. A snapshot captures every
+   input needed to reproduce an identical analysis: the workspace files plus
+   the analysis/UI options. The schema is versioned so future releases can
+   migrate stored workspaces instead of dropping them. */
+interface WorkspaceSnapshot {
+  version: number;
+  savedAt: string;
+  files: WorkspaceFile[];
+  options: {
+    dialect: string;
+    scope: string;
+    view: string;
+    detail: string;
+    dir: string;
+    group: boolean;
+    number: boolean;
+    fanIn: boolean;
+    sources: boolean;
+  };
+  activeObjectId: string | null;
+}
+
+/* v1.8.0 — presentation-only dependency filtering. Filters derive a filtered
+   graph at render time and must never mutate the underlying estate graph:
+   disabling a filter affects the view only, never the analysis result. */
+interface WorkspaceFilter {
+  reads?: boolean;
+  writes?: boolean;
+  calls?: boolean;
+  external?: boolean;
+  temp?: boolean;
+  focus?: string;
+}
+
 interface FixtureExpectation {
   mode?: 'flow' | 'query';
   branch?: number;
@@ -560,6 +595,24 @@ interface Window {
   PROCFLOW_PARITY_FAILURES?: string[];
   PROCFLOW_LAYOUT_PASS?: boolean;
   PROCFLOW_LAYOUT_RESULT?: {passed: number; total: number};
+  /* v1.8.0 workspace-persistence / dependency-filtering suite results,
+     published for the golden and metrics pages. */
+  PROCFLOW_WORKSPACE_PASS?: boolean;
+  PROCFLOW_WORKSPACE_RESULT?: {
+    passed: number;
+    total: number;
+  };
+  /* v1.8.0 opt-in workspace persistence globals (src/workspace.ts), exposed for
+     the browser UI tests. */
+  clearWorkspace(): void;
+  hasSavedWorkspace(): boolean;
+  readWorkspace(): WorkspaceSnapshot | null;
+  writeWorkspace(snapshot: WorkspaceSnapshot): boolean;
+  buildWorkspaceSnapshot(state: {
+    files: WorkspaceFile[];
+    options: Record<string, unknown>;
+    activeObjectId: string | null;
+  }): WorkspaceSnapshot;
 }
 
 declare var mermaid: Window['mermaid'];

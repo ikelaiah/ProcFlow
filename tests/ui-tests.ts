@@ -140,6 +140,70 @@
         pass:!!w.mermaid&&!Array.prototype.some.call(d.scripts,function(s){
           return /^https?:/i.test(s.getAttribute('src')||'');
         })});
+
+      /* v1.8.0 usable local workspace — dependency filtering and opt-in
+         persistence (save → restore identical, explicit clear). */
+      w.clearWorkspace();
+      var depSource=[
+        'CREATE VIEW dbo.dep_view AS SELECT id FROM dbo.student;',
+        'GO',
+        'CREATE PROC dbo.dep_proc AS',
+        'BEGIN',
+        '  EXEC dbo.dep_callee;',
+        '  UPDATE dbo.student SET x = 1;',
+        '  SELECT id FROM dbo.dep_view;',
+        'END'
+      ].join('\n');
+      get('sql').value=depSource;
+      get('sql').dispatchEvent(new Event('input'));
+      get('btn-draw').click();
+      get('object-select').options.length; /* analyse estate */
+      get('opt-scope').value='dependencies';
+      get('opt-scope').dispatchEvent(new Event('change'));
+      var filterShown=get('filter-menu').style.display!=='none';
+      var fullDep=get('mermaid-out').textContent;
+      get('f-w').checked=false;
+      get('f-w').dispatchEvent(new Event('change'));
+      var filteredDep=get('mermaid-out').textContent;
+      get('btn-filter-reset').click();
+      var resetDep=get('mermaid-out').textContent;
+      results.push({name:'dependency filter panel shows only in dependency scope',
+        pass:filterShown&&fullDep.length>0,
+        detail:{shown:filterShown,full:fullDep.slice(0,80)}});
+      results.push({name:'dependency filtering is presentation-only in the UI',
+        pass:fullDep!==filteredDep&&filteredDep.length<fullDep.length&&
+          resetDep===fullDep,
+        detail:{full:fullDep.slice(0,120),filtered:filteredDep.slice(0,120),
+          reset:resetDep.slice(0,120)}});
+
+      var persistenceSource=[
+        'CREATE PROC dbo.ws_persist AS',
+        'BEGIN',
+        '  SELECT 1;',
+        'END'
+      ].join('\n');
+      get('opt-scope').value='internal';
+      get('opt-scope').dispatchEvent(new Event('change'));
+      get('opt-dialect').value='tsql';
+      get('sql').value=persistenceSource;
+      get('sql').dispatchEvent(new Event('input'));
+      get('btn-draw').click();
+      var capturedCode=get('mermaid-out').textContent;
+      get('btn-ws-save').click();
+      get('sql').value='SELECT changed;';
+      get('sql').dispatchEvent(new Event('input'));
+      get('btn-draw').click();
+      get('btn-ws-restore').click();
+      var restoredCode=get('mermaid-out').textContent;
+      results.push({name:'opt-in save then restore reproduces identical analysis',
+        pass:get('sql').value.indexOf('ws_persist')>=0&&capturedCode===restoredCode,
+        detail:{captured:capturedCode.slice(0,80),restored:restoredCode.slice(0,80),
+          sql:get('sql').value.slice(0,60)}});
+      get('btn-ws-forget').click();
+      results.push({name:'forgetting a saved workspace is explicit',
+        pass:w.hasSavedWorkspace()===false&&
+          /No workspace is saved/i.test(get('ws-status').textContent||''),
+        detail:{saved:w.hasSavedWorkspace(),status:get('ws-status').textContent}});
       finish(results);
     },1200);
   });

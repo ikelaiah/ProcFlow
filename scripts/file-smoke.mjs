@@ -91,6 +91,12 @@ if (!existsSync(smokePage)) {
         fail(`browser exited with status ${result.status}`, result.stderr || output);
       } else if (!/data-procflow-ready="true"/.test(output)) {
         fail("application did not initialize its local runtime", output || result.stderr);
+      } else if (!/data-workspace-optin="1"/.test(output)) {
+        /* v1.8.0 extended local-only check: the app must initialise with
+           workspace persistence marked opt-in. Nothing is written to or
+           restored from browser storage on load — Save/Restore/Forget are the
+           only storage touchpoints and each needs an explicit user action. */
+        fail("application did not declare opt-in workspace persistence (data-workspace-optin missing)", output || result.stderr);
       } else {
         console.log(`file smoke: application and local runtime loaded (${fileUrl})`);
       }

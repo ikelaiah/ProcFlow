@@ -64,6 +64,14 @@ jobs:
             echo "Runtime files contain an external URL."
             exit 1
           fi
+          if grep -REn '\bfetch\(|new XMLHttpRequest|new WebSocket|navigator\.sendBeacon' index.html src dist; then
+            echo "Runtime files contain a network submission API."
+            exit 1
+          fi
+          if grep -REn 'localStorage' src --include=*.ts | grep -v 'src/workspace.ts'; then
+            echo "Browser storage is only touched by the opt-in persistence module (src/workspace.ts)."
+            exit 1
+          fi
 
       - name: Start static test server
         shell: bash

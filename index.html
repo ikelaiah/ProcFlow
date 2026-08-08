@@ -22,6 +22,9 @@
       <strong>Your SQL stays in this browser.</strong>
       Procflow does not upload SQL, connect to a database, or send it to an API.
       Imported files remain in this tab and are discarded when it closes.
+      Workspace persistence is opt-in: nothing is saved to this browser unless
+      you choose Save in the Workspace menu, and saved workspaces are local-only,
+      exportable, and clearable.
     </div>
   </details>
   <div class="top-actions">
@@ -135,6 +138,33 @@
             <button class="menu-action" id="btn-drawio">Save draw.io</button>
           </div>
         </details>
+        <details class="command-menu" id="workspace-menu">
+          <summary class="btn">Workspace</summary>
+          <div class="command-menu-panel workspace-actions" aria-label="Workspace persistence and transfer">
+            <p class="ws-note" id="ws-status"></p>
+            <input id="ws-file-input" type="file" accept=".json,application/json" hidden>
+            <button class="menu-action" id="btn-ws-save">Save to this browser</button>
+            <button class="menu-action" id="btn-ws-restore">Restore saved workspace</button>
+            <button class="menu-action" id="btn-ws-export">Export workspace file</button>
+            <button class="menu-action" id="btn-ws-import">Import workspace file</button>
+            <button class="menu-action" id="btn-ws-forget">Forget saved workspace</button>
+          </div>
+        </details>
+        <details class="command-menu" id="filter-menu" style="display:none">
+          <summary class="btn">Filter dependencies</summary>
+          <div class="command-menu-panel settings-panel filter-panel" aria-label="Dependency graph filters (presentation only)">
+            <p class="ws-note">Filters affect the dependency view only; the analysis graph is unchanged.</p>
+            <label class="opt" id="lbl-f-reads"><input type="checkbox" id="f-r" checked> Reads</label>
+            <label class="opt" id="lbl-f-writes"><input type="checkbox" id="f-w" checked> Writes</label>
+            <label class="opt" id="lbl-f-calls"><input type="checkbox" id="f-c" checked> Calls</label>
+            <label class="opt" id="lbl-f-external"><input type="checkbox" id="f-e" checked> External objects</label>
+            <label class="opt" id="lbl-f-temp"><input type="checkbox" id="f-t" checked> Temp tables</label>
+            <label class="opt filter-focus">Focus
+              <input type="text" id="f-focus" placeholder="object name" spellcheck="false">
+            </label>
+            <button class="menu-action" id="btn-filter-reset">Reset filters</button>
+          </div>
+        </details>
       </div>
     </div>
     <div class="msg" id="msg"></div>
@@ -162,6 +192,7 @@
 <script src="dist/src/lineage.js"></script>
 <script src="dist/src/ir.js"></script>
 <script src="dist/src/exporters.js"></script>
+<script src="dist/src/workspace.js"></script>
 <script src="dist/src/app.js"></script>
 </body>
 </html>
