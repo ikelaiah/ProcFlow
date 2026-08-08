@@ -282,6 +282,13 @@ interface GraphNode {
   provenance?: NodeProvenance;
   reason?: string;
   sources?: SourceSpan[];
+  /* v1.9.0 — catalogue resolution on external/source nodes. `resolution` is
+     'verified' when the catalogue proves the object identity, 'conflict' when
+     catalogue evidence is ambiguous, and 'external' (default) when it is not
+     present. `resolvedName` is the canonical catalogue name a synonym or
+     cross-database reference resolves to. */
+  resolution?: CatalogueResolution;
+  resolvedName?: string;
   /* Structured label lines (v1.7.0): multi-line labels are carried as an
      explicit array instead of an embedded \u0001 sentinel. When present,
      `text` is lines.join('\n') and exporters render from `lines`. */
@@ -347,6 +354,14 @@ interface AnalyseOptions {
   fanIn?: boolean;
   number?: boolean;
   finalLabel?: string;
+  /* v1.9.0 — resolve by catalogue. When a parsed catalogue is present, unmatched
+     object references that the catalogue proves are 'verified' instead of the
+     conservative v1.5.0 'external' label; partial or conflicting catalogue
+     evidence stays conservative and attaches a region-scoped diagnostic. */
+  catalogue?: Catalogue;
+  /* Document-scoped catalogue parse diagnostics surfaced alongside the
+     analysis (set by the caller after parseCatalogue). */
+  catalogueDiagnostics?: Diagnostic[];
 }
 
 interface DrawioOptions {
@@ -499,6 +514,10 @@ interface WorkspaceSnapshot {
     fanIn: boolean;
     sources: boolean;
   };
+  /* v1.9.0 — the raw catalogue text (JSON or the simple line format). It is an
+     analysis input, so it is captured with the snapshot so Restore reproduces
+     an identical analysis. Null/absent means no catalogue. */
+  catalogue?: string | null;
   activeObjectId: string | null;
 }
 
@@ -512,6 +531,52 @@ interface WorkspaceFilter {
   external?: boolean;
   temp?: boolean;
   focus?: string;
+}
+
+/* v1.9.0 — resolve by catalogue (README post-v1.0.0 item 5).
+   A catalogue carries table/view/column metadata so unmatched object
+   references can be resolved to their exact identity instead of a conservative
+   'external' label. Only full-name and explicit-synonym matches count as
+   'verified'; partial (suffix-only) or conflicting evidence stays conservative
+   and is reported with a region-scoped diagnostic. Column metadata is accepted
+   and validated now, and used for lineage in a later release. */
+type CatalogueKind =
+  | 'TABLE' | 'VIEW' | 'PROC' | 'FUNCTION' | 'TRIGGER' | 'SYNONYM'
+  | 'TYPE' | 'SEQUENCE' | 'OTHER';
+
+type CatalogueResolution = 'verified' | 'external' | 'conflict';
+
+interface CatalogueObject {
+  name: string;          /* canonical object name (possibly multi-part) */
+  kind: CatalogueKind;
+  synonyms: string[];    /* alternative names that resolve to this object */
+}
+
+interface CatalogueColumn {
+  table: string;         /* owning object name (matches a CatalogueObject.name) */
+  name: string;
+  kind?: CatalogueKind;
+}
+
+interface Catalogue {
+  objects: CatalogueObject[];
+  columns: CatalogueColumn[];
+  /* Normalized lookup indexes, filled by buildCatalogueIndex so resolution is
+     O(1). byName maps normalized full names to objects; bySynonym maps
+     normalized synonym names to their owning object. */
+  byName: Record<string, CatalogueObject>;
+  bySynonym: Record<string, CatalogueObject>;
+  /* Normalized names with conflicting catalogue entries (duplicate objects or
+     a synonym colliding with an object name). */
+  conflicts: StringSet;
+}
+
+interface CatalogueParseResult {
+  catalogue: Catalogue;
+  diagnostics: Diagnostic[];
+  format: 'json' | 'text';
+  objectCount: number;
+  columnCount: number;
 }
 
 interface FixtureExpectation {
@@ -602,6 +667,12 @@ interface Window {
     passed: number;
     total: number;
   };
+  /* v1.9.0 catalogue suite results, published for the golden and metrics pages. */
+  PROCFLOW_CATALOGUE_PASS?: boolean;
+  PROCFLOW_CATALOGUE_RESULT?: {
+    passed: number;
+    total: number;
+  };
   /* v1.8.0 opt-in workspace persistence globals (src/workspace.ts), exposed for
      the browser UI tests. */
   clearWorkspace(): void;
@@ -612,6 +683,7 @@ interface Window {
     files: WorkspaceFile[];
     options: Record<string, unknown>;
     activeObjectId: string | null;
+    catalogue?: string | null;
   }): WorkspaceSnapshot;
 }
 

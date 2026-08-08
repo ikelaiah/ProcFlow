@@ -51,7 +51,8 @@ For the first stable release, see
 [RELEASE_NOTE_v1.5.0.md](docs/RELEASE_NOTE_v1.5.0.md). For the v1.6.0 release, see
 [RELEASE_NOTE_v1.6.0.md](docs/RELEASE_NOTE_v1.6.0.md). For the v1.7.0 release, see
 [RELEASE_NOTE_v1.7.0.md](docs/RELEASE_NOTE_v1.7.0.md). For the v1.8.0 release, see
-[RELEASE_NOTE_v1.8.0.md](docs/RELEASE_NOTE_v1.8.0.md).
+[RELEASE_NOTE_v1.8.0.md](docs/RELEASE_NOTE_v1.8.0.md). For the v1.9.0 release, see
+[RELEASE_NOTE_v1.9.0.md](docs/RELEASE_NOTE_v1.9.0.md).
 
 ## Start here
 
@@ -67,7 +68,7 @@ For the first stable release, see
 
 ## 60-second quick start
 
-1. Download the `v1.8.0` archive from
+1. Download the `v1.9.0` archive from
    [GitHub Releases](https://github.com/ikelaiah/ProcFlow/releases) or clone
    this repository.
 2. Extract the complete archive. Keep `index.html`, `styles.css`, `dist/`, and
@@ -134,7 +135,7 @@ statements.
    analysis to another engineer.
 
 ProcFlow imports SQL text, not report-definition files. SSRS/RDL import is on
-the roadmap; for v1.8.0, paste or export the dataset SQL itself.
+the roadmap; for v1.9.0, paste or export the dataset SQL itself.
 
 ## What ProcFlow can show
 
@@ -176,9 +177,11 @@ the roadmap; for v1.8.0, paste or export the dataset SQL itself.
 - object → table write
 
 Known imported objects are linked. Selecting one can open its internal logic.
-Unmatched three-/four-part names keep their complete identity as
-`external: [server].[database].[schema].[object]` nodes rather than collapsing
-to a bare last-part match.
+With a catalogue loaded, unmatched references the catalogue proves — an exact
+full-name match, or an explicit synonym — resolve to their canonical identity
+instead of a conservative label. Unmatched three-/four-part names keep their
+complete identity as `external: [server].[database].[schema].[object]` nodes
+rather than collapsing to a bare last-part match.
 
 ## Reading the analysis safely
 
@@ -194,7 +197,9 @@ The analysis panel provides four release-safety signals:
 - **Coverage** is the percentage of body tokens consumed by the parser.
 - **Diagnostics** reports uncertain dialects, balance errors, missing block
   terminators, unconsumed input, invalid actions, opaque dynamic SQL, opaque
-  table expressions, and heuristic `APPLY` targets. Informational annotations
+  table expressions, heuristic `APPLY` targets, and catalogue problems
+  (malformed or conflicting catalogue data, and unproven partial matches
+  reported at the exact reference). Informational annotations
   (for example a correctly resolved recursive CTE) are displayed separately and
   never inflate the findings count. Document-scoped findings such as dialect
   ambiguity carry no fabricated source span.
@@ -215,7 +220,7 @@ than silently disappearing from the diagram.
 
 ## Supported SQL
 
-ProcFlow v1.8.0 recognises:
+ProcFlow v1.9.0 recognises:
 
 - Microsoft T-SQL
 - IBM DB2 SQL PL
@@ -226,7 +231,7 @@ Supported inputs include procedures, functions, triggers, views, plain SQL
 statements, report dataset queries, and multi-object scripts where those object
 types apply to the selected dialect.
 
-Dialect-specific v1.8.0 coverage includes:
+Dialect-specific v1.9.0 coverage includes:
 
 - **T-SQL:** mixed one-line and block `IF`/`WHILE` control flow (single
   statement and `BEGIN`/`END` bodies in one AST), labelled `GOTO` and labels
@@ -258,6 +263,11 @@ When detection is uncertain and several dialects score equally, an explicit
 `dialect_ambiguous` diagnostic is reported along with the usual
 low-confidence warning.
 
+Catalogue resolution (README item 5, delivered in v1.9.0) applies across
+dialects: when a catalogue is loaded, object references the catalogue proves
+are shown as verified identity instead of external labels. See
+[Working with a catalogue](#working-with-a-catalogue).
+
 ## Importing SQL
 
 **Import SQL files** accepts multiple `.sql`, `.ddl`, and `.txt` files. Files
@@ -268,16 +278,43 @@ Multi-object scripts are split into selectable objects. If the split cannot be
 made confidently, ProcFlow keeps the input as one script and reports the
 uncertainty.
 
+## Working with a catalogue
+
+The **Catalogue** menu imports table/view/column metadata so ProcFlow can
+resolve object references to their exact identity instead of a conservative
+`external:` label.
+
+- **Paste or import.** Type a catalogue into the textarea (or press **Import
+  file**) and press **Apply catalogue**. Two formats are accepted:
+  - **JSON** — `{"objects":[{"name":"dbo.Student","kind":"TABLE",
+    "synonyms":["student"]}], "columns":[{"table":"dbo.Student","name":"Id"}]}`
+    (a bare array of objects or names also works);
+  - **simple line format** — one object per line: `name KIND syn1, syn2` plus
+    `COL table.column` column lines; `#` lines are comments.
+- **Verified resolution.** Only exact full-name matches and explicit synonyms
+  count as verified. In **Object dependencies** scope and the **Query
+  structure** view, a verified reference renders as its canonical object name
+  (no `external:` prefix) and carries the resolution as metadata on draw.io
+  exports.
+- **Conservative when uncertain.** A reference that only partially matches
+  (for example a server prefix over a catalogued object) stays external and
+  gets a region-scoped `catalogue_partial` diagnostic naming the unproven
+  candidate. Duplicate or colliding catalogue entries produce a
+  `catalogue_conflict` diagnostic and never invent a verification.
+- **Clear** removes the catalogue; applying a different catalogue re-runs the
+  current analysis. The catalogue is an analysis input, so a saved workspace
+  captures it and Restore reproduces an identical analysis.
+
 ## Workspace
 
 The **Workspace** menu keeps your work usable across sessions, entirely on your
 terms:
 
-- **Save to this browser** persists the current workspace (files plus analysis
-  options) to this browser's `localStorage`. This is strictly opt-in — nothing
-  is written or restored on load.
-- **Restore saved workspace** replays the saved files and options into an
-  identical analysis.
+- **Save to this browser** persists the current workspace (files, analysis
+  options, and any applied catalogue text) to this browser's `localStorage`.
+  This is strictly opt-in — nothing is written or restored on load.
+- **Restore saved workspace** replays the saved files, options, and catalogue
+  into an identical analysis.
 - **Export workspace file** / **Import workspace file** transfer a workspace as
   portable JSON.
 - **Forget saved workspace** removes the local copy explicitly.
@@ -319,7 +356,7 @@ endorsed by draw.io.
 
 ### Quick answers
 
-| Question | ProcFlow v1.8.0 behavior |
+| Question | ProcFlow v1.9.0 behavior |
 |---|---|
 | Is SQL uploaded? | No. Analysis and rendering happen in the browser tab. |
 | Does it connect to a database? | No. There is no driver, connection string, or query execution. |
@@ -341,6 +378,7 @@ The runtime application consists of:
 index.html
 styles.css
 dist/src/tokenizer.js
+dist/src/catalogue.js
 dist/src/dialects.js
 dist/src/lineage.js
 dist/src/ir.js
@@ -359,9 +397,10 @@ The opt-in persistence module (`dist/src/workspace.js`) is the only runtime
 that touches browser storage, and it does so only through explicit
 **Workspace** menu actions (Save / Restore / Forget) — never on load. Its
 import/export uses the browser download API, which also requires an explicit
-action.
+action. The catalogue module (`dist/src/catalogue.js`) parses pasted or
+imported metadata in memory only; it never reads or writes storage.
 
-The SHA-256 of `vendor/mermaid/mermaid.min.js` in v1.8.0 is:
+The SHA-256 of `vendor/mermaid/mermaid.min.js` in v1.9.0 is:
 
 ```text
 61B335A46DF05A7CE1C98378F60E5F3E77A7FB608A1056997E8A649304A936D6
@@ -372,7 +411,7 @@ so the release checksum remains reproducible across operating systems.
 
 ### Guidance for security review
 
-1. Review and pin the `v1.8.0` tag or its exact commit.
+1. Review and pin the `v1.9.0` tag or its exact commit.
 2. Verify the vendored Mermaid checksum.
 3. Review the runtime files listed above.
 4. Open the reviewed files locally or serve them from an approved internal
@@ -408,9 +447,16 @@ and contains no automatic data-submission path.
   splits.
 - Query lineage is object-level rather than column-level.
 - Some vendor-specific table expressions might not be detected.
-- Temporary-table data flow is shown within one object; cross-object temp
-  flow, synonym, linked-server, and cross-database resolution is lightweight.
-- SSRS/RDL files are not imported in v1.8.0.
+- Temporary-table data flow is shown within one object; cross-object temp flow
+  remains unresolved.
+- Catalogue resolution is deliberately conservative: only exact full-name and
+  explicit-synonym matches are verified. Suffix-only matches, unqualified names
+  without a catalogue synonym, and unknown linked-server layouts stay external
+  (with a `catalogue_partial` diagnostic where a plausible but unproven
+  candidate exists) until the catalogue proves them.
+- Columns are parsed and validated by the catalogue import but not yet used;
+  column lineage is scheduled for v1.10.0+.
+- SSRS/RDL files are not imported in v1.9.0.
 - draw.io layout is deterministic for the documented graph classes at
   documented size limits; very large or non-planar graphs are laid out without
   overlapping boxes and reported honestly rather than claimed crossing-free.
@@ -478,23 +524,26 @@ Then open:
 - `http://127.0.0.1:8000/tests/ui.html` — browser interaction and local-runtime
   tests
 
-The v1.8.0 baseline is:
+The v1.9.0 baseline is:
 
-- 207 golden and boundary assertions
+- 208 golden and boundary assertions
 - 400 deterministic mutation cases
-- 20 browser interaction tests
+- 22 browser interaction tests
 - 20 export-parity checks (10 fixtures × TD + LR), 11 layout-budget fixtures,
   and 100 % export-traceability on the export fixtures
 - 13 workspace-persistence and dependency-filtering fixtures (save→reload
   identity, schema migration, corrupt recovery, explicit clear, non-mutating
   filters)
+- 13 catalogue fixtures (JSON and line import, synonym / linked-server /
+  cross-database verification, conservative conflict and partial diagnostics,
+  export metadata, workspace round-trip)
 
 Fixture-corpus accuracy metrics (attribution, unresolved-token, tail-unconsumed,
 fallback, opaque-dynamic, semantic-edge coverage, provenance,
 region-diagnostic-to-span, export-parity, export-traceability, layout-budget,
-and workspace pass-rate ratios) are published from the checked-in golden
-corpus in [docs/metrics-v1.8.0.json](docs/metrics-v1.8.0.json). Generation is
-deterministic and fixture-only — no user inputs or runtime telemetry are
+workspace, and catalogue pass-rate ratios) are published from the checked-in
+golden corpus in [docs/metrics-v1.9.0.json](docs/metrics-v1.9.0.json). Generation
+is deterministic and fixture-only — no user inputs or runtime telemetry are
 collected — and CI refuses to merge when the snapshot is stale. Regenerate with
 `npm run metrics:write`.
 
@@ -530,6 +579,7 @@ docs/
 ├── PR_NOTE_1.6.0.md
 ├── PR_NOTE_1.7.0.md
 ├── PR_NOTE_1.8.0.md
+├── PR_NOTE_1.9.0.md
 ├── RELEASE_NOTE_1.1.0.md
 ├── RELEASE_NOTE_1.2.0.md
 ├── RELEASE_NOTE_1.3.0.md
@@ -542,7 +592,8 @@ docs/
 ├── RELEASE_NOTE_v1.6.0.md
 ├── RELEASE_NOTE_v1.7.0.md
 ├── RELEASE_NOTE_v1.8.0.md
-└── metrics-v1.8.0.json   # deterministic fixture-only accuracy metrics snapshot
+├── RELEASE_NOTE_v1.9.0.md
+└── metrics-v1.9.0.json   # deterministic fixture-only accuracy metrics snapshot
 examples/
 ├── dbo.v110_demo.sql    # per-release outcome demos
 ├── dbo.v120_demo.sql
@@ -551,13 +602,15 @@ examples/
 ├── dbo.v150_demo.sql
 ├── dbo.v160_demo.sql
 ├── dbo.v170_demo.sql    # v1.7.0: clear deterministic exports demo
-└── dbo.v180_demo.sql    # v1.8.0: usable local workspace demo
+├── dbo.v180_demo.sql    # v1.8.0: usable local workspace demo
+└── dbo.v190_demo.sql    # v1.9.0: resolve by catalogue demo
 scripts/
 ├── file-smoke.mjs    # dependency-free local-file release smoke test
 └── metrics.mjs       # generate/verify the fixture-corpus metric snapshot
 src/
 ├── types.d.ts        # shared tokens, AST, graphs, diagnostics, and contracts
 ├── tokenizer.ts      # lexical analysis, escaping, balance checks, source spans
+├── catalogue.ts      # catalogue import (JSON + line) and object resolution
 ├── dialects.ts       # dialect detection and procedural parsing
 ├── lineage.ts        # CTE and query dependency extraction
 ├── ir.ts             # graphs, diagnostics, confidence, and estate analysis
@@ -577,6 +630,7 @@ tests/
 ├── boundary.ts
 ├── parity.ts
 ├── workspace.ts
+├── catalogue.ts
 ├── tests.ts
 ├── fuzz.ts
 ├── ui-tests.ts
@@ -615,13 +669,13 @@ Then verify:
 3. Generated `dist/` files match their TypeScript sources.
 4. The Mermaid SHA-256 matches the value in this README and the workflow.
 5. `npm run metrics` reports the metric snapshot is current.
-6. `RELEASE_NOTE_v1.8.0.md` matches the final tag contents.
+6. `RELEASE_NOTE_v1.9.0.md` matches the final tag contents.
 7. The complete archive opens locally with `index.html`, and the local-file
    smoke test reports the opt-in workspace assertion.
-8. The tag is named `v1.8.0`.
+8. The tag is named `v1.9.0`.
 
-The release can then be created manually from the `v1.8.0` tag using
-[RELEASE_NOTE_v1.8.0.md](docs/RELEASE_NOTE_v1.8.0.md).
+The release can then be created manually from the `v1.9.0` tag using
+[RELEASE_NOTE_v1.9.0.md](docs/RELEASE_NOTE_v1.9.0.md).
 
 ## Roadmap after v1.0.0
 
@@ -630,6 +684,7 @@ The release can then be created manually from the `v1.8.0` tag using
 3. Model more multi-statement and temporary-table transformations.
 4. Import SSRS/RDL definitions and link reports to datasets.
 5. Accept database catalogue metadata for more accurate object resolution.
+   **Delivered in v1.9.0.**
 6. Add column-level lineage where it can be resolved safely.
 7. Add optional local workspace persistence and dependency filtering.
    **Delivered in v1.8.0.**

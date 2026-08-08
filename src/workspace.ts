@@ -13,7 +13,10 @@
    filtered copy at render time and never mutates the underlying estate graph.
    Disabling a filter changes the view only — never the analysis result.
 */
-var WORKSPACE_SCHEMA_VERSION = 1;
+/* v1.8.0 schema was version 1. v1.9.0 adds the optional catalogue text (an
+   analysis input) as a top-level snapshot field, so a saved workspace still
+   reproduces an identical analysis when a catalogue was in use. */
+var WORKSPACE_SCHEMA_VERSION = 2;
 var WORKSPACE_STORAGE_KEY = 'procflow.workspace'; /* schema base key; versioned payload */
 
 var DIALECT_SELECT_ORDER = ['auto','tsql','db2','plpgsql','sqlite'];
@@ -40,6 +43,7 @@ function buildWorkspaceSnapshot(state: {
   files: WorkspaceFile[];
   options: Record<string, unknown>;
   activeObjectId: string | null;
+  catalogue?: string | null;
 }): WorkspaceSnapshot {
   var opt: WorkspaceSnapshot['options'] = {
     dialect:String(state.options.dialect==null?'auto':state.options.dialect),
@@ -52,15 +56,17 @@ function buildWorkspaceSnapshot(state: {
     fanIn:!!state.options.fanIn,
     sources:!!state.options.sources
   };
-  return {
+  var snap: WorkspaceSnapshot = {
     version:WORKSPACE_SCHEMA_VERSION,
     savedAt:new Date().toISOString(),
     files:(state.files||[]).map(function(f){
       return {name:String(f.name||''), text:String(f.text==null?'':f.text)};
     }),
     options:opt,
+    catalogue:state.catalogue==null?null:String(state.catalogue),
     activeObjectId:state.activeObjectId||null
   };
+  return snap;
 }
 
 function serializeWorkspace(snapshot: WorkspaceSnapshot): string {
@@ -93,6 +99,7 @@ function migrateWorkspace(raw: any): WorkspaceSnapshot {
     fanIn:src.fanIn===undefined?d.fanIn:!!src.fanIn,
     sources:src.sources===undefined?d.sources:!!src.sources
   };
+  migrated.catalogue=raw&&raw.catalogue!=null?String(raw.catalogue):null;
   migrated.activeObjectId=raw&&raw.activeObjectId?String(raw.activeObjectId):null;
   return migrated;
 }

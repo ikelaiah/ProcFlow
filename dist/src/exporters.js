@@ -51,6 +51,10 @@ function provenanceComment(graph) {
         }
         if (n.objectId)
             bits.push('object=' + n.objectId);
+        if (n.resolution)
+            bits.push('resolution=' + n.resolution);
+        if (n.resolvedName)
+            bits.push('resolved=' + n.resolvedName);
         if (n.reason)
             bits.push('reason=' + n.reason);
         lines.push('%% ' + bits.join(' '));
@@ -500,6 +504,10 @@ function toDrawio(graph, opts) {
             meta.push('span=' + n.source.start + '-' + n.source.end);
         if (n.objectId)
             meta.push('object=' + n.objectId);
+        if (n.resolution)
+            meta.push('resolution=' + n.resolution);
+        if (n.resolvedName)
+            meta.push('resolved=' + n.resolvedName);
         if (n.reason)
             meta.push('reason=' + n.reason);
         var metaAttr = meta.length ? ' data-procflow="' + xmlAttr(meta.join(' ')) + '"' : '';

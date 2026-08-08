@@ -129,6 +129,26 @@
             <label class="opt" id="lbl-sources" style="display:none"><input type="checkbox" id="opt-sources" checked> Source tables</label>
           </div>
         </details>
+        <details class="command-menu" id="catalogue-menu">
+          <summary class="btn">Catalogue</summary>
+          <div class="command-menu-panel settings-panel catalogue-panel" aria-label="Catalogue metadata import and object resolution">
+            <p class="ws-note">Paste or import table/view/column metadata so
+            unresolved object references resolve to their exact identity
+            instead of an external label.</p>
+            <label class="opt">Catalogue
+              <textarea id="catalogue-text" rows="7" spellcheck="false"
+                placeholder="dbo.student TABLE student&#10;salesdb.dbo.orders TABLE&#10;COL dbo.orders.OrderId&#10;… (JSON is also accepted)"></textarea>
+            </label>
+            <div class="catalogue-actions">
+              <input id="catalogue-file-input" type="file"
+                accept=".json,.cat,.txt,.sql,text/plain,application/json" hidden>
+              <button class="menu-action" id="btn-catalogue-import">Import file</button>
+              <button class="menu-action primary-action" id="btn-catalogue-apply">Apply catalogue</button>
+              <button class="menu-action" id="btn-catalogue-clear">Clear</button>
+            </div>
+            <p class="ws-note" id="catalogue-status">No catalogue loaded.</p>
+          </div>
+        </details>
         <details class="command-menu" id="export-menu">
           <summary class="btn">Export</summary>
           <div class="command-menu-panel export-actions" aria-label="Copy and export diagram">
@@ -188,6 +208,7 @@
 
 <script src="vendor/mermaid/mermaid.min.js"></script>
 <script src="dist/src/tokenizer.js"></script>
+<script src="dist/src/catalogue.js"></script>
 <script src="dist/src/dialects.js"></script>
 <script src="dist/src/lineage.js"></script>
 <script src="dist/src/ir.js"></script>

@@ -793,6 +793,18 @@
     catch (err) {
         record('v1.8.0 workspace persistence, migration, clear, and filter fixtures', false, String(err && err.stack || err));
     }
+    /* v1.9.0: resolve by catalogue — import parsing, exact synonym / linked-server
+       / cross-database verification, conservative conflict handling, region-scoped
+       partial diagnostics, export metadata, and the workspace round-trip run ahead
+       in tests/catalogue.ts; gate the whole golden page on them. */
+    try {
+        record('v1.9.0 catalogue import, resolution, diagnostics, and export fixtures', window.PROCFLOW_CATALOGUE_PASS === true &&
+            !!window.PROCFLOW_CATALOGUE_RESULT &&
+            window.PROCFLOW_CATALOGUE_RESULT.passed === window.PROCFLOW_CATALOGUE_RESULT.total, window.PROCFLOW_CATALOGUE_RESULT);
+    }
+    catch (err) {
+        record('v1.9.0 catalogue import, resolution, diagnostics, and export fixtures', false, String(err && err.stack || err));
+    }
     var passed = results.filter(function (r) { return r.pass; }).length;
     document.body.className = passed === results.length ? 'pass' : 'fail';
     document.getElementById('summary').textContent = passed + '/' + results.length + ' tests passed';

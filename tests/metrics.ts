@@ -1,11 +1,12 @@
-/* v1.8.0 — fixture-corpus metric publishing.
+/* v1.9.0 — fixture-corpus metric publishing.
    Aggregates the "Metrics that matter" over the checked-in golden corpus,
    including the v1.7.0 export-parity, export-traceability, and layout-budget
-   pass rates reported by tests/parity.ts, plus the v1.8.0 workspace
-   persistence/dependency-filtering pass rate from tests/workspace.ts.
+   pass rates reported by tests/parity.ts, the v1.8.0 workspace
+   persistence/dependency-filtering pass rate from tests/workspace.ts, and the
+   v1.9.0 catalogue pass rate from tests/catalogue.ts.
    Purely deterministic and fixture-only: no user inputs and no runtime
    telemetry are ever collected. scripts/metrics.mjs drives this page to
-   produce or verify docs/metrics-v1.8.0.json. */
+   produce or verify docs/metrics-v1.9.0.json. */
 (function(){
   var corpus=PROCFLOW_FIXTURES||[];
 
@@ -76,11 +77,13 @@
          `npm run metrics:write`; CI then refuses to merge a stale snapshot. */
       golden:corpus.length,
       fuzz:400,
-      ui:20,
+      ui:22,
       parity:window.PROCFLOW_PARITY_RESULT?window.PROCFLOW_PARITY_RESULT.total/2:0,
       layout:window.PROCFLOW_LAYOUT_RESULT?window.PROCFLOW_LAYOUT_RESULT.total:0,
       workspace:window.PROCFLOW_WORKSPACE_RESULT
-        ?window.PROCFLOW_WORKSPACE_RESULT.total:0
+        ?window.PROCFLOW_WORKSPACE_RESULT.total:0,
+      catalogue:window.PROCFLOW_CATALOGUE_RESULT
+        ?window.PROCFLOW_CATALOGUE_RESULT.total:0
     },
     attributionRate:rate(attributedAll,totalTokens),
     unresolvedTokenRate:rate(unresolvedTokens,totalTokens),
@@ -109,6 +112,13 @@
        filtering all pass on the checked-in fixture corpus. */
     workspacePassRate:window.PROCFLOW_WORKSPACE_RESULT
       ? rate(window.PROCFLOW_WORKSPACE_RESULT.passed,window.PROCFLOW_WORKSPACE_RESULT.total)
+      : 0,
+    /* v1.9.0 resolve by catalogue: import parsing (JSON and line formats),
+       exact synonym/linked-server/cross-database verification, conservative
+       conflict handling, region-scoped partial diagnostics, export metadata,
+       and workspace round-trip all pass on the checked-in fixture corpus. */
+    cataloguePassRate:window.PROCFLOW_CATALOGUE_RESULT
+      ? rate(window.PROCFLOW_CATALOGUE_RESULT.passed,window.PROCFLOW_CATALOGUE_RESULT.total)
       : 0,
     aggregate:{
       totalTokens:totalTokens,
