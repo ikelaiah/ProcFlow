@@ -766,6 +766,21 @@
     catch (err) {
         record('v1.6.0 informational annotations do not inflate the findings count', false, String(err && err.stack || err));
     }
+    /* v1.7.0: clear deterministic exports — export-parity and layout suites run
+       in tests/parity.ts ahead of this suite; these records gate the whole golden
+       page on them. */
+    try {
+        record('v1.7.0 export-parity fixtures round-trip from both exporters', window.PROCFLOW_PARITY_PASS === true &&
+            !!window.PROCFLOW_PARITY_RESULT &&
+            window.PROCFLOW_PARITY_RESULT.passed === window.PROCFLOW_PARITY_RESULT.total, window.PROCFLOW_PARITY_RESULT || window.PROCFLOW_PARITY_FAILURES);
+        record('v1.7.0 layout budget fixtures (deterministic, no overlap, budgets)', window.PROCFLOW_LAYOUT_PASS === true &&
+            !!window.PROCFLOW_LAYOUT_RESULT &&
+            window.PROCFLOW_LAYOUT_RESULT.passed === window.PROCFLOW_LAYOUT_RESULT.total, window.PROCFLOW_LAYOUT_RESULT);
+    }
+    catch (err) {
+        record('v1.7.0 export-parity fixtures round-trip from both exporters', false, String(err && err.stack || err));
+        record('v1.7.0 layout budget fixtures (deterministic, no overlap, budgets)', false, String(err && err.stack || err));
+    }
     var passed = results.filter(function (r) { return r.pass; }).length;
     document.body.className = passed === results.length ? 'pass' : 'fail';
     document.getElementById('summary').textContent = passed + '/' + results.length + ' tests passed';

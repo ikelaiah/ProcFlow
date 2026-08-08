@@ -49,7 +49,8 @@ For the first stable release, see
 [RELEASE_NOTE_1.3.0.md](docs/RELEASE_NOTE_1.3.0.md). For the v1.4.0 release, see
 [RELEASE_NOTE_v1.4.0.md](docs/RELEASE_NOTE_v1.4.0.md). For the v1.5.0 release, see
 [RELEASE_NOTE_v1.5.0.md](docs/RELEASE_NOTE_v1.5.0.md). For the v1.6.0 release, see
-[RELEASE_NOTE_v1.6.0.md](docs/RELEASE_NOTE_v1.6.0.md).
+[RELEASE_NOTE_v1.6.0.md](docs/RELEASE_NOTE_v1.6.0.md). For the v1.7.0 release, see
+[RELEASE_NOTE_v1.7.0.md](docs/RELEASE_NOTE_v1.7.0.md).
 
 ## Start here
 
@@ -65,7 +66,7 @@ For the first stable release, see
 
 ## 60-second quick start
 
-1. Download the `v1.6.0` archive from
+1. Download the `v1.7.0` archive from
    [GitHub Releases](https://github.com/ikelaiah/ProcFlow/releases) or clone
    this repository.
 2. Extract the complete archive. Keep `index.html`, `styles.css`, `dist/`, and
@@ -132,7 +133,7 @@ statements.
    analysis to another engineer.
 
 ProcFlow imports SQL text, not report-definition files. SSRS/RDL import is on
-the roadmap; for v1.6.0, paste or export the dataset SQL itself.
+the roadmap; for v1.7.0, paste or export the dataset SQL itself.
 
 ## What ProcFlow can show
 
@@ -213,7 +214,7 @@ than silently disappearing from the diagram.
 
 ## Supported SQL
 
-ProcFlow v1.6.0 recognises:
+ProcFlow v1.7.0 recognises:
 
 - Microsoft T-SQL
 - IBM DB2 SQL PL
@@ -224,7 +225,7 @@ Supported inputs include procedures, functions, triggers, views, plain SQL
 statements, report dataset queries, and multi-object scripts where those object
 types apply to the selected dialect.
 
-Dialect-specific v1.6.0 coverage includes:
+Dialect-specific v1.7.0 coverage includes:
 
 - **T-SQL:** mixed one-line and block `IF`/`WHILE` control flow (single
   statement and `BEGIN`/`END` bodies in one AST), labelled `GOTO` and labels
@@ -274,7 +275,10 @@ The **Export** menu provides:
 - **Copy narration prompt** — copy a prompt containing diagram structure and
   source SQL.
 - **Save SVG** — download the rendered diagram.
-- **Save draw.io** — download editable native `.drawio` XML.
+- **Save draw.io** — download editable native `.drawio` XML, placed by a
+  deterministic, data-flow-aware layered layout. Exporting the same SQL always
+  produces the same coordinates, with temp-table data-flow edges routed in a
+  dedicated lane.
 
 The narration prompt is never submitted automatically. It reaches another
 system only if a user pastes it there. Review organisational policy before
@@ -287,7 +291,7 @@ endorsed by draw.io.
 
 ### Quick answers
 
-| Question | ProcFlow v1.6.0 behavior |
+| Question | ProcFlow v1.7.0 behavior |
 |---|---|
 | Is SQL uploaded? | No. Analysis and rendering happen in the browser tab. |
 | Does it connect to a database? | No. There is no driver, connection string, or query execution. |
@@ -321,7 +325,7 @@ network-submission code. The only bundled third-party runtime is the pinned
 Mermaid 10.9.1 renderer. Its MIT licence is stored at
 `vendor/mermaid/LICENSE`.
 
-The SHA-256 of `vendor/mermaid/mermaid.min.js` in v1.6.0 is:
+The SHA-256 of `vendor/mermaid/mermaid.min.js` in v1.7.0 is:
 
 ```text
 61B335A46DF05A7CE1C98378F60E5F3E77A7FB608A1056997E8A649304A936D6
@@ -332,7 +336,7 @@ so the release checksum remains reproducible across operating systems.
 
 ### Guidance for security review
 
-1. Review and pin the `v1.6.0` tag or its exact commit.
+1. Review and pin the `v1.7.0` tag or its exact commit.
 2. Verify the vendored Mermaid checksum.
 3. Review the runtime files listed above.
 4. Open the reviewed files locally or serve them from an approved internal
@@ -370,8 +374,10 @@ and contains no automatic data-submission path.
 - Some vendor-specific table expressions might not be detected.
 - Temporary-table data flow is shown within one object; cross-object temp
   flow, synonym, linked-server, and cross-database resolution is lightweight.
-- SSRS/RDL files are not imported in v1.6.0.
-- Large draw.io exports can require manual rearrangement.
+- SSRS/RDL files are not imported in v1.7.0.
+- draw.io layout is deterministic for the documented graph classes at
+  documented size limits; very large or non-planar graphs are laid out without
+  overlapping boxes and reported honestly rather than claimed crossing-free.
 
 Always confirm critical dependencies, execution paths, transaction behavior,
 and security conclusions against the original SQL and target database.
@@ -436,16 +442,19 @@ Then open:
 - `http://127.0.0.1:8000/tests/ui.html` — browser interaction and local-runtime
   tests
 
-The v1.6.0 baseline is:
+The v1.7.0 baseline is:
 
-- 204 golden and boundary assertions
+- 206 golden and boundary assertions
 - 400 deterministic mutation cases
 - 16 browser interaction tests
+- 20 export-parity checks (10 fixtures × TD + LR), 11 layout-budget fixtures,
+  and 100 % export-traceability on the export fixtures
 
 Fixture-corpus accuracy metrics (attribution, unresolved-token, tail-unconsumed,
-fallback, opaque-dynamic, semantic-edge coverage, provenance, and
-region-diagnostic-to-span ratios) are published from the checked-in golden
-corpus in [docs/metrics-v1.6.0.json](docs/metrics-v1.6.0.json). Generation is
+fallback, opaque-dynamic, semantic-edge coverage, provenance,
+region-diagnostic-to-span, export-parity, export-traceability, and
+layout-budget ratios) are published from the checked-in golden
+corpus in [docs/metrics-v1.7.0.json](docs/metrics-v1.7.0.json). Generation is
 deterministic and fixture-only — no user inputs or runtime telemetry are
 collected — and CI refuses to merge when the snapshot is stale. Regenerate with
 `npm run metrics:write`.
@@ -478,6 +487,7 @@ docs/
 ├── PR_NOTE_1.4.0.md
 ├── PR_NOTE_1.5.0.md
 ├── PR_NOTE_1.6.0.md
+├── PR_NOTE_1.7.0.md
 ├── RELEASE_NOTE_1.1.0.md
 ├── RELEASE_NOTE_1.2.0.md
 ├── RELEASE_NOTE_1.3.0.md
@@ -488,14 +498,16 @@ docs/
 ├── RELEASE_NOTE_v1.4.0.md
 ├── RELEASE_NOTE_v1.5.0.md
 ├── RELEASE_NOTE_v1.6.0.md
-└── metrics-v1.6.0.json   # deterministic fixture-only accuracy metrics snapshot
+├── RELEASE_NOTE_v1.7.0.md
+└── metrics-v1.7.0.json   # deterministic fixture-only accuracy metrics snapshot
 examples/
 ├── dbo.v110_demo.sql    # per-release outcome demos
 ├── dbo.v120_demo.sql
 ├── dbo.v130_demo.sql
 ├── dbo.v140_demo.sql
 ├── dbo.v150_demo.sql
-└── dbo.v160_demo.sql    # v1.6.0: honest measurement demo
+├── dbo.v160_demo.sql
+└── dbo.v170_demo.sql    # v1.7.0: clear deterministic exports demo
 scripts/
 ├── file-smoke.mjs    # dependency-free local-file release smoke test
 └── metrics.mjs       # generate/verify the fixture-corpus metric snapshot
@@ -518,6 +530,7 @@ tests/
 ├── fixtures.ts
 ├── tsql-fixtures.ts
 ├── boundary.ts
+├── parity.ts
 ├── tests.ts
 ├── fuzz.ts
 ├── ui-tests.ts
@@ -556,12 +569,12 @@ Then verify:
 3. Generated `dist/` files match their TypeScript sources.
 4. The Mermaid SHA-256 matches the value in this README and the workflow.
 5. `npm run metrics` reports the metric snapshot is current.
-6. `RELEASE_NOTE_v1.6.0.md` matches the final tag contents.
+6. `RELEASE_NOTE_v1.7.0.md` matches the final tag contents.
 7. The complete archive opens locally with `index.html`.
-8. The tag is named `v1.6.0`.
+8. The tag is named `v1.7.0`.
 
-The release can then be created manually from the `v1.6.0` tag using
-[RELEASE_NOTE_v1.6.0.md](docs/RELEASE_NOTE_v1.6.0.md).
+The release can then be created manually from the `v1.7.0` tag using
+[RELEASE_NOTE_v1.7.0.md](docs/RELEASE_NOTE_v1.7.0.md).
 
 ## Roadmap after v1.0.0
 

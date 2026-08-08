@@ -488,11 +488,17 @@ function buildGraph(ast, header, opts) {
            write edges. */
         return 'control';
     }
-    function add(shape, text, cls, source) {
+    function add(shape, text, cls, source, lines, reason) {
         var id = 'n' + (++seq);
-        nodes.push({ id: id, shape: shape, text: (text && String(text).trim()) || '…',
+        var label = (text && String(text).trim()) || '…';
+        var structured = lines && lines.length
+            ? lines.map(function (l) { return String(l).trim(); }).filter(function (l) { return l.length > 0; })
+            : undefined;
+        nodes.push({ id: id, shape: shape, text: structured ? structured.join('\n') : label,
             cls: cls, source: source || null,
-            provenance: source ? 'source' : 'synthetic' });
+            lines: structured,
+            provenance: source ? 'source' : 'synthetic',
+            reason: source ? undefined : reason });
         return id;
     }
     function link(from, to, label, style, kind) {
@@ -965,7 +971,7 @@ function buildGraph(ast, header, opts) {
                 if (run.length > 1) {
                     var runSpan = { start: run[0].toks[0].pos,
                         end: run[run.length - 1].toks[run[run.length - 1].toks.length - 1].end };
-                    var id = add('rect', run.map(textOf).join(''), 'stmt', runSpan);
+                    var id = add('rect', run.map(textOf).join('\n'), 'stmt', runSpan, run.map(textOf));
                     stats.stmt += run.length;
                     if (statementReachable) {
                         /* Temp flow across a grouped run: reads wire from pre-run
@@ -1051,7 +1057,7 @@ function buildGraph(ast, header, opts) {
         switch (st.type) {
             case 'block': {
                 if (st.atomic && dialect === 'db2') {
-                    var am = add('marker', 'BEGIN ATOMIC · rollback scope', 'try');
+                    var am = add('marker', 'BEGIN ATOMIC · rollback scope', 'try', null, null, 'DB2 ATOMIC block rollback scope');
                     var innerA = emitList(st.body, ctx, depth + 1);
                     if (innerA.entry)
                         link(am, innerA.entry);
@@ -1063,7 +1069,7 @@ function buildGraph(ast, header, opts) {
                         var unwind = nd0 && (/Exit compound block/.test(nd0.text) || /Undo and exit/.test(nd0.text));
                         if (unwind) {
                             if (!rb)
-                                rb = add('round', 'Implicit rollback · ATOMIC block', 'err');
+                                rb = add('round', 'Implicit rollback · ATOMIC block', 'err', null, null, 'implicit DB2 ATOMIC rollback after UNDO/EXIT handler');
                             link(ex0.id, rb, ex0.label || 'undo');
                         }
                         else
@@ -1238,7 +1244,7 @@ function buildGraph(ast, header, opts) {
             case 'try': {
                 stats.cat += st.handlers.length || 1;
                 var tstart = add('marker', dialect === 'tsql' ? 'BEGIN TRY' :
-                    (dialect === 'plpgsql' ? 'BEGIN exception block · subtransaction' : 'BEGIN block'), 'try');
+                    (dialect === 'plpgsql' ? 'BEGIN exception block · subtransaction' : 'BEGIN block'), 'try', null, null, 'exception-protected region entry');
                 var mark = nodes.length;
                 var exceptionCtx = dialect === 'plpgsql'
                     ? { parent: ctx, handlers: [], handlerExits: [], pgSubtransaction: true }
@@ -1278,7 +1284,7 @@ function buildGraph(ast, header, opts) {
                     var catchText = lab2 === 'CATCH' ? 'BEGIN CATCH' : ('WHEN ' + lab2);
                     if (dialect === 'tsql' && lab2 === 'CATCH' && currentXactAbort(ctx) === true)
                         catchText += ' · XACT_ABORT ON at TRY entry; inspect XACT_STATE';
-                    var cm = add('marker', catchText, 'catch');
+                    var cm = add('marker', catchText, 'catch', null, null, 'exception handler entry');
                     if (lab2 !== 'CATCH' && dialect !== 'tsql')
                         nodes[nodes.length - 1].text = 'EXCEPTION WHEN ' + lab2;
                     handlerMarkers.push(cm);
@@ -1302,7 +1308,7 @@ function buildGraph(ast, header, opts) {
                         }
                     });
                     if (unknownRaisers.length && handlerMarkers.length > 1) {
-                        junction = add('marker', 'on error', 'catch');
+                        junction = add('marker', 'on error', 'catch', null, null, 'exception fan-in junction');
                         unknownRaisers.forEach(function (id) { link(id, junction, '', 'dotted'); });
                         handlerMarkers.forEach(function (id, index) {
                             link(junction, id, handlerLabels[index], 'dotted');
@@ -1323,7 +1329,7 @@ function buildGraph(ast, header, opts) {
                 }
                 else {
                     if (fanIn && raisers.length && handlerMarkers.length > 1)
-                        junction = add('marker', 'on error', 'catch');
+                        junction = add('marker', 'on error', 'catch', null, null, 'exception fan-in junction');
                     handlerMarkers.forEach(function (cm, index) {
                         if (junction) {
                             link(junction, cm, handlerLabels[index] === 'CATCH' ? '' : handlerLabels[index], 'dotted');
@@ -1346,9 +1352,11 @@ function buildGraph(ast, header, opts) {
                 for (var hbIndex = 0; hbIndex < st.handlers.length; hbIndex++) {
                     var handlerScopeMark = nodes.length;
                     var rollbackMarker = null;
-                    if (dialect === 'plpgsql')
-                        rollbackMarker = add('marker', 'Implicit rollback · ' + clip(handlerLabels[hbIndex], 32) +
-                            '\u0001Persistent changes undone · variables preserved', 'tran');
+                    if (dialect === 'plpgsql') {
+                        var rollbackLines = ['Implicit rollback · ' + clip(handlerLabels[hbIndex], 32),
+                            'Persistent changes undone · variables preserved'];
+                        rollbackMarker = add('marker', rollbackLines.join('\n'), 'tran', null, rollbackLines, 'implicit PL/pgSQL subtransaction rollback');
+                    }
                     var cb2 = emitList(st.handlers[hbIndex].body, handlerCtx, depth + 1);
                     mergeTempsMulti(tryTemps, cb2.endTemps);
                     if (handlerReachable[hbIndex] && cb2.entry) {
@@ -1388,7 +1396,7 @@ function buildGraph(ast, header, opts) {
                 var terminalText = st.kind === 'CONTINUE'
                     ? 'Resume after raising statement'
                     : (st.kind === 'UNDO' ? 'Undo and exit compound block' : 'Exit compound block');
-                var terminal = add('marker', terminalText, st.kind === 'CONTINUE' ? 'flowctl' : 'catch');
+                var terminal = add('marker', terminalText, st.kind === 'CONTINUE' ? 'flowctl' : 'catch', null, null, 'DB2 handler terminal action');
                 joinExits(hb && hb.entry ? hb.exits : [{ id: hm }], terminal);
                 if (ctx) {
                     var handlerFlow = {
@@ -1440,7 +1448,7 @@ function buildGraph(ast, header, opts) {
                             link(dq, L.cond, 'yes');
                     }
                     else if (st.target) {
-                        var uq = add('rect', 'Unresolved label: ' + st.target, 'flowctl');
+                        var uq = add('rect', 'Unresolved label: ' + st.target, 'flowctl', null, null, 'unresolved ' + word.split(' ')[0].toLowerCase() + ' target');
                         link(dq, uq, 'goto', 'dotted');
                     }
                     return { entry: dq, exits: [{ id: dq, label: 'no' }] };
@@ -1453,7 +1461,7 @@ function buildGraph(ast, header, opts) {
                         link(bn, L.cond, 'continue');
                 }
                 else if (st.target) {
-                    var ub = add('rect', 'Unresolved label: ' + st.target, 'flowctl');
+                    var ub = add('rect', 'Unresolved label: ' + st.target, 'flowctl', null, null, 'unresolved ' + word.split(' ')[0].toLowerCase() + ' target');
                     link(bn, ub, 'goto', 'dotted');
                 }
                 return { entry: bn, exits: [] };
@@ -1474,7 +1482,7 @@ function buildGraph(ast, header, opts) {
     var startText = header.name
         ? header.name + (header.params ? '(' + clip(header.params, 44) + ')' : '')
         : (header.kind ? header.kind.toLowerCase() : 'Script start');
-    var start = add('round', startText, 'start');
+    var start = add('round', startText, 'start', null, null, 'diagram entry');
     var head = start;
     if (header.gate && header.gate.length) { /* SQLite trigger WHEN clause */
         stats.branch++;
@@ -1483,7 +1491,7 @@ function buildGraph(ast, header, opts) {
         head = gd;
     }
     var body = emitList(ast, null, 1);
-    var end = add('round', 'End', 'start');
+    var end = add('round', 'End', 'start', null, null, 'diagram exit');
     if (head !== start) {
         if (body.entry)
             link(head, body.entry, 'yes');
@@ -1503,7 +1511,7 @@ function buildGraph(ast, header, opts) {
             link(gotos[g2].from, labels[gotos[g2].to], 'goto', 'dotted');
     for (var g3 = 0; g3 < gotos.length; g3++) {
         if (!labels[gotos[g3].to]) {
-            var gun = add('rect', 'Unresolved label: ' + gotos[g3].label, 'flowctl');
+            var gun = add('rect', 'Unresolved label: ' + gotos[g3].label, 'flowctl', null, null, 'unresolved GOTO target');
             link(gotos[g3].from, gun, 'goto', 'dotted');
         }
     }
@@ -1714,16 +1722,22 @@ function splitSqlObjects(sql, fileName) {
 }
 function dependencyGraph(objects) {
     var nodes = [], edges = [], ids = {}, ext = {}, seq = 0;
-    function add(text, cls, source, objectId, provenance) {
+    function add(text, cls, source, objectId, provenance, lines, reason) {
         var id = 'd' + (++seq);
-        nodes.push({ id: id, shape: cls === 'src' ? 'io' : 'rect', text: text, cls: cls,
+        var structured = lines && lines.length
+            ? lines.map(function (l) { return String(l).trim(); }).filter(function (l) { return l.length > 0; })
+            : undefined;
+        nodes.push({ id: id, shape: cls === 'src' ? 'io' : 'rect', text: structured ?
+                structured.join('\n') : text, cls: cls,
             source: source || null, objectId: objectId || null,
+            lines: structured,
+            reason: reason || undefined,
             provenance: provenance || (source ? 'source' : (objectId ? 'external' : 'synthetic')) });
         return id;
     }
     objects.forEach(function (o) {
         var cls = o.kind === 'VIEW' ? 'cte' : (o.kind === 'SCRIPT' ? 'final' : 'call');
-        ids[o.name.toUpperCase()] = add(o.name + '\u0001' + o.kind, cls, o.span, o.id);
+        ids[o.name.toUpperCase()] = add(o.name, cls, o.span, o.id, undefined, [o.name, o.kind]);
     });
     function target(name, type) {
         var known = ids[name.toUpperCase()];
@@ -1736,11 +1750,11 @@ function dependencyGraph(objects) {
                last-part label. Unmatched object targets are external; temp tables
                are workspace-internal and remain synthetic. */
             if (name.charAt(0) === '#') {
-                ext[key] = add(name, 'src', null, null, 'synthetic');
+                ext[key] = add(name, 'src', null, null, 'synthetic', undefined, 'temporary table placeholder');
             }
             else {
                 var remote = name.split('.').length >= 3;
-                ext[key] = add(remote ? 'external: ' + name : name, type === 'call' ? 'call' : 'src', null, null, 'external');
+                ext[key] = add(remote ? 'external: ' + name : name, type === 'call' ? 'call' : 'src', null, name, 'external');
             }
         }
         return ext[key];

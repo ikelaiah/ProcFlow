@@ -454,7 +454,12 @@
       el.setAttribute('role','button');
       var open=function(e){
         e.stopPropagation();
-        if(node.objectId){
+        /* External nodes carry their complete identity in objectId, but only
+           objects in the current estate are navigable; external/temp placeholders
+           fall back to source selection. */
+        var navigable=node.objectId&&estate&&
+          estate.objects.some(function(o){return o.id===node.objectId;});
+        if(navigable){
           activeObjectId=node.objectId;
           var object=activeObject();
           loadObjectSource(object);
