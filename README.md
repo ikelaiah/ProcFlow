@@ -50,7 +50,8 @@ For the first stable release, see
 [RELEASE_NOTE_v1.4.0.md](docs/RELEASE_NOTE_v1.4.0.md). For the v1.5.0 release, see
 [RELEASE_NOTE_v1.5.0.md](docs/RELEASE_NOTE_v1.5.0.md). For the v1.6.0 release, see
 [RELEASE_NOTE_v1.6.0.md](docs/RELEASE_NOTE_v1.6.0.md). For the v1.7.0 release, see
-[RELEASE_NOTE_v1.7.0.md](docs/RELEASE_NOTE_v1.7.0.md).
+[RELEASE_NOTE_v1.7.0.md](docs/RELEASE_NOTE_v1.7.0.md). For the v1.8.0 release, see
+[RELEASE_NOTE_v1.8.0.md](docs/RELEASE_NOTE_v1.8.0.md).
 
 ## Start here
 
@@ -66,7 +67,7 @@ For the first stable release, see
 
 ## 60-second quick start
 
-1. Download the `v1.7.0` archive from
+1. Download the `v1.8.0` archive from
    [GitHub Releases](https://github.com/ikelaiah/ProcFlow/releases) or clone
    this repository.
 2. Extract the complete archive. Keep `index.html`, `styles.css`, `dist/`, and
@@ -133,7 +134,7 @@ statements.
    analysis to another engineer.
 
 ProcFlow imports SQL text, not report-definition files. SSRS/RDL import is on
-the roadmap; for v1.7.0, paste or export the dataset SQL itself.
+the roadmap; for v1.8.0, paste or export the dataset SQL itself.
 
 ## What ProcFlow can show
 
@@ -214,7 +215,7 @@ than silently disappearing from the diagram.
 
 ## Supported SQL
 
-ProcFlow v1.7.0 recognises:
+ProcFlow v1.8.0 recognises:
 
 - Microsoft T-SQL
 - IBM DB2 SQL PL
@@ -225,7 +226,7 @@ Supported inputs include procedures, functions, triggers, views, plain SQL
 statements, report dataset queries, and multi-object scripts where those object
 types apply to the selected dialect.
 
-Dialect-specific v1.7.0 coverage includes:
+Dialect-specific v1.8.0 coverage includes:
 
 - **T-SQL:** mixed one-line and block `IF`/`WHILE` control flow (single
   statement and `BEGIN`/`END` bodies in one AST), labelled `GOTO` and labels
@@ -260,12 +261,39 @@ low-confidence warning.
 ## Importing SQL
 
 **Import SQL files** accepts multiple `.sql`, `.ddl`, and `.txt` files. Files
-are read into memory by the current browser tab; they are not uploaded or
-persisted.
+are read into memory by the current browser tab; they are not uploaded and are
+not persisted automatically.
 
 Multi-object scripts are split into selectable objects. If the split cannot be
 made confidently, ProcFlow keeps the input as one script and reports the
 uncertainty.
+
+## Workspace
+
+The **Workspace** menu keeps your work usable across sessions, entirely on your
+terms:
+
+- **Save to this browser** persists the current workspace (files plus analysis
+  options) to this browser's `localStorage`. This is strictly opt-in — nothing
+  is written or restored on load.
+- **Restore saved workspace** replays the saved files and options into an
+  identical analysis.
+- **Export workspace file** / **Import workspace file** transfer a workspace as
+  portable JSON.
+- **Forget saved workspace** removes the local copy explicitly.
+
+Saved workspaces are versioned (so future releases can migrate them) and, if
+corrupt or unreadable, are recovered by starting fresh rather than crashing.
+
+## Dependency filtering
+
+In **Object dependencies** scope, the **Filter dependencies** menu offers
+presentation-only filters over the estate diagram: show/hide **Reads**,
+**Writes**, and **Calls** edges; show/hide **External objects** and **Temp
+tables** nodes; and a **Focus** box that keeps an object and its direct
+neighbours. Filtering derives a filtered view at render time and never changes
+the underlying analysis graph, so confidence, coverage, diagnostics, and the
+reported stats stay exactly as analysed.
 
 ## Exporting and sharing
 
@@ -291,7 +319,7 @@ endorsed by draw.io.
 
 ### Quick answers
 
-| Question | ProcFlow v1.7.0 behavior |
+| Question | ProcFlow v1.8.0 behavior |
 |---|---|
 | Is SQL uploaded? | No. Analysis and rendering happen in the browser tab. |
 | Does it connect to a database? | No. There is no driver, connection string, or query execution. |
@@ -299,7 +327,8 @@ endorsed by draw.io.
 | Is there analytics or telemetry? | No. |
 | Is internet access required? | No for local or internally hosted use. |
 | Are imported files uploaded? | No. The browser File API reads them into the current tab. |
-| Is SQL retained after closing the tab? | No. ProcFlow does not use cookies, `localStorage`, `sessionStorage`, or IndexedDB. |
+| Is SQL retained after closing the tab? | No by default. ProcFlow does not use cookies, `sessionStorage`, or IndexedDB, and does not write to `localStorage` on load. A workspace is kept across sessions only when you explicitly choose **Save to this browser** in the Workspace menu. |
+| Is a saved workspace stored on this computer? | Only if you choose **Save to this browser**. It is written to this browser's `localStorage`, is local-only, versioned, exportable to a JSON file, and removed by **Forget saved workspace** or by clearing browser site data. |
 | Does ProcFlow write to the clipboard automatically? | No. Clipboard writes follow an explicit copy action. |
 | Are exports local? | Yes. SVG and draw.io files are generated in memory and downloaded by the browser. |
 | Does it call an AI service? | No. It can copy a narration prompt but never submits it. |
@@ -316,6 +345,7 @@ dist/src/dialects.js
 dist/src/lineage.js
 dist/src/ir.js
 dist/src/exporters.js
+dist/src/workspace.js
 dist/src/app.js
 vendor/mermaid/mermaid.min.js
 ```
@@ -325,7 +355,13 @@ network-submission code. The only bundled third-party runtime is the pinned
 Mermaid 10.9.1 renderer. Its MIT licence is stored at
 `vendor/mermaid/LICENSE`.
 
-The SHA-256 of `vendor/mermaid/mermaid.min.js` in v1.7.0 is:
+The opt-in persistence module (`dist/src/workspace.js`) is the only runtime
+that touches browser storage, and it does so only through explicit
+**Workspace** menu actions (Save / Restore / Forget) — never on load. Its
+import/export uses the browser download API, which also requires an explicit
+action.
+
+The SHA-256 of `vendor/mermaid/mermaid.min.js` in v1.8.0 is:
 
 ```text
 61B335A46DF05A7CE1C98378F60E5F3E77A7FB608A1056997E8A649304A936D6
@@ -336,7 +372,7 @@ so the release checksum remains reproducible across operating systems.
 
 ### Guidance for security review
 
-1. Review and pin the `v1.7.0` tag or its exact commit.
+1. Review and pin the `v1.8.0` tag or its exact commit.
 2. Verify the vendored Mermaid checksum.
 3. Review the runtime files listed above.
 4. Open the reviewed files locally or serve them from an approved internal
@@ -374,7 +410,7 @@ and contains no automatic data-submission path.
 - Some vendor-specific table expressions might not be detected.
 - Temporary-table data flow is shown within one object; cross-object temp
   flow, synonym, linked-server, and cross-database resolution is lightweight.
-- SSRS/RDL files are not imported in v1.7.0.
+- SSRS/RDL files are not imported in v1.8.0.
 - draw.io layout is deterministic for the documented graph classes at
   documented size limits; very large or non-planar graphs are laid out without
   overlapping boxes and reported honestly rather than claimed crossing-free.
@@ -442,27 +478,32 @@ Then open:
 - `http://127.0.0.1:8000/tests/ui.html` — browser interaction and local-runtime
   tests
 
-The v1.7.0 baseline is:
+The v1.8.0 baseline is:
 
-- 206 golden and boundary assertions
+- 207 golden and boundary assertions
 - 400 deterministic mutation cases
-- 16 browser interaction tests
+- 20 browser interaction tests
 - 20 export-parity checks (10 fixtures × TD + LR), 11 layout-budget fixtures,
   and 100 % export-traceability on the export fixtures
+- 13 workspace-persistence and dependency-filtering fixtures (save→reload
+  identity, schema migration, corrupt recovery, explicit clear, non-mutating
+  filters)
 
 Fixture-corpus accuracy metrics (attribution, unresolved-token, tail-unconsumed,
 fallback, opaque-dynamic, semantic-edge coverage, provenance,
-region-diagnostic-to-span, export-parity, export-traceability, and
-layout-budget ratios) are published from the checked-in golden
-corpus in [docs/metrics-v1.7.0.json](docs/metrics-v1.7.0.json). Generation is
+region-diagnostic-to-span, export-parity, export-traceability, layout-budget,
+and workspace pass-rate ratios) are published from the checked-in golden
+corpus in [docs/metrics-v1.8.0.json](docs/metrics-v1.8.0.json). Generation is
 deterministic and fixture-only — no user inputs or runtime telemetry are
 collected — and CI refuses to merge when the snapshot is stale. Regenerate with
 `npm run metrics:write`.
 
 GitHub Actions installs dependencies, type-checks, builds, verifies generated
-files, runs the local-file smoke test, checks that the runtime remains
-local-only, verifies the metric snapshot, and runs all three served browser
-suites on every push and pull request.
+files, runs the local-file smoke test (including the opt-in workspace
+assertion), checks that the runtime remains local-only (no external URLs or
+network APIs, and browser storage confined to the opt-in persistence module),
+verifies the metric snapshot, and runs all three served browser suites on every
+push and pull request.
 
 ### Project structure
 
@@ -488,6 +529,7 @@ docs/
 ├── PR_NOTE_1.5.0.md
 ├── PR_NOTE_1.6.0.md
 ├── PR_NOTE_1.7.0.md
+├── PR_NOTE_1.8.0.md
 ├── RELEASE_NOTE_1.1.0.md
 ├── RELEASE_NOTE_1.2.0.md
 ├── RELEASE_NOTE_1.3.0.md
@@ -499,7 +541,8 @@ docs/
 ├── RELEASE_NOTE_v1.5.0.md
 ├── RELEASE_NOTE_v1.6.0.md
 ├── RELEASE_NOTE_v1.7.0.md
-└── metrics-v1.7.0.json   # deterministic fixture-only accuracy metrics snapshot
+├── RELEASE_NOTE_v1.8.0.md
+└── metrics-v1.8.0.json   # deterministic fixture-only accuracy metrics snapshot
 examples/
 ├── dbo.v110_demo.sql    # per-release outcome demos
 ├── dbo.v120_demo.sql
@@ -507,7 +550,8 @@ examples/
 ├── dbo.v140_demo.sql
 ├── dbo.v150_demo.sql
 ├── dbo.v160_demo.sql
-└── dbo.v170_demo.sql    # v1.7.0: clear deterministic exports demo
+├── dbo.v170_demo.sql    # v1.7.0: clear deterministic exports demo
+└── dbo.v180_demo.sql    # v1.8.0: usable local workspace demo
 scripts/
 ├── file-smoke.mjs    # dependency-free local-file release smoke test
 └── metrics.mjs       # generate/verify the fixture-corpus metric snapshot
@@ -518,6 +562,7 @@ src/
 ├── lineage.ts        # CTE and query dependency extraction
 ├── ir.ts             # graphs, diagnostics, confidence, and estate analysis
 ├── exporters.ts      # Mermaid, draw.io, and narration output
+├── workspace.ts      # opt-in persistence + presentation-only dependency filtering
 └── app.ts            # browser UI and workspace interaction
 dist/                 # generated JavaScript and source maps
 ├── src/
@@ -531,6 +576,7 @@ tests/
 ├── tsql-fixtures.ts
 ├── boundary.ts
 ├── parity.ts
+├── workspace.ts
 ├── tests.ts
 ├── fuzz.ts
 ├── ui-tests.ts
@@ -569,12 +615,13 @@ Then verify:
 3. Generated `dist/` files match their TypeScript sources.
 4. The Mermaid SHA-256 matches the value in this README and the workflow.
 5. `npm run metrics` reports the metric snapshot is current.
-6. `RELEASE_NOTE_v1.7.0.md` matches the final tag contents.
-7. The complete archive opens locally with `index.html`.
-8. The tag is named `v1.7.0`.
+6. `RELEASE_NOTE_v1.8.0.md` matches the final tag contents.
+7. The complete archive opens locally with `index.html`, and the local-file
+   smoke test reports the opt-in workspace assertion.
+8. The tag is named `v1.8.0`.
 
-The release can then be created manually from the `v1.7.0` tag using
-[RELEASE_NOTE_v1.7.0.md](docs/RELEASE_NOTE_v1.7.0.md).
+The release can then be created manually from the `v1.8.0` tag using
+[RELEASE_NOTE_v1.8.0.md](docs/RELEASE_NOTE_v1.8.0.md).
 
 ## Roadmap after v1.0.0
 
@@ -585,6 +632,7 @@ The release can then be created manually from the `v1.7.0` tag using
 5. Accept database catalogue metadata for more accurate object resolution.
 6. Add column-level lineage where it can be resolved safely.
 7. Add optional local workspace persistence and dependency filtering.
+   **Delivered in v1.8.0.**
 8. Separate graph, transaction, and estate-analysis internals while preserving
    the v1.0.0 behavior through golden tests. **Delivered in v1.1.0.**
 

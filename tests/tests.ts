@@ -886,6 +886,21 @@
       false,String(err&&err.stack||err));
   }
 
+  /* v1.8.0: usable local workspace — persistence round-trip, migration,
+     corrupt recovery, explicit clearing, and presentation-only dependency
+     filtering run ahead in tests/workspace.ts; gate the whole golden page on
+     them. */
+  try{
+    record('v1.8.0 workspace persistence, migration, clear, and filter fixtures',
+      window.PROCFLOW_WORKSPACE_PASS===true&&
+        !!window.PROCFLOW_WORKSPACE_RESULT&&
+        window.PROCFLOW_WORKSPACE_RESULT.passed===window.PROCFLOW_WORKSPACE_RESULT.total,
+      window.PROCFLOW_WORKSPACE_RESULT);
+  }catch(err){
+    record('v1.8.0 workspace persistence, migration, clear, and filter fixtures',
+      false,String(err&&err.stack||err));
+  }
+
   var passed=results.filter(function(r){return r.pass;}).length;
   document.body.className=passed===results.length?'pass':'fail';
   document.getElementById('summary').textContent=passed+'/'+results.length+' tests passed';

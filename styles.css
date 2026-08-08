@@ -192,6 +192,18 @@ input[type=checkbox]{accent-color:var(--marigold);width:14px;height:14px}
 .settings-panel{display:grid;gap:4px}
 .settings-panel .opt{padding:7px 8px;border-radius:3px;white-space:nowrap}
 .settings-panel .opt:hover{background:#20333f;color:var(--ink)}
+.workspace-actions{display:grid;gap:3px;min-width:250px}
+.filter-panel{min-width:230px}
+.filter-panel .opt{white-space:normal}
+.filter-panel .filter-focus input{
+  width:100%;margin-top:4px;padding:6px 7px;border:1px solid var(--rule);
+  border-radius:3px;background:#11222d;color:var(--ink);font-family:var(--mono)
+}
+.ws-note{
+  margin:0 0 6px;padding:7px 8px;border-radius:3px;background:#11222d;
+  color:var(--ink-soft,#9fb2bf);font-size:10.5px;line-height:1.45
+}
+.ws-note.has{border-left:2px solid var(--marigold)}
 .export-actions{display:grid;gap:3px}
 .menu-action{
   width:100%;padding:8px 9px;border:0;border-radius:3px;background:transparent;
