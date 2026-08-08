@@ -489,6 +489,13 @@ docs/
 ├── RELEASE_NOTE_v1.5.0.md
 ├── RELEASE_NOTE_v1.6.0.md
 └── metrics-v1.6.0.json   # deterministic fixture-only accuracy metrics snapshot
+examples/
+├── dbo.v110_demo.sql    # per-release outcome demos
+├── dbo.v120_demo.sql
+├── dbo.v130_demo.sql
+├── dbo.v140_demo.sql
+├── dbo.v150_demo.sql
+└── dbo.v160_demo.sql    # v1.6.0: honest measurement demo
 scripts/
 ├── file-smoke.mjs    # dependency-free local-file release smoke test
 └── metrics.mjs       # generate/verify the fixture-corpus metric snapshot

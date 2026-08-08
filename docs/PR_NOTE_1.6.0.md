@@ -82,6 +82,11 @@ its `cte_recursive` info annotation and a findings count of 0).
   annotations keep the findings count at 0.
 - `tests/metrics.ts` / `tests/metrics.html` / `scripts/metrics.mjs` —
   deterministic fixture-corpus metric snapshot.
+- `examples/dbo.v160_demo.sql` — release demo exercising the v1.6.0 outcomes:
+  the per-region confidence formula (resolved/approx/opaque regions measured
+  from a real script), `apply_heuristic` and `source_opaque` region warnings,
+  the info-only recursive-CTE annotation, and the coverage-cannot-inflate
+  guarantee; header records the measured 91 % (T-SQL) / 78 % (Detect) outcome.
 
 ## Verification
 
