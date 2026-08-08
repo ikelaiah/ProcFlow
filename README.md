@@ -48,7 +48,8 @@ For the first stable release, see
 [RELEASE_NOTE_1.2.0.md](docs/RELEASE_NOTE_1.2.0.md). For the v1.3.0 release, see
 [RELEASE_NOTE_1.3.0.md](docs/RELEASE_NOTE_1.3.0.md). For the v1.4.0 release, see
 [RELEASE_NOTE_v1.4.0.md](docs/RELEASE_NOTE_v1.4.0.md). For the v1.5.0 release, see
-[RELEASE_NOTE_v1.5.0.md](docs/RELEASE_NOTE_v1.5.0.md).
+[RELEASE_NOTE_v1.5.0.md](docs/RELEASE_NOTE_v1.5.0.md). For the v1.6.0 release, see
+[RELEASE_NOTE_v1.6.0.md](docs/RELEASE_NOTE_v1.6.0.md).
 
 ## Start here
 
@@ -64,7 +65,7 @@ For the first stable release, see
 
 ## 60-second quick start
 
-1. Download the `v1.5.0` archive from
+1. Download the `v1.6.0` archive from
    [GitHub Releases](https://github.com/ikelaiah/ProcFlow/releases) or clone
    this repository.
 2. Extract the complete archive. Keep `index.html`, `styles.css`, `dist/`, and
@@ -131,7 +132,7 @@ statements.
    analysis to another engineer.
 
 ProcFlow imports SQL text, not report-definition files. SSRS/RDL import is on
-the roadmap; for v1.5.0, paste or export the dataset SQL itself.
+the roadmap; for v1.6.0, paste or export the dataset SQL itself.
 
 ## What ProcFlow can show
 
@@ -181,10 +182,20 @@ to a bare last-part match.
 
 The analysis panel provides four release-safety signals:
 
-- **Confidence** combines dialect certainty, parser coverage, and diagnostics.
+- **Confidence** is a single headline number from a versioned formula
+  (v1.6.0) built on per-region signals: dialect certainty × the token-weighted
+  quality of each statement region (resolved / approximate / opaque / error) ×
+  a coverage factor. The health band (`high`/`medium`/`low`) is derived from
+  the same formula, so it can never disagree with the percentage. Coverage
+  alone never raises confidence: an object whose tokens all land in opaque
+  dynamic-SQL regions stays at 40 % even at 100 % coverage.
 - **Coverage** is the percentage of body tokens consumed by the parser.
 - **Diagnostics** reports uncertain dialects, balance errors, missing block
-  terminators, unconsumed input, invalid actions, and opaque dynamic SQL.
+  terminators, unconsumed input, invalid actions, opaque dynamic SQL, opaque
+  table expressions, and heuristic `APPLY` targets. Informational annotations
+  (for example a correctly resolved recursive CTE) are displayed separately and
+  never inflate the findings count. Document-scoped findings such as dialect
+  ambiguity carry no fabricated source span.
 - **Constructs** reports how many branches, loops, handlers, CTEs, source
   references, and temp-flow links were detected, resolved, or left opaque.
 
@@ -202,7 +213,7 @@ than silently disappearing from the diagram.
 
 ## Supported SQL
 
-ProcFlow v1.5.0 recognises:
+ProcFlow v1.6.0 recognises:
 
 - Microsoft T-SQL
 - IBM DB2 SQL PL
@@ -213,7 +224,7 @@ Supported inputs include procedures, functions, triggers, views, plain SQL
 statements, report dataset queries, and multi-object scripts where those object
 types apply to the selected dialect.
 
-Dialect-specific v1.5.0 coverage includes:
+Dialect-specific v1.6.0 coverage includes:
 
 - **T-SQL:** mixed one-line and block `IF`/`WHILE` control flow (single
   statement and `BEGIN`/`END` bodies in one AST), labelled `GOTO` and labels
@@ -276,7 +287,7 @@ endorsed by draw.io.
 
 ### Quick answers
 
-| Question | ProcFlow v1.5.0 behavior |
+| Question | ProcFlow v1.6.0 behavior |
 |---|---|
 | Is SQL uploaded? | No. Analysis and rendering happen in the browser tab. |
 | Does it connect to a database? | No. There is no driver, connection string, or query execution. |
@@ -310,7 +321,7 @@ network-submission code. The only bundled third-party runtime is the pinned
 Mermaid 10.9.1 renderer. Its MIT licence is stored at
 `vendor/mermaid/LICENSE`.
 
-The SHA-256 of `vendor/mermaid/mermaid.min.js` in v1.5.0 is:
+The SHA-256 of `vendor/mermaid/mermaid.min.js` in v1.6.0 is:
 
 ```text
 61B335A46DF05A7CE1C98378F60E5F3E77A7FB608A1056997E8A649304A936D6
@@ -321,7 +332,7 @@ so the release checksum remains reproducible across operating systems.
 
 ### Guidance for security review
 
-1. Review and pin the `v1.5.0` tag or its exact commit.
+1. Review and pin the `v1.6.0` tag or its exact commit.
 2. Verify the vendored Mermaid checksum.
 3. Review the runtime files listed above.
 4. Open the reviewed files locally or serve them from an approved internal
@@ -359,7 +370,7 @@ and contains no automatic data-submission path.
 - Some vendor-specific table expressions might not be detected.
 - Temporary-table data flow is shown within one object; cross-object temp
   flow, synonym, linked-server, and cross-database resolution is lightweight.
-- SSRS/RDL files are not imported in v1.5.0.
+- SSRS/RDL files are not imported in v1.6.0.
 - Large draw.io exports can require manual rearrangement.
 
 Always confirm critical dependencies, execution paths, transaction behavior,
@@ -425,16 +436,24 @@ Then open:
 - `http://127.0.0.1:8000/tests/ui.html` — browser interaction and local-runtime
   tests
 
-The v1.5.0 baseline is:
+The v1.6.0 baseline is:
 
-- 199 golden and boundary assertions
+- 204 golden and boundary assertions
 - 400 deterministic mutation cases
-- 14 browser interaction tests
+- 16 browser interaction tests
+
+Fixture-corpus accuracy metrics (attribution, unresolved-token, tail-unconsumed,
+fallback, opaque-dynamic, semantic-edge coverage, provenance, and
+region-diagnostic-to-span ratios) are published from the checked-in golden
+corpus in [docs/metrics-v1.6.0.json](docs/metrics-v1.6.0.json). Generation is
+deterministic and fixture-only — no user inputs or runtime telemetry are
+collected — and CI refuses to merge when the snapshot is stale. Regenerate with
+`npm run metrics:write`.
 
 GitHub Actions installs dependencies, type-checks, builds, verifies generated
 files, runs the local-file smoke test, checks that the runtime remains
-local-only, and runs all three served browser suites on every push and pull
-request.
+local-only, verifies the metric snapshot, and runs all three served browser
+suites on every push and pull request.
 
 ### Project structure
 
@@ -458,6 +477,7 @@ docs/
 ├── PR_NOTE_1.3.0.md
 ├── PR_NOTE_1.4.0.md
 ├── PR_NOTE_1.5.0.md
+├── PR_NOTE_1.6.0.md
 ├── RELEASE_NOTE_1.1.0.md
 ├── RELEASE_NOTE_1.2.0.md
 ├── RELEASE_NOTE_1.3.0.md
@@ -466,15 +486,25 @@ docs/
 ├── RELEASE_NOTE_v1.2.0.md
 ├── RELEASE_NOTE_v1.3.0.md
 ├── RELEASE_NOTE_v1.4.0.md
-└── RELEASE_NOTE_v1.5.0.md
+├── RELEASE_NOTE_v1.5.0.md
+├── RELEASE_NOTE_v1.6.0.md
+└── metrics-v1.6.0.json   # deterministic fixture-only accuracy metrics snapshot
+examples/
+├── dbo.v110_demo.sql    # per-release outcome demos
+├── dbo.v120_demo.sql
+├── dbo.v130_demo.sql
+├── dbo.v140_demo.sql
+├── dbo.v150_demo.sql
+└── dbo.v160_demo.sql    # v1.6.0: honest measurement demo
 scripts/
-└── file-smoke.mjs    # dependency-free local-file release smoke test
+├── file-smoke.mjs    # dependency-free local-file release smoke test
+└── metrics.mjs       # generate/verify the fixture-corpus metric snapshot
 src/
 ├── types.d.ts        # shared tokens, AST, graphs, diagnostics, and contracts
 ├── tokenizer.ts      # lexical analysis, escaping, balance checks, source spans
 ├── dialects.ts       # dialect detection and procedural parsing
 ├── lineage.ts        # CTE and query dependency extraction
-├── ir.ts             # graphs, diagnostics, and estate analysis
+├── ir.ts             # graphs, diagnostics, confidence, and estate analysis
 ├── exporters.ts      # Mermaid, draw.io, and narration output
 └── app.ts            # browser UI and workspace interaction
 dist/                 # generated JavaScript and source maps
@@ -484,12 +514,14 @@ tests/
 ├── index.html
 ├── fuzz.html
 ├── ui.html
+├── metrics.html
 ├── fixtures.ts
 ├── tsql-fixtures.ts
 ├── boundary.ts
 ├── tests.ts
 ├── fuzz.ts
 ├── ui-tests.ts
+├── metrics.ts
 └── dialects/
     ├── db2.ts
     ├── tsql.ts
@@ -523,12 +555,13 @@ Then verify:
 2. `git status --short` shows only the intended release changes.
 3. Generated `dist/` files match their TypeScript sources.
 4. The Mermaid SHA-256 matches the value in this README and the workflow.
-5. `RELEASE_NOTE_v1.5.0.md` matches the final tag contents.
-6. The complete archive opens locally with `index.html`.
-7. The tag is named `v1.5.0`.
+5. `npm run metrics` reports the metric snapshot is current.
+6. `RELEASE_NOTE_v1.6.0.md` matches the final tag contents.
+7. The complete archive opens locally with `index.html`.
+8. The tag is named `v1.6.0`.
 
-The release can then be created manually from the `v1.5.0` tag using
-[RELEASE_NOTE_v1.5.0.md](docs/RELEASE_NOTE_v1.5.0.md).
+The release can then be created manually from the `v1.6.0` tag using
+[RELEASE_NOTE_v1.6.0.md](docs/RELEASE_NOTE_v1.6.0.md).
 
 ## Roadmap after v1.0.0
 

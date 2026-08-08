@@ -308,6 +308,7 @@ interface StructuredQueryReference {
   span: SourceSpan | null;
   role: QueryReferenceRole;
   resolution: QueryResolution;
+  apply?: boolean;
 }
 
 interface QueryReferenceInfo {
@@ -372,10 +373,30 @@ interface ConstructCoverage {
   byKind: Record<string, {detected: number; resolved: number; opaque: number}>;
 }
 
+/* v1.6.0 per-region confidence signals. Every statement region is scored by
+   its resolution state so the headline number is honest about what was
+   verified versus estimated. */
+interface ConfidenceRegionBreakdown {
+  total: number;
+  resolved: number;
+  approx: number;
+  opaque: number;
+  error: number;
+}
+
+interface ConfidenceSignals {
+  dialect: number;
+  coverage: number;
+  regionQuality: number;
+  regionBreakdown: ConfidenceRegionBreakdown;
+}
+
 interface AnalysisResult {
   dialect: Dialect;
   detected: DialectDetection;
   confidence: number;
+  confidenceFormulaVersion: string;
+  confidenceSignals: ConfidenceSignals;
   dialectConfidence: number;
   coverage: number;
   consumedTokens: number;
@@ -499,6 +520,8 @@ interface Window {
     render(id: string, definition: string): Promise<{svg: string}>;
   };
   PROCFLOW_TSQL_FIXTURE_COUNT?: number;
+  PROCFLOW_METRICS_OUTPUT?: string;
+  PROCFLOW_METRICS_READY?: boolean;
 }
 
 declare var mermaid: Window['mermaid'];

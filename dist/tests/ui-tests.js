@@ -75,6 +75,14 @@
             pass: get('coverage-val').textContent === '100%' &&
                 /%$/.test(get('confidence-val').textContent) &&
                 /^\d+$/.test(get('diagnostic-val').textContent) });
+        results.push({ name: 'analysis health data-band derives from the confidence formula',
+            pass: (function () {
+                var pct = parseInt(get('confidence-val').textContent, 10);
+                var expected = pct >= 85 ? 'high' : pct >= 60 ? 'medium' : 'low';
+                return get('analysis-health').getAttribute('data-band') === expected;
+            })(),
+            detail: { band: get('analysis-health').getAttribute('data-band'),
+                pct: get('confidence-val').textContent } });
         results.push({ name: 'construct coverage display',
             pass: /^\d+\/\d+$/.test(get('construct-val').textContent) &&
                 /\d+ detected · \d+ resolved · \d+ opaque/.test(get('construct-note').textContent),
@@ -109,6 +117,21 @@
                 pass: parseInt(get('coverage-val').textContent, 10) < 100 &&
                     parseInt(get('diagnostic-val').textContent, 10) >= 2 &&
                     get('analysis-health').getAttribute('data-band') === 'low' });
+            get('opt-dialect').value = 'tsql';
+            get('sql').value = [
+                'CREATE PROC dbo.rec_ui AS',
+                'BEGIN',
+                '  WITH r(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM r WHERE n<10)',
+                '  SELECT n FROM r;',
+                'END'
+            ].join('\n');
+            get('sql').dispatchEvent(new Event('input'));
+            get('btn-draw').click();
+            results.push({ name: 'informational annotations do not inflate findings count',
+                pass: get('diagnostic-val').textContent === '0' &&
+                    parseInt(get('confidence-val').textContent, 10) >= 85,
+                detail: { diag: get('diagnostic-val').textContent,
+                    conf: get('confidence-val').textContent } });
             results.push({ name: 'local Mermaid runtime',
                 pass: !!w.mermaid && !Array.prototype.some.call(d.scripts, function (s) {
                     return /^https?:/i.test(s.getAttribute('src') || '');

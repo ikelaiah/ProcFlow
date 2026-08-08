@@ -271,9 +271,10 @@
         $('confidence-val').textContent = Math.round(confidence * 100) + '%';
         $('coverage-val').textContent = Math.round(coverage * 100) + '%';
         $('diagnostic-val').textContent = diagnosticCount;
-        var score = Math.min(confidence, coverage);
-        $('analysis-health').setAttribute('data-band', score >= 0.85 ? 'high' : score >= 0.6 ? 'medium' : 'low');
-        $('analysis-health').title = 'Confidence combines dialect certainty, parser coverage, and error diagnostics.';
+        /* The data-band comes from the same per-region confidence formula as the
+           headline number, so the band can never contradict the percentage. */
+        $('analysis-health').setAttribute('data-band', confidenceBand(confidence));
+        $('analysis-health').title = 'Confidence (formula v1.6.0) = dialect certainty · per-region quality · coverage factor.';
     }
     function mergeConstructCoverage(acc, cc) {
         if (!cc)
