@@ -346,6 +346,8 @@ v1.11.0, item 4 → v1.12.0.**
 
 ### v1.10.0 — Column lineage foundations
 
+**Delivered in v1.10.0.**
+
 - **Ships:** column scopes and bindings for qualified references, aliases,
   projections, CTEs, derived tables, and catalogue-backed wildcard expansion;
   expression-level provenance within one query statement; explicit ambiguous

@@ -2198,6 +2198,26 @@ function analyse(sql, opts) {
     var tempFlowEdges = (graph.stats && graph.stats.dataflow) || 0;
     for (var tfi = 0; tfi < tempFlowEdges; tfi++)
         trackC('temp_flow', true);
+    /* v1.10.0 — column lineage foundations. Every query-bearing SELECT statement
+       is analysed at column level: scopes and bindings plus explicit ambiguous
+       and opaque column references, surfaced as region-scoped diagnostics.
+       Unsupported or unresolved references never invent a binding. */
+    var columnLineages = [];
+    walkAst(ast, function (st) {
+        if (st.type !== 'stmt' || !st.toks || !st.toks.length)
+            return;
+        var csplit = splitCTEs(st.toks);
+        var cwork = csplit.ctes.length || csplit.finalStart > 0
+            ? st.toks.slice(csplit.finalStart) : st.toks;
+        var chead = cwork[0] ? cwork[0].u : '';
+        if (chead !== 'SELECT')
+            return;
+        var cl = analyseColumns(st.toks, { catalogue: opts.catalogue, dialect: dialect });
+        if (!cl)
+            return;
+        columnLineages.push(cl);
+        cl.diagnostics.forEach(function (d) { diagnostics.push(d); });
+    }, 0);
     return { dialect: dialect, detected: det, confidence: confidence,
         confidenceFormulaVersion: confidenceFormulaVersion,
         confidenceSignals: confidenceSignals,
@@ -2206,6 +2226,7 @@ function analyse(sql, opts) {
         diagnostics: diagnostics, header: header, ast: ast, mode: selectedMode,
         graph: selected, stats: selected.stats,
         mermaid: toMermaid(selected, opts.dir || 'TD'),
-        attribution: attribution, constructCoverage: constructCoverage };
+        attribution: attribution, constructCoverage: constructCoverage,
+        columns: columnLineages };
 }
 //# sourceMappingURL=ir.js.map

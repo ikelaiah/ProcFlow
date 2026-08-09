@@ -916,6 +916,22 @@
       false,String(err&&err.stack||err));
   }
 
+  /* v1.10.0: column lineage foundations — scopes and bindings for qualified
+     references, aliases, projections, CTEs, derived tables, and catalogue-backed
+     wildcard expansion; expression-level provenance; explicit ambiguous and
+     opaque column references with region-scoped diagnostics. Runs ahead in
+     tests/columns.ts; gate the whole golden page on them. */
+  try{
+    record('v1.10.0 column scopes, bindings, wildcards, and diagnostics fixtures',
+      window.PROCFLOW_COLUMN_PASS===true&&
+        !!window.PROCFLOW_COLUMN_RESULT&&
+        window.PROCFLOW_COLUMN_RESULT.passed===window.PROCFLOW_COLUMN_RESULT.total,
+      window.PROCFLOW_COLUMN_RESULT);
+  }catch(err){
+    record('v1.10.0 column scopes, bindings, wildcards, and diagnostics fixtures',
+      false,String(err&&err.stack||err));
+  }
+
   var passed=results.filter(function(r){return r.pass;}).length;
   document.body.className=passed===results.length?'pass':'fail';
   document.getElementById('summary').textContent=passed+'/'+results.length+' tests passed';
