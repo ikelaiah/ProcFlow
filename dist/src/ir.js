@@ -1803,12 +1803,26 @@ function analyseEstate(files, opts) {
     (files || []).forEach(function (file) {
         units = units.concat(splitSqlObjects(file.text, file.name));
     });
+    /* v1.11.0 — same-script column flow: definitions (view/table column lists)
+       from objects analysed earlier in the same script cross object boundaries,
+       so consumers resolve by definition instead of staying opaque. */
+    var scriptDefs = {};
     var objects = units.map(function (unit, index) {
         unit.id = 'object-' + (index + 1);
-        var result = analyse(unit.sql, opts);
+        var oopts = Object.assign({}, opts, { define: scriptDefs });
+        var result = analyse(unit.sql, oopts);
         unit.name = result.header.name || unit.name || ('Script ' + (index + 1));
         var ir = buildObjectIR(result, unit);
         ir.result = result;
+        if (result.columnFlow) {
+            Object.keys(result.columnFlow.objects).forEach(function (k) {
+                var o = result.columnFlow.objects[k];
+                if (!o || o.name.charAt(0) === '#')
+                    return; /* temps are object-local */
+                if (!scriptDefs[String(k).toUpperCase()])
+                    scriptDefs[String(k).toUpperCase()] = o;
+            });
+        }
         return ir;
     });
     var graph = dependencyGraph(objects, opts);
@@ -2218,6 +2232,48 @@ function analyse(sql, opts) {
         columnLineages.push(cl);
         cl.diagnostics.forEach(function (d) { diagnostics.push(d); });
     }, 0);
+    /* v1.11.0 — column lineage pipelines. Cross-statement column flow through
+       temp tables, transformations, views, CTEs, and catalogue-resolved object
+       boundaries. Ambiguous reaching definitions and unresolvable transformations
+       stay opaque with region-scoped `column_flow_opaque` diagnostics; the export
+       graph is a plain Graph on its own documented column layout class. */
+    var columnFlow = null;
+    var columnFlowGraph = null;
+    try {
+        columnFlow = analyseColumnFlow(ast, {
+            catalogue: opts.catalogue, dialect: dialect, sql: sql,
+            define: opts.define,
+            viewName: header.name, viewKind: header.kind,
+            viewBodyTokens: (header.kind === 'VIEW') ? bodyToks : null
+        });
+    }
+    catch (err) {
+        columnFlow = null;
+    }
+    if (columnFlow) {
+        columnFlow.diagnostics.forEach(function (d) { diagnostics.push(d); });
+        /* column-resolution constructs feed the same construct-coverage surface */
+        var cfo = columnFlow.stats.objects, cfoR = columnFlow.stats.objectsResolved, cfoO = columnFlow.stats.objectsOpaque;
+        var cfe = columnFlow.stats.edges, cfeR = columnFlow.stats.edgesResolved, cfeO = columnFlow.stats.edgesOpaque;
+        var cTotal = cfo + cfe;
+        if (cTotal > 0) {
+            var cc = constructCoverage.byKind['column_flow'] = constructCoverage.byKind['column_flow'] ||
+                { detected: 0, resolved: 0, opaque: 0 };
+            cc.detected += cTotal;
+            cc.resolved += cfoR + cfeR;
+            cc.opaque += cfoO + cfeO;
+            constructCoverage.constructs += cTotal;
+            constructCoverage.resolved += cfoR + cfeR;
+            constructCoverage.opaque += cfoO + cfeO;
+        }
+        if (columnFlow.steps.length || columnFlow.edges.length)
+            try {
+                columnFlowGraph = buildColumnGraph(columnFlow);
+            }
+            catch (err) {
+                columnFlowGraph = null;
+            }
+    }
     return { dialect: dialect, detected: det, confidence: confidence,
         confidenceFormulaVersion: confidenceFormulaVersion,
         confidenceSignals: confidenceSignals,
@@ -2227,6 +2283,7 @@ function analyse(sql, opts) {
         graph: selected, stats: selected.stats,
         mermaid: toMermaid(selected, opts.dir || 'TD'),
         attribution: attribution, constructCoverage: constructCoverage,
-        columns: columnLineages };
+        columns: columnLineages, columnFlow: columnFlow || undefined,
+        columnFlowGraph: columnFlowGraph || undefined };
 }
 //# sourceMappingURL=ir.js.map

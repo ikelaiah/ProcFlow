@@ -818,6 +818,21 @@
     catch (err) {
         record('v1.10.0 column scopes, bindings, wildcards, and diagnostics fixtures', false, String(err && err.stack || err));
     }
+    /* v1.11.0: column lineage pipelines — end-to-end column-flow edges through
+       temp tables, transformations, views, CTEs, and catalogue-resolved object
+       boundaries; ambiguous reaching definitions stay opaque; the exported
+       column-flow graph round-trips with provenance and meets its bounded column
+       layout budgets. Runs ahead in tests/column-flow.ts; gate the whole golden
+       page on them. */
+    try {
+        record('v1.11.0 column-flow pipelines, exports, and column layout fixtures', window.PROCFLOW_COLUMNFLOW_PASS === true &&
+            !!window.PROCFLOW_COLUMNFLOW_RESULT &&
+            window.PROCFLOW_COLUMNFLOW_RESULT.passed === window.PROCFLOW_COLUMNFLOW_RESULT.total &&
+            window.PROCFLOW_COLUMNFLOW_RESULT.layoutPassed === window.PROCFLOW_COLUMNFLOW_RESULT.layoutTotal, window.PROCFLOW_COLUMNFLOW_RESULT);
+    }
+    catch (err) {
+        record('v1.11.0 column-flow pipelines, exports, and column layout fixtures', false, String(err && err.stack || err));
+    }
     var passed = results.filter(function (r) { return r.pass; }).length;
     document.body.className = passed === results.length ? 'pass' : 'fail';
     document.getElementById('summary').textContent = passed + '/' + results.length + ' tests passed';

@@ -86,7 +86,11 @@
       catalogue:window.PROCFLOW_CATALOGUE_RESULT
         ?window.PROCFLOW_CATALOGUE_RESULT.total:0,
       columns:window.PROCFLOW_COLUMN_RESULT
-        ?window.PROCFLOW_COLUMN_RESULT.total:0
+        ?window.PROCFLOW_COLUMN_RESULT.total:0,
+      columnFlow:window.PROCFLOW_COLUMNFLOW_RESULT
+        ?window.PROCFLOW_COLUMNFLOW_RESULT.total:0,
+      columnLayout:window.PROCFLOW_COLUMNFLOW_RESULT
+        ?window.PROCFLOW_COLUMNFLOW_RESULT.layoutTotal:0
     },
     attributionRate:rate(attributedAll,totalTokens),
     unresolvedTokenRate:rate(unresolvedTokens,totalTokens),
@@ -130,6 +134,17 @@
     columnPassRate:window.PROCFLOW_COLUMN_RESULT
       ? rate(window.PROCFLOW_COLUMN_RESULT.passed,window.PROCFLOW_COLUMN_RESULT.total)
       : 0,
+    /* v1.11.0 column lineage pipelines: end-to-end column-flow fixtures trace
+       `SELECT col INTO #t` through transformations to outputs, ambiguous
+       reaching definitions stay opaque, and the exported column graph
+       round-trips with provenance and meets its bounded layout budgets. */
+    columnFlowPassRate:window.PROCFLOW_COLUMNFLOW_RESULT
+      ? rate(window.PROCFLOW_COLUMNFLOW_RESULT.passed,window.PROCFLOW_COLUMNFLOW_RESULT.total)
+      : 0,
+    columnLayoutPassRate:window.PROCFLOW_COLUMNFLOW_RESULT
+      ? rate(window.PROCFLOW_COLUMNFLOW_RESULT.layoutPassed,
+             window.PROCFLOW_COLUMNFLOW_RESULT.layoutTotal)
+      : 1,
     aggregate:{
       totalTokens:totalTokens,
       accountedTokens:attributedAll,

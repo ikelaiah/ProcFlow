@@ -18,7 +18,13 @@ var CANONICAL_NODE_STYLE = {
     flowctl: { mermaid: 'fill:#2a2438,stroke:#a98fd6,color:#ece4ff', fill: '#f3e8ff', stroke: '#9333ea', font: '#3b0764' },
     cte: { mermaid: 'fill:#1c2f3f,stroke:#7ea6e0,color:#dcebff', fill: '#dbeafe', stroke: '#3b82f6', font: '#172554' },
     src: { mermaid: 'fill:#1b242c,stroke:#4c6274,color:#a9bccb', fill: '#f1f5f9', stroke: '#64748b', font: '#0f172a' },
-    final: { mermaid: 'fill:#3a2c15,stroke:#e8a33d,color:#ffeccc', fill: '#fef3c7', stroke: '#d97706', font: '#451a03' }
+    final: { mermaid: 'fill:#3a2c15,stroke:#e8a33d,color:#ffeccc', fill: '#fef3c7', stroke: '#d97706', font: '#451a03' },
+    /* v1.11.0 column-flow export styles: `colstep` is a column-pipeline step and
+       `colobj` is a column-carrying object (temp table, local view, catalogue
+       boundary). Both exporters derive these from the same canonical registry,
+       so Mermaid and draw.io can never disagree about the column graph class. */
+    colstep: { mermaid: 'fill:#12302c,stroke:#3fd0b0,color:#dcfff5', fill: '#d5f5ef', stroke: '#0d9488', font: '#082f2a' },
+    colobj: { mermaid: 'fill:#2c1c3f,stroke:#b18ce8,color:#f0e6ff', fill: '#f1e6ff', stroke: '#8b5cf6', font: '#2e1065' }
 };
 var CANONICAL_EDGE_STYLE = {
     control: 'solid', exception: 'dotted', data: 'solid', dependency: 'solid', call: 'solid'

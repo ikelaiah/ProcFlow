@@ -53,7 +53,8 @@ For the first stable release, see
 [RELEASE_NOTE_v1.7.0.md](docs/RELEASE_NOTE_v1.7.0.md). For the v1.8.0 release, see
 [RELEASE_NOTE_v1.8.0.md](docs/RELEASE_NOTE_v1.8.0.md). For the v1.9.0 release, see
 [RELEASE_NOTE_v1.9.0.md](docs/RELEASE_NOTE_v1.9.0.md). For the v1.10.0 release, see
-[RELEASE_NOTE_v1.10.0.md](docs/RELEASE_NOTE_v1.10.0.md).
+[RELEASE_NOTE_v1.10.0.md](docs/RELEASE_NOTE_v1.10.0.md). For the v1.11.0 release, see
+[RELEASE_NOTE_v1.11.0.md](docs/RELEASE_NOTE_v1.11.0.md).
 
 ## Start here
 
@@ -69,7 +70,7 @@ For the first stable release, see
 
 ## 60-second quick start
 
-1. Download the `v1.10.0` archive from
+1. Download the `v1.11.0` archive from
    [GitHub Releases](https://github.com/ikelaiah/ProcFlow/releases) or clone
    this repository.
 2. Extract the complete archive. Keep `index.html`, `styles.css`, `dist/`, and
@@ -136,7 +137,7 @@ statements.
    analysis to another engineer.
 
 ProcFlow imports SQL text, not report-definition files. SSRS/RDL import is on
-the roadmap; for v1.10.0, paste or export the dataset SQL itself.
+the roadmap; for v1.11.0, paste or export the dataset SQL itself.
 
 ## What ProcFlow can show
 
@@ -199,14 +200,16 @@ The analysis panel provides four release-safety signals:
 - **Diagnostics** reports uncertain dialects, balance errors, missing block
   terminators, unconsumed input, invalid actions, opaque dynamic SQL, opaque
   table expressions, heuristic `APPLY` targets, ambiguous and opaque column
-  references (v1.10.0), and catalogue problems
+  references (v1.10.0), opaque column-flow reaching definitions across
+  statements (v1.11.0), and catalogue problems
   (malformed or conflicting catalogue data, and unproven partial matches
   reported at the exact reference). Informational annotations
   (for example a correctly resolved recursive CTE) are displayed separately and
   never inflate the findings count. Document-scoped findings such as dialect
   ambiguity carry no fabricated source span.
 - **Constructs** reports how many branches, loops, handlers, CTEs, source
-  references, and temp-flow links were detected, resolved, or left opaque.
+  references, temp-flow links, and column-flow objects and edges were detected,
+  resolved, or left opaque.
 
 Use this rule of thumb:
 
@@ -222,7 +225,7 @@ than silently disappearing from the diagram.
 
 ## Supported SQL
 
-ProcFlow v1.10.0 recognises:
+ProcFlow v1.11.0 recognises:
 
 - Microsoft T-SQL
 - IBM DB2 SQL PL
@@ -233,7 +236,7 @@ Supported inputs include procedures, functions, triggers, views, plain SQL
 statements, report dataset queries, and multi-object scripts where those object
 types apply to the selected dialect.
 
-Dialect-specific v1.10.0 coverage includes:
+Dialect-specific v1.11.0 coverage includes:
 
 - **T-SQL:** mixed one-line and block `IF`/`WHILE` control flow (single
   statement and `BEGIN`/`END` bodies in one AST), labelled `GOTO` and labels
@@ -245,7 +248,10 @@ Dialect-specific v1.10.0 coverage includes:
   savepoints (including savepoint-only recovery declared in `TRY` and rolled
   back in `CATCH`), `SET XACT_ABORT` (annotated when set inside a `CATCH`),
   invalid transaction-action termination, and temporary-table
-  producer→consumer data-flow edges with conservative branch merges.
+  producer→consumer data-flow edges with conservative branch merges, and column
+  flow across statements through temp tables (`SELECT … INTO`, `INSERT …
+  SELECT`, `CREATE TABLE`, `UPDATE … SET`), views, CTEs, and catalogue-resolved
+  boundaries (v1.11.0).
 - **DB2 SQL PL:** mixed `THEN` and `BEGIN`/`END` `IF` forms, `BEGIN ATOMIC`
   rollback scope, labelled loop control and `LEAVE`/`ITERATE` target validation,
   `FOR … CURSOR FOR` queries in the query graph, scoped handlers, and
@@ -266,9 +272,19 @@ projections, CTE and derived-table scopes, and catalogue-backed wildcard
 expansion produce exact input→output column bindings with source spans. An
 unqualified reference that matches several sources is reported as ambiguous and
 never invents a binding, and unsupported expressions (for example a scalar
-subquery) become opaque with a region-scoped diagnostic. Multi-statement
-temporary-table column flow and inter-object column flow remain on the roadmap
-(v1.11.0).
+subquery) become opaque with a region-scoped diagnostic.
+
+Since v1.11.0, column lineage flows across statements as a pipeline (README
+roadmap item 6 delivered): `SELECT col INTO #t`, `INSERT … SELECT`, `CREATE
+TABLE`, and `UPDATE … SET` transformations define an object's columns, later
+consumers bind back through them, and each produced column is traced end-to-end
+to its original source object — through temp tables, views defined earlier in
+the same script, catalogue-resolved object boundaries, and CTE scopes. When a
+reaching definition is ambiguous (a conditional write or a branch merge) the
+consumer stays explicitly opaque with a region-scoped `column_flow_opaque`
+diagnostic, and no binding is invented. The column-flow graph exports to Mermaid
+and draw.io with provenance metadata and is laid out on its own documented
+`column` graph class. Interactive column views remain scheduled for v1.13.0.
 
 Detection is automatic and can be overridden from the **Dialect** selector.
 When detection is uncertain and several dialects score equally, an explicit
@@ -368,7 +384,7 @@ endorsed by draw.io.
 
 ### Quick answers
 
-| Question | ProcFlow v1.10.0 behavior |
+| Question | ProcFlow v1.11.0 behavior |
 |---|---|
 | Is SQL uploaded? | No. Analysis and rendering happen in the browser tab. |
 | Does it connect to a database? | No. There is no driver, connection string, or query execution. |
@@ -379,7 +395,7 @@ endorsed by draw.io.
 | Is SQL retained after closing the tab? | No by default. ProcFlow does not use cookies, `sessionStorage`, or IndexedDB, and does not write to `localStorage` on load. A workspace is kept across sessions only when you explicitly choose **Save to this browser** in the Workspace menu. |
 | Is a saved workspace stored on this computer? | Only if you choose **Save to this browser**. It is written to this browser's `localStorage`, is local-only, versioned, exportable to a JSON file, and removed by **Forget saved workspace** or by clearing browser site data. |
 | Does ProcFlow write to the clipboard automatically? | No. Clipboard writes follow an explicit copy action. |
-| Are exports local? | Yes. SVG and draw.io files are generated in memory and downloaded by the browser. |
+| Are exports local? | Yes. SVG and draw.io files are generated in memory and downloaded by the browser. (Column-flow graphs export with full provenance metadata; interactive column views arrive with v1.13.0.) |
 | Does it call an AI service? | No. It can copy a narration prompt but never submits it. |
 
 ### Runtime files
@@ -413,7 +429,7 @@ import/export uses the browser download API, which also requires an explicit
 action. The catalogue module (`dist/src/catalogue.js`) parses pasted or
 imported metadata in memory only; it never reads or writes storage.
 
-The SHA-256 of `vendor/mermaid/mermaid.min.js` in v1.10.0 is:
+The SHA-256 of `vendor/mermaid/mermaid.min.js` in v1.11.0 is:
 
 ```text
 61B335A46DF05A7CE1C98378F60E5F3E77A7FB608A1056997E8A649304A936D6
@@ -424,7 +440,7 @@ so the release checksum remains reproducible across operating systems.
 
 ### Guidance for security review
 
-1. Review and pin the `v1.10.0` tag or its exact commit.
+1. Review and pin the `v1.11.0` tag or its exact commit.
 2. Verify the vendored Mermaid checksum.
 3. Review the runtime files listed above.
 4. Open the reviewed files locally or serve them from an approved internal
@@ -458,9 +474,12 @@ and contains no automatic data-submission path.
   authoritative and omitted semicolons are split by control keywords and
   statement grammar. Exceptionally malformed batches can still produce imperfect
   splits.
-- Query lineage is object-level; since v1.10.0 a single query statement also
-  reports column-level scopes and bindings, while multi-statement
-  temporary-table and inter-object column flow remain on the roadmap (v1.11.0).
+- Query lineage is object-level; a single query statement also reports
+  column-level scopes and bindings (v1.10.0), and since v1.11.0 column flow
+  crosses statements through temp tables, transformations, views, CTEs, and
+  catalogue-resolved object boundaries. Column resolution remains conservative:
+  an ambiguous reaching definition stays opaque and is never resolved by
+  invention.
 - Some vendor-specific table expressions might not be detected.
 - Temporary-table data flow is shown within one object; cross-object temp flow
   remains unresolved.
@@ -471,8 +490,9 @@ and contains no automatic data-submission path.
   candidate exists) until the catalogue proves them.
 - Columns are parsed and validated by the catalogue import and, since v1.10.0,
   drive wildcard expansion and column bindings inside a single statement.
-  Column flow across statements, objects, and CTE/view boundaries is scheduled
-  for v1.11.0.
+  Since v1.11.0, column flow also crosses statements through temp tables,
+  transformations, views, CTEs, and catalogue-resolved object boundaries;
+  interactive column views in the app are scheduled for v1.13.0.
 - SSRS/RDL files are not imported in v1.9.0.
 - draw.io layout is deterministic for the documented graph classes at
   documented size limits; very large or non-planar graphs are laid out without
@@ -541,9 +561,9 @@ Then open:
 - `http://127.0.0.1:8000/tests/ui.html` — browser interaction and local-runtime
   tests
 
-The v1.10.0 baseline is:
+The v1.11.0 baseline is:
 
-- 209 golden and boundary assertions
+- 210 golden and boundary assertions
 - 400 deterministic mutation cases
 - 22 browser interaction tests
 - 20 export-parity checks (10 fixtures × TD + LR), 11 layout-budget fixtures,
@@ -554,16 +574,21 @@ The v1.10.0 baseline is:
 - 13 catalogue fixtures (JSON and line import, synonym / linked-server /
   cross-database verification, conservative conflict and partial diagnostics,
   export metadata, workspace round-trip)
-- 18 column-lineage fixtures (qualified references, aliases, projections,
-  CTE and derived-table scopes, catalogue-backed wildcard expansion, ambiguous
-  and opaque column references with exact spans)
+- 18 single-statement column-lineage fixtures (qualified references, aliases,
+  projections, CTE and derived-table scopes, catalogue-backed wildcard
+  expansion, ambiguous and opaque column references with exact spans)
+- 15 column-flow pipeline fixtures (end-to-end `SELECT … INTO #t` traces
+  through transformations to outputs, opaque ambiguous reaching definitions,
+  same-script view and catalogue-boundary resolution, clean invariants, and
+  export parity) plus 2 column layout-budget fixtures on the documented
+  `column` graph class
 
 Fixture-corpus accuracy metrics (attribution, unresolved-token, tail-unconsumed,
 fallback, opaque-dynamic, semantic-edge coverage, provenance,
 region-diagnostic-to-span, export-parity, export-traceability, layout-budget,
-workspace, catalogue, and column pass-rate ratios) are published from the
-checked-in golden corpus in
-[docs/metrics-v1.10.0.json](docs/metrics-v1.10.0.json). Generation
+workspace, catalogue, column, and column-flow pass-rate ratios) are published
+from the checked-in golden corpus in
+[docs/metrics-v1.11.0.json](docs/metrics-v1.11.0.json). Generation
 is deterministic and fixture-only — no user inputs or runtime telemetry are
 collected — and CI refuses to merge when the snapshot is stale. Regenerate with
 `npm run metrics:write`.
@@ -616,7 +641,8 @@ docs/
 ├── RELEASE_NOTE_v1.8.0.md
 ├── RELEASE_NOTE_v1.9.0.md
 ├── RELEASE_NOTE_v1.10.0.md
-└── metrics-v1.10.0.json   # deterministic fixture-only accuracy metrics snapshot
+├── RELEASE_NOTE_v1.11.0.md
+└── metrics-v1.11.0.json   # deterministic fixture-only accuracy metrics snapshot
 examples/
 ├── dbo.v110_demo.sql    # per-release outcome demos
 ├── dbo.v120_demo.sql
@@ -627,7 +653,8 @@ examples/
 ├── dbo.v170_demo.sql    # v1.7.0: clear deterministic exports demo
 ├── dbo.v180_demo.sql    # v1.8.0: usable local workspace demo
 ├── dbo.v190_demo.sql    # v1.9.0: resolve by catalogue demo
-└── dbo.v1100_demo.sql   # v1.10.0: column lineage foundations demo
+├── dbo.v1100_demo.sql   # v1.10.0: column lineage foundations demo
+└── dbo.v1110_demo.sql   # v1.11.0: column lineage pipelines demo
 scripts/
 ├── file-smoke.mjs    # dependency-free local-file release smoke test
 └── metrics.mjs       # generate/verify the fixture-corpus metric snapshot
@@ -639,6 +666,7 @@ src/
 ├── lineage.ts        # CTE and query dependency extraction
 ├── ir.ts             # graphs, diagnostics, confidence, and estate analysis
 ├── columns.ts        # v1.10.0: single-statement column scopes and bindings
+├── columnflow.ts     # v1.11.0: cross-statement column-flow pipelines + export graph
 ├── exporters.ts      # Mermaid, draw.io, and narration output
 ├── workspace.ts      # opt-in persistence + presentation-only dependency filtering
 └── app.ts            # browser UI and workspace interaction
@@ -657,6 +685,7 @@ tests/
 ├── workspace.ts
 ├── catalogue.ts
 ├── columns.ts        # v1.10.0: column lineage foundations fixtures
+├── column-flow.ts    # v1.11.0: column-flow pipelines, export, and layout fixtures
 ├── tests.ts
 ├── fuzz.ts
 ├── ui-tests.ts
@@ -695,13 +724,13 @@ Then verify:
 3. Generated `dist/` files match their TypeScript sources.
 4. The Mermaid SHA-256 matches the value in this README and the workflow.
 5. `npm run metrics` reports the metric snapshot is current.
-6. `RELEASE_NOTE_v1.10.0.md` matches the final tag contents.
+6. `RELEASE_NOTE_v1.11.0.md` matches the final tag contents.
 7. The complete archive opens locally with `index.html`, and the local-file
    smoke test reports the opt-in workspace assertion.
-8. The tag is named `v1.10.0`.
+8. The tag is named `v1.11.0`.
 
-The release can then be created manually from the `v1.10.0` tag using
-[RELEASE_NOTE_v1.10.0.md](docs/RELEASE_NOTE_v1.10.0.md).
+The release can then be created manually from the `v1.11.0` tag using
+[RELEASE_NOTE_v1.11.0.md](docs/RELEASE_NOTE_v1.11.0.md).
 
 ## Roadmap after v1.0.0
 
@@ -712,10 +741,12 @@ The release can then be created manually from the `v1.10.0` tag using
 5. Accept database catalogue metadata for more accurate object resolution.
    **Delivered in v1.9.0.**
 6. Add column-level lineage where it can be resolved safely.
-   **Foundations delivered in v1.10.0** (column scopes, bindings, projections,
-   CTE/derived-table scopes, and catalogue-backed wildcard expansion within one
-   statement); full column-flow pipelines through temp tables and object
-   boundaries are scheduled for v1.11.0.
+   **Delivered in v1.11.0** — foundations landed in v1.10.0 (column scopes,
+   bindings, projections, CTE/derived-table scopes, and catalogue-backed
+   wildcard expansion within one statement); v1.11.0 adds the full column-flow
+   pipelines through temp tables, transformations, views, CTEs, and
+   catalogue-resolved object boundaries, plus column export metadata/styles and
+   the documented column layout class.
 7. Add optional local workspace persistence and dependency filtering.
    **Delivered in v1.8.0.**
 8. Separate graph, transaction, and estate-analysis internals while preserving
