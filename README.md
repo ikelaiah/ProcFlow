@@ -52,7 +52,8 @@ For the first stable release, see
 [RELEASE_NOTE_v1.6.0.md](docs/RELEASE_NOTE_v1.6.0.md). For the v1.7.0 release, see
 [RELEASE_NOTE_v1.7.0.md](docs/RELEASE_NOTE_v1.7.0.md). For the v1.8.0 release, see
 [RELEASE_NOTE_v1.8.0.md](docs/RELEASE_NOTE_v1.8.0.md). For the v1.9.0 release, see
-[RELEASE_NOTE_v1.9.0.md](docs/RELEASE_NOTE_v1.9.0.md).
+[RELEASE_NOTE_v1.9.0.md](docs/RELEASE_NOTE_v1.9.0.md). For the v1.10.0 release, see
+[RELEASE_NOTE_v1.10.0.md](docs/RELEASE_NOTE_v1.10.0.md).
 
 ## Start here
 
@@ -68,7 +69,7 @@ For the first stable release, see
 
 ## 60-second quick start
 
-1. Download the `v1.9.0` archive from
+1. Download the `v1.10.0` archive from
    [GitHub Releases](https://github.com/ikelaiah/ProcFlow/releases) or clone
    this repository.
 2. Extract the complete archive. Keep `index.html`, `styles.css`, `dist/`, and
@@ -135,7 +136,7 @@ statements.
    analysis to another engineer.
 
 ProcFlow imports SQL text, not report-definition files. SSRS/RDL import is on
-the roadmap; for v1.9.0, paste or export the dataset SQL itself.
+the roadmap; for v1.10.0, paste or export the dataset SQL itself.
 
 ## What ProcFlow can show
 
@@ -197,7 +198,8 @@ The analysis panel provides four release-safety signals:
 - **Coverage** is the percentage of body tokens consumed by the parser.
 - **Diagnostics** reports uncertain dialects, balance errors, missing block
   terminators, unconsumed input, invalid actions, opaque dynamic SQL, opaque
-  table expressions, heuristic `APPLY` targets, and catalogue problems
+  table expressions, heuristic `APPLY` targets, ambiguous and opaque column
+  references (v1.10.0), and catalogue problems
   (malformed or conflicting catalogue data, and unproven partial matches
   reported at the exact reference). Informational annotations
   (for example a correctly resolved recursive CTE) are displayed separately and
@@ -220,7 +222,7 @@ than silently disappearing from the diagram.
 
 ## Supported SQL
 
-ProcFlow v1.9.0 recognises:
+ProcFlow v1.10.0 recognises:
 
 - Microsoft T-SQL
 - IBM DB2 SQL PL
@@ -231,7 +233,7 @@ Supported inputs include procedures, functions, triggers, views, plain SQL
 statements, report dataset queries, and multi-object scripts where those object
 types apply to the selected dialect.
 
-Dialect-specific v1.9.0 coverage includes:
+Dialect-specific v1.10.0 coverage includes:
 
 - **T-SQL:** mixed one-line and block `IF`/`WHILE` control flow (single
   statement and `BEGIN`/`END` bodies in one AST), labelled `GOTO` and labels
@@ -257,6 +259,16 @@ Across dialects, Query structure view reports every read source: a
 comma-separated `FROM` list, an `APPLY` or tabular function, a `MERGE…USING` /
 `DELETE…USING` source, a recursive CTE, and a derived-table inner table all
 appear as source nodes.
+
+Since v1.10.0, each query-bearing `SELECT` statement also gets column-level
+analysis (README roadmap item 6 foundations): qualified references, aliases,
+projections, CTE and derived-table scopes, and catalogue-backed wildcard
+expansion produce exact input→output column bindings with source spans. An
+unqualified reference that matches several sources is reported as ambiguous and
+never invents a binding, and unsupported expressions (for example a scalar
+subquery) become opaque with a region-scoped diagnostic. Multi-statement
+temporary-table column flow and inter-object column flow remain on the roadmap
+(v1.11.0).
 
 Detection is automatic and can be overridden from the **Dialect** selector.
 When detection is uncertain and several dialects score equally, an explicit
@@ -356,7 +368,7 @@ endorsed by draw.io.
 
 ### Quick answers
 
-| Question | ProcFlow v1.9.0 behavior |
+| Question | ProcFlow v1.10.0 behavior |
 |---|---|
 | Is SQL uploaded? | No. Analysis and rendering happen in the browser tab. |
 | Does it connect to a database? | No. There is no driver, connection string, or query execution. |
@@ -382,6 +394,7 @@ dist/src/catalogue.js
 dist/src/dialects.js
 dist/src/lineage.js
 dist/src/ir.js
+dist/src/columns.js
 dist/src/exporters.js
 dist/src/workspace.js
 dist/src/app.js
@@ -400,7 +413,7 @@ import/export uses the browser download API, which also requires an explicit
 action. The catalogue module (`dist/src/catalogue.js`) parses pasted or
 imported metadata in memory only; it never reads or writes storage.
 
-The SHA-256 of `vendor/mermaid/mermaid.min.js` in v1.9.0 is:
+The SHA-256 of `vendor/mermaid/mermaid.min.js` in v1.10.0 is:
 
 ```text
 61B335A46DF05A7CE1C98378F60E5F3E77A7FB608A1056997E8A649304A936D6
@@ -411,7 +424,7 @@ so the release checksum remains reproducible across operating systems.
 
 ### Guidance for security review
 
-1. Review and pin the `v1.9.0` tag or its exact commit.
+1. Review and pin the `v1.10.0` tag or its exact commit.
 2. Verify the vendored Mermaid checksum.
 3. Review the runtime files listed above.
 4. Open the reviewed files locally or serve them from an approved internal
@@ -445,7 +458,9 @@ and contains no automatic data-submission path.
   authoritative and omitted semicolons are split by control keywords and
   statement grammar. Exceptionally malformed batches can still produce imperfect
   splits.
-- Query lineage is object-level rather than column-level.
+- Query lineage is object-level; since v1.10.0 a single query statement also
+  reports column-level scopes and bindings, while multi-statement
+  temporary-table and inter-object column flow remain on the roadmap (v1.11.0).
 - Some vendor-specific table expressions might not be detected.
 - Temporary-table data flow is shown within one object; cross-object temp flow
   remains unresolved.
@@ -454,8 +469,10 @@ and contains no automatic data-submission path.
   without a catalogue synonym, and unknown linked-server layouts stay external
   (with a `catalogue_partial` diagnostic where a plausible but unproven
   candidate exists) until the catalogue proves them.
-- Columns are parsed and validated by the catalogue import but not yet used;
-  column lineage is scheduled for v1.10.0+.
+- Columns are parsed and validated by the catalogue import and, since v1.10.0,
+  drive wildcard expansion and column bindings inside a single statement.
+  Column flow across statements, objects, and CTE/view boundaries is scheduled
+  for v1.11.0.
 - SSRS/RDL files are not imported in v1.9.0.
 - draw.io layout is deterministic for the documented graph classes at
   documented size limits; very large or non-planar graphs are laid out without
@@ -524,9 +541,9 @@ Then open:
 - `http://127.0.0.1:8000/tests/ui.html` — browser interaction and local-runtime
   tests
 
-The v1.9.0 baseline is:
+The v1.10.0 baseline is:
 
-- 208 golden and boundary assertions
+- 209 golden and boundary assertions
 - 400 deterministic mutation cases
 - 22 browser interaction tests
 - 20 export-parity checks (10 fixtures × TD + LR), 11 layout-budget fixtures,
@@ -537,12 +554,16 @@ The v1.9.0 baseline is:
 - 13 catalogue fixtures (JSON and line import, synonym / linked-server /
   cross-database verification, conservative conflict and partial diagnostics,
   export metadata, workspace round-trip)
+- 18 column-lineage fixtures (qualified references, aliases, projections,
+  CTE and derived-table scopes, catalogue-backed wildcard expansion, ambiguous
+  and opaque column references with exact spans)
 
 Fixture-corpus accuracy metrics (attribution, unresolved-token, tail-unconsumed,
 fallback, opaque-dynamic, semantic-edge coverage, provenance,
 region-diagnostic-to-span, export-parity, export-traceability, layout-budget,
-workspace, and catalogue pass-rate ratios) are published from the checked-in
-golden corpus in [docs/metrics-v1.9.0.json](docs/metrics-v1.9.0.json). Generation
+workspace, catalogue, and column pass-rate ratios) are published from the
+checked-in golden corpus in
+[docs/metrics-v1.10.0.json](docs/metrics-v1.10.0.json). Generation
 is deterministic and fixture-only — no user inputs or runtime telemetry are
 collected — and CI refuses to merge when the snapshot is stale. Regenerate with
 `npm run metrics:write`.
@@ -580,6 +601,7 @@ docs/
 ├── PR_NOTE_1.7.0.md
 ├── PR_NOTE_1.8.0.md
 ├── PR_NOTE_1.9.0.md
+├── PR_NOTE_1.10.0.md
 ├── RELEASE_NOTE_1.1.0.md
 ├── RELEASE_NOTE_1.2.0.md
 ├── RELEASE_NOTE_1.3.0.md
@@ -593,7 +615,8 @@ docs/
 ├── RELEASE_NOTE_v1.7.0.md
 ├── RELEASE_NOTE_v1.8.0.md
 ├── RELEASE_NOTE_v1.9.0.md
-└── metrics-v1.9.0.json   # deterministic fixture-only accuracy metrics snapshot
+├── RELEASE_NOTE_v1.10.0.md
+└── metrics-v1.10.0.json   # deterministic fixture-only accuracy metrics snapshot
 examples/
 ├── dbo.v110_demo.sql    # per-release outcome demos
 ├── dbo.v120_demo.sql
@@ -603,7 +626,8 @@ examples/
 ├── dbo.v160_demo.sql
 ├── dbo.v170_demo.sql    # v1.7.0: clear deterministic exports demo
 ├── dbo.v180_demo.sql    # v1.8.0: usable local workspace demo
-└── dbo.v190_demo.sql    # v1.9.0: resolve by catalogue demo
+├── dbo.v190_demo.sql    # v1.9.0: resolve by catalogue demo
+└── dbo.v1100_demo.sql   # v1.10.0: column lineage foundations demo
 scripts/
 ├── file-smoke.mjs    # dependency-free local-file release smoke test
 └── metrics.mjs       # generate/verify the fixture-corpus metric snapshot
@@ -614,6 +638,7 @@ src/
 ├── dialects.ts       # dialect detection and procedural parsing
 ├── lineage.ts        # CTE and query dependency extraction
 ├── ir.ts             # graphs, diagnostics, confidence, and estate analysis
+├── columns.ts        # v1.10.0: single-statement column scopes and bindings
 ├── exporters.ts      # Mermaid, draw.io, and narration output
 ├── workspace.ts      # opt-in persistence + presentation-only dependency filtering
 └── app.ts            # browser UI and workspace interaction
@@ -631,6 +656,7 @@ tests/
 ├── parity.ts
 ├── workspace.ts
 ├── catalogue.ts
+├── columns.ts        # v1.10.0: column lineage foundations fixtures
 ├── tests.ts
 ├── fuzz.ts
 ├── ui-tests.ts
@@ -669,13 +695,13 @@ Then verify:
 3. Generated `dist/` files match their TypeScript sources.
 4. The Mermaid SHA-256 matches the value in this README and the workflow.
 5. `npm run metrics` reports the metric snapshot is current.
-6. `RELEASE_NOTE_v1.9.0.md` matches the final tag contents.
+6. `RELEASE_NOTE_v1.10.0.md` matches the final tag contents.
 7. The complete archive opens locally with `index.html`, and the local-file
    smoke test reports the opt-in workspace assertion.
-8. The tag is named `v1.9.0`.
+8. The tag is named `v1.10.0`.
 
-The release can then be created manually from the `v1.9.0` tag using
-[RELEASE_NOTE_v1.9.0.md](docs/RELEASE_NOTE_v1.9.0.md).
+The release can then be created manually from the `v1.10.0` tag using
+[RELEASE_NOTE_v1.10.0.md](docs/RELEASE_NOTE_v1.10.0.md).
 
 ## Roadmap after v1.0.0
 
@@ -686,6 +712,10 @@ The release can then be created manually from the `v1.9.0` tag using
 5. Accept database catalogue metadata for more accurate object resolution.
    **Delivered in v1.9.0.**
 6. Add column-level lineage where it can be resolved safely.
+   **Foundations delivered in v1.10.0** (column scopes, bindings, projections,
+   CTE/derived-table scopes, and catalogue-backed wildcard expansion within one
+   statement); full column-flow pipelines through temp tables and object
+   boundaries are scheduled for v1.11.0.
 7. Add optional local workspace persistence and dependency filtering.
    **Delivered in v1.8.0.**
 8. Separate graph, transaction, and estate-analysis internals while preserving

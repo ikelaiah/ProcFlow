@@ -1,12 +1,13 @@
-/* v1.9.0 — fixture-corpus metric publishing.
+/* v1.10.0 — fixture-corpus metric publishing.
    Aggregates the "Metrics that matter" over the checked-in golden corpus,
    including the v1.7.0 export-parity, export-traceability, and layout-budget
    pass rates reported by tests/parity.ts, the v1.8.0 workspace
-   persistence/dependency-filtering pass rate from tests/workspace.ts, and the
-   v1.9.0 catalogue pass rate from tests/catalogue.ts.
+   persistence/dependency-filtering pass rate from tests/workspace.ts, the
+   v1.9.0 catalogue pass rate from tests/catalogue.ts, and the v1.10.0 column
+   lineage pass rate from tests/columns.ts.
    Purely deterministic and fixture-only: no user inputs and no runtime
    telemetry are ever collected. scripts/metrics.mjs drives this page to
-   produce or verify docs/metrics-v1.9.0.json. */
+   produce or verify docs/metrics-v1.10.0.json. */
 (function(){
   var corpus=PROCFLOW_FIXTURES||[];
 
@@ -83,7 +84,9 @@
       workspace:window.PROCFLOW_WORKSPACE_RESULT
         ?window.PROCFLOW_WORKSPACE_RESULT.total:0,
       catalogue:window.PROCFLOW_CATALOGUE_RESULT
-        ?window.PROCFLOW_CATALOGUE_RESULT.total:0
+        ?window.PROCFLOW_CATALOGUE_RESULT.total:0,
+      columns:window.PROCFLOW_COLUMN_RESULT
+        ?window.PROCFLOW_COLUMN_RESULT.total:0
     },
     attributionRate:rate(attributedAll,totalTokens),
     unresolvedTokenRate:rate(unresolvedTokens,totalTokens),
@@ -119,6 +122,13 @@
        and workspace round-trip all pass on the checked-in fixture corpus. */
     cataloguePassRate:window.PROCFLOW_CATALOGUE_RESULT
       ? rate(window.PROCFLOW_CATALOGUE_RESULT.passed,window.PROCFLOW_CATALOGUE_RESULT.total)
+      : 0,
+    /* v1.10.0 column lineage foundations: single-statement column fixtures
+       assert exact input→output mappings and spans, ambiguity never invents a
+       column binding, and unsupported expressions become opaque with
+       region-scoped diagnostics. */
+    columnPassRate:window.PROCFLOW_COLUMN_RESULT
+      ? rate(window.PROCFLOW_COLUMN_RESULT.passed,window.PROCFLOW_COLUMN_RESULT.total)
       : 0,
     aggregate:{
       totalTokens:totalTokens,

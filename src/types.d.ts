@@ -451,6 +451,9 @@ interface AnalysisResult {
   mermaid: string;
   attribution?: TokenAttribution;
   constructCoverage?: ConstructCoverage;
+  /* v1.10.0 — column lineage foundations: one entry per query-bearing
+     statement that was column-analysed (single-statement scope). */
+  columns?: ColumnLineage[];
 }
 
 interface WorkspaceFile {
@@ -579,6 +582,78 @@ interface CatalogueParseResult {
   columnCount: number;
 }
 
+/* v1.10.0 — column lineage foundations.
+   Column scopes and bindings for qualified references, aliases, projections,
+   CTEs, derived tables, and catalogue-backed wildcard expansion; expression-
+   level provenance within one query statement; explicit ambiguous and opaque
+   column references. Inter-object column flow (v1.11.0) and the final column
+   export contract are deferred. */
+type ColumnResolution = 'exact' | 'ambiguous' | 'opaque';
+type ColumnSourceKind = 'table' | 'cte' | 'derived' | 'tabfunc' | 'opaque';
+
+/* One source (table, CTE, derived table, or tabular function) visible in a
+   query's scope. `columns` is authoritative only when `columnsKnown` is true:
+   for plain tables it is true only with catalogue evidence. */
+interface ColumnSource {
+  key: string;
+  name: string;
+  alias: string | null;
+  kind: ColumnSourceKind;
+  columns: string[];
+  columnsKnown: boolean;
+  span: SourceSpan | null;
+}
+
+/* One input column a projection output derives from. */
+interface ColumnBinding {
+  source: string;
+  column: string;
+  span: SourceSpan | null;
+}
+
+/* One projection item mapped to the input columns it reads. `resolution` is
+   'exact' when every reference bound; 'ambiguous' when at least one reference
+   matched several sources (no edge is invented); 'opaque' when an expression
+   or reference could not be resolved statically. */
+interface ColumnOutput {
+  name: string;
+  label: string;
+  span: SourceSpan | null;
+  bindings: ColumnBinding[];
+  resolution: ColumnResolution;
+  reason?: string;
+}
+
+/* A wildcard reference (`*` or `alias.*`). It expands to concrete columns
+   only when the catalogue proves every contributing source's columns;
+   otherwise it is recorded unexpanded and never invents columns. */
+interface ColumnWildcard {
+  source: string | null;
+  span: SourceSpan | null;
+  expanded: boolean;
+  columns: string[];
+}
+
+/* One column reference inside a statement with its binding verdict. */
+interface ColumnReference {
+  qualifier: string | null;
+  name: string;
+  span: SourceSpan;
+  resolution: ColumnResolution;
+}
+
+/* The full column-lineage analysis of one query statement. */
+interface ColumnLineage {
+  sources: ColumnSource[];
+  outputs: ColumnOutput[];
+  wildcards: ColumnWildcard[];
+  references: ColumnReference[];
+  tokensConsumed: number;
+  tokensOpaque: number;
+  opaqueCount: number;
+  diagnostics: Diagnostic[];
+}
+
 interface FixtureExpectation {
   mode?: 'flow' | 'query';
   branch?: number;
@@ -673,6 +748,15 @@ interface Window {
     passed: number;
     total: number;
   };
+  /* v1.10.0 column-lineage suite results, published for the golden and metrics
+     pages. */
+  PROCFLOW_COLUMN_PASS?: boolean;
+  PROCFLOW_COLUMN_RESULT?: {
+    passed: number;
+    total: number;
+  };
+  /* v1.10.0 per-fixture column suite records, published for debugging. */
+  PROCFLOW_COLUMN_DETAIL?: Array<{name: string; pass: boolean; detail: unknown}>;
   /* v1.8.0 opt-in workspace persistence globals (src/workspace.ts), exposed for
      the browser UI tests. */
   clearWorkspace(): void;
