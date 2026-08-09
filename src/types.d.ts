@@ -362,6 +362,11 @@ interface AnalyseOptions {
   /* Document-scoped catalogue parse diagnostics surfaced alongside the
      analysis (set by the caller after parseCatalogue). */
   catalogueDiagnostics?: Diagnostic[];
+  /* v1.11.0 — same-script column definitions. Object definitions (view/table
+     column lists) collected from objects analysed earlier in the same script
+     so column flow can cross object boundaries within the workspace. Read-only
+     references resolved by the catalogue are seeded automatically. */
+  define?: Record<string, ColumnFlowObject>;
 }
 
 interface DrawioOptions {
@@ -454,6 +459,11 @@ interface AnalysisResult {
   /* v1.10.0 — column lineage foundations: one entry per query-bearing
      statement that was column-analysed (single-statement scope). */
   columns?: ColumnLineage[];
+  /* v1.11.0 — column lineage pipelines: cross-statement column flow through
+     temp tables, transformations, views, CTEs, and catalogue-resolved object
+     boundaries, plus the exported column-flow graph (its own layout class). */
+  columnFlow?: ColumnFlow;
+  columnFlowGraph?: Graph;
 }
 
 interface WorkspaceFile {
@@ -654,6 +664,93 @@ interface ColumnLineage {
   diagnostics: Diagnostic[];
 }
 
+/* v1.11.0 — column lineage pipelines.
+   Column-flow edges through CTEs, views, temporary tables, transformations, and
+   catalogue-resolved object boundaries; column metadata and column-flow export
+   styles; column-resolution signals (E). Interactive column views are deferred
+   to v1.13.0; this release ships the model, exports, layout class, and
+   fixtures. No edge or binding is ever invented: an ambiguous reaching
+   definition or an unresolvable transformation stays opaque. */
+
+/* One produced column on a column-carrying object, traced end-to-end to its
+   origin. `source`/`sourceColumn` name the ultimate resolvable origin object
+   and column: when the origin is itself a column of a tracked object (temp
+   table, local view) the trace is flattened to the original source, so
+   `SELECT a FROM #stage INTO #out` reports the same origin as `#stage` did.
+   Ambiguous reaching definitions and opaque transformations carry no source. */
+interface ColumnFlowOutput {
+  name: string;                /* column name on the object */
+  span: SourceSpan | null;     /* span of the name in the defining statement */
+  resolution: ColumnResolution;/* 'exact' | 'ambiguous' | 'opaque' */
+  source: string | null;       /* ultimate origin object, or null when opaque */
+  sourceColumn: string | null; /* ultimate origin column, or null */
+  sourceSpan: SourceSpan | null;
+  reason?: string;
+}
+
+/* Reaching-definition state of one column-carrying object (temp table, local
+   view, or catalogue-resolved external object). `multi` records that more than
+   one producer statement reaches readers without a provable unique definition
+   (conditional write or branch merge); its columns are then opaque. */
+interface ColumnFlowObject {
+  name: string;
+  multi: boolean;
+  span: SourceSpan | null;
+  columns: ColumnFlowOutput[];
+}
+
+/* Columns one statement consumes from a column-carrying object. `resolution`
+   is 'exact' when every consumed column resolves to a provable definition,
+   'opaque' when the object's reaching definition is ambiguous or unknown. */
+interface ColumnFlowConsume {
+  object: string;
+  names: string[];
+  resolution: ColumnResolution;
+  span: SourceSpan | null;
+}
+
+/* One statement's column-flow involvement, keyed by its flow-node id so the
+   column graph stays traceable to the source diagram. */
+interface ColumnFlowStep {
+  id: string;                  /* 's1', 's2', … mirroring the flow node id */
+  text: string;                /* summarised statement label */
+  span: SourceSpan | null;
+  produces: Array<{object: string; columns: ColumnFlowOutput[]; multi: boolean}>;
+  consumes: ColumnFlowConsume[];
+  resolution: ColumnResolution;
+  opaque?: boolean;            /* statement is outside column analysis (dynamic) */
+}
+
+/* A producer→consumer column-flow edge through a shared object. `columns`
+   lists the object columns carried between the two steps. */
+interface ColumnFlowEdge {
+  fromStep: string;
+  toStep: string;
+  object: string;
+  columns: Array<{name: string; resolution: ColumnResolution;
+                  span: SourceSpan | null}>;
+  resolution: ColumnResolution; /* opaque when the reaching definition is not unique */
+}
+
+/* Cross-statement column-flow analysis of one object. `objects` is the final
+   reaching-definition state; `steps` is the ordered statement walk; `edges`
+   are the end-to-end producer→consumer pairs through shared objects. */
+interface ColumnFlow {
+  steps: ColumnFlowStep[];
+  edges: ColumnFlowEdge[];
+  objects: Record<string, ColumnFlowObject>;
+  opaqueCount: number;
+  diagnostics: Diagnostic[];
+  stats: {
+    objects: number;
+    objectsResolved: number;
+    objectsOpaque: number;
+    edges: number;
+    edgesResolved: number;
+    edgesOpaque: number;
+  };
+}
+
 interface FixtureExpectation {
   mode?: 'flow' | 'query';
   branch?: number;
@@ -757,6 +854,17 @@ interface Window {
   };
   /* v1.10.0 per-fixture column suite records, published for debugging. */
   PROCFLOW_COLUMN_DETAIL?: Array<{name: string; pass: boolean; detail: unknown}>;
+  /* v1.11.0 column-flow pipeline suite results, published for the golden and
+     metrics pages (end-to-end traces, opaque ambiguity, export parity, and the
+     column layout class budget). */
+  PROCFLOW_COLUMNFLOW_PASS?: boolean;
+  PROCFLOW_COLUMNFLOW_RESULT?: {
+    passed: number;
+    total: number;
+    layoutPassed: number;
+    layoutTotal: number;
+  };
+  PROCFLOW_COLUMNFLOW_DETAIL?: Array<{name: string; pass: boolean; detail: unknown}>;
   /* v1.8.0 opt-in workspace persistence globals (src/workspace.ts), exposed for
      the browser UI tests. */
   clearWorkspace(): void;

@@ -361,6 +361,8 @@ v1.11.0, item 4 → v1.12.0.**
 
 ### v1.11.0 — Column lineage pipelines
 
+**Delivered in v1.11.0.**
+
 - **Ships:** README item 6 in full — column-flow edges through CTEs, views,
   temporary tables, transformations, and catalogue-resolved object boundaries;
   F column metadata and column-flow export styles; E column-resolution signals;

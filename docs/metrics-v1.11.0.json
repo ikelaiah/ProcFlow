@@ -9,7 +9,9 @@
     "layout": 11,
     "workspace": 13,
     "catalogue": 13,
-    "columns": 18
+    "columns": 18,
+    "columnFlow": 15,
+    "columnLayout": 2
   },
   "attributionRate": 1,
   "unresolvedTokenRate": 0.04432,
@@ -25,6 +27,8 @@
   "workspacePassRate": 1,
   "cataloguePassRate": 1,
   "columnPassRate": 1,
+  "columnFlowPassRate": 1,
+  "columnLayoutPassRate": 1,
   "aggregate": {
     "totalTokens": 2685,
     "accountedTokens": 2685,

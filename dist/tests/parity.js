@@ -293,6 +293,11 @@ var PROCFLOW_LAYOUT_CLASSES = [
     { cls: 'query', nodeLimit: 18, crossingBudget: 1, large: false },
     { cls: 'data', nodeLimit: 20, crossingBudget: 0, large: false },
     { cls: 'dependencies', nodeLimit: 14, crossingBudget: 1, large: false },
+    /* v1.11.0 column-flow export graph class. The column graph is a step spine in
+       statement order with column-carrying object nodes routed as data lanes; at
+       the documented sizes it stays overlap-free, monotonically ranked, and
+       crossing-free. Enforced by tests/column-flow.ts with per-fixture budgets. */
+    { cls: 'column', nodeLimit: 28, crossingBudget: 0, large: false },
     { cls: 'nonplanar', nodeLimit: 80, crossingBudget: 30, large: true }
 ];
 /* ---------- export-parity runner ---------- */

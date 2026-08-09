@@ -461,22 +461,31 @@ function colParseItems(projToks: Token[]):
     var toks=item.expr;
     if(!toks.length) return;
     var alias: string | null=null, expr: Token[]=toks.slice();
-    var asIx=-1, d2=0;
-    for(var i=0;i<toks.length;i++){
-      if(toks[i].v==='(') d2++;
-      else if(toks[i].v===')') d2--;
-      if(d2===0&&toks[i].u==='AS'){ asIx=i; break; }
-    }
-    if(asIx>=0&&toks[asIx+1]){
-      alias=toks[asIx+1].v;
-      expr=toks.slice(0,asIx);
-    } else if(toks.length>=2){
-      var last=toks[toks.length-1];
-      var prev=toks[toks.length-2];
-      if(last.type==='word'&&prev.v!=='.'&&COL_REF_SKIP[last.u]===undefined&&
-         COL_CLAUSE_START[last.u]===undefined&&last.v!==';'){
-        alias=last.v;
-        expr=toks.slice(0,toks.length-1);
+    /* T-SQL `SELECT col = expr` alias assignment (v1.11.0 transformations): a
+       leading bare identifier immediately followed by `=` at depth 0 names the
+       output column, so the assignment target is never mistaken for a reference
+       to a source column. */
+    if(toks.length>=2&&toks[0].type==='word'&&toks[0].v!=='*'&&toks[1].v==='='){
+      alias=toks[0].v;
+      expr=toks.slice(2);
+    } else {
+      var asIx=-1, d2=0;
+      for(var i=0;i<toks.length;i++){
+        if(toks[i].v==='(') d2++;
+        else if(toks[i].v===')') d2--;
+        if(d2===0&&toks[i].u==='AS'){ asIx=i; break; }
+      }
+      if(asIx>=0&&toks[asIx+1]){
+        alias=toks[asIx+1].v;
+        expr=toks.slice(0,asIx);
+      } else if(toks.length>=2){
+        var last=toks[toks.length-1];
+        var prev=toks[toks.length-2];
+        if(last.type==='word'&&prev.v!=='.'&&COL_REF_SKIP[last.u]===undefined&&
+           COL_CLAUSE_START[last.u]===undefined&&last.v!==';'){
+          alias=last.v;
+          expr=toks.slice(0,toks.length-1);
+        }
       }
     }
     out.push({expr:expr, alias:alias, span:spanOfTokens(toks)});
@@ -693,11 +702,30 @@ function colAnalyseToks(toks: Token[], ctx: ColCtx): ColumnLineage | null {
           diagnostics:diagnostics};
 }
 
+/* Trim a raw statement token list before analysis: trailing semicolons are
+   delimiters, and a depth-0 batch separator (GO) terminates the statement.
+   Statement tokens from the AST already exclude these; raw body tokens (for
+   example a view body handed to column seeding) do not. */
+function colTrimStatement(toks: Token[]): Token[] {
+  var end=toks.length;
+  while(end>0&&toks[end-1].v===';') end--;
+  var d=0;
+  for(var i=0;i<end;i++){
+    if(toks[i].v==='(') d++;
+    else if(toks[i].v===')') d--;
+    else if(d<=0&&toks[i].type==='word'&&toks[i].u==='GO'){ end=i; break; }
+  }
+  while(end>0&&toks[end-1].v===';') end--;
+  return toks.slice(0,end);
+}
+
 /* Public entry point: analyse one query statement's column lineage. Returns
    null when the tokens do not represent a SELECT query. */
 function analyseColumns(toks: Token[], opts?: {catalogue?: Catalogue | null;
     dialect?: Dialect}): ColumnLineage | null {
   opts=opts||{};
+  var trim=colTrimStatement(toks||[]);
+  if(trim.length!==(toks||[]).length) toks=trim;
   var ctx: ColCtx={cteColumns:{}, catalogue:opts.catalogue||null,
                    dialect:opts.dialect, depth:0};
   return colAnalyseToks(toks||[],ctx);
