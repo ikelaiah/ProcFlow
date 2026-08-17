@@ -27,35 +27,22 @@
 
 <hr>
 
-`proc>flow` is a local-first SQL logic and dependency visualiser for database
-administrators, SQL report engineers, developers, analysts, and reviewers.
-Paste SQL or import a group of SQL files to see:
+`proc>flow` turns complicated SQL into diagrams you can actually follow. Paste
+SQL — or import a folder of files — and see:
 
 - how a procedure, function, trigger, view, or query works internally; and
 - how database objects read, write, and call one another.
 
-There is no installation, database connection, backend service, or sign-in.
-The application runs entirely in a browser and works from the local filesystem.
+It runs entirely in your browser, straight from the local filesystem: no
+installation, no database connection, no backend, no sign-in.
 
 > [!IMPORTANT]
 > ProcFlow uses a heuristic parser rather than a database engine's compiler.
 > Treat diagrams as investigation aids. Check important findings against the
 > source SQL and the target database.
 
-For the first stable release, see
-[RELEASE_NOTE_v1.0.0.md](docs/RELEASE_NOTE_v1.0.0.md). For the v1.1.0 release, see
-[RELEASE_NOTE_1.1.0.md](docs/RELEASE_NOTE_1.1.0.md). For the v1.2.0 release, see
-[RELEASE_NOTE_1.2.0.md](docs/RELEASE_NOTE_1.2.0.md). For the v1.3.0 release, see
-[RELEASE_NOTE_1.3.0.md](docs/RELEASE_NOTE_1.3.0.md). For the v1.4.0 release, see
-[RELEASE_NOTE_v1.4.0.md](docs/RELEASE_NOTE_v1.4.0.md). For the v1.5.0 release, see
-[RELEASE_NOTE_v1.5.0.md](docs/RELEASE_NOTE_v1.5.0.md). For the v1.6.0 release, see
-[RELEASE_NOTE_v1.6.0.md](docs/RELEASE_NOTE_v1.6.0.md). For the v1.7.0 release, see
-[RELEASE_NOTE_v1.7.0.md](docs/RELEASE_NOTE_v1.7.0.md). For the v1.8.0 release, see
-[RELEASE_NOTE_v1.8.0.md](docs/RELEASE_NOTE_v1.8.0.md). For the v1.9.0 release, see
-[RELEASE_NOTE_v1.9.0.md](docs/RELEASE_NOTE_v1.9.0.md). For the v1.10.0 release, see
-[RELEASE_NOTE_v1.10.0.md](docs/RELEASE_NOTE_v1.10.0.md). For the v1.11.0 release, see
-[RELEASE_NOTE_v1.11.0.md](docs/RELEASE_NOTE_v1.11.0.md). For the v1.12.0 release, see
-[RELEASE_NOTE_v1.12.0.md](docs/RELEASE_NOTE_v1.12.0.md).
+**Release notes:** [v1.12.0](docs/RELEASE_NOTE_v1.12.0.md) · earlier releases
+live in [`docs/`](docs/) alongside the per-release PR notes.
 
 ## Start here
 
@@ -74,21 +61,17 @@ For the first stable release, see
 1. Download the `v1.12.0` archive from
    [GitHub Releases](https://github.com/ikelaiah/ProcFlow/releases) or clone
    this repository.
-2. Extract the complete archive. Keep `index.html`, `styles.css`, `dist/`, and
-   `vendor/` together.
+2. Extract the complete archive — `index.html`, `styles.css`, `dist/`, and
+   `vendor/` must stay together.
 3. Open `index.html` in a recent Chrome, Edge, Firefox, or Chromium browser.
-4. Choose one input:
-   - press **Load sample**;
-   - paste SQL into **SQL source**; or
-   - press **Import SQL files** and select one or more files.
+4. Choose one input: press **Load sample**, paste SQL into **SQL source**, or
+   press **Import SQL files** and select one or more files.
 5. Press **Refresh** or use `Ctrl+Enter` (`Cmd+Enter` on macOS).
 
 No `npm install`, local server, database, or internet connection is required
-for normal use.
-
-If the page opens but the diagram does not render, first confirm that the whole
-archive was extracted. Opening a copied `index.html` without its sibling
-`dist/` and `vendor/` directories will not work.
+for normal use. If the diagram does not render, the archive was probably
+extracted incompletely — an `index.html` without its sibling `dist/` and
+`vendor/` directories will not work.
 
 ## Workflow for database administrators
 
@@ -108,14 +91,11 @@ reviews.
 8. Use **Export** to save SVG or editable draw.io XML when the diagram is ready
    to share.
 
-Useful DBA review questions include:
-
-- Which tables are read or changed?
-- Which routines are called?
-- Can execution exit before a commit or final result?
-- Where can an exception or error be handled, rethrown, or terminate work?
-- Does transaction state affect the available recovery path?
-- Is any dynamic SQL hiding behavior from static analysis?
+Useful DBA review questions include: which tables are read or changed; which
+routines are called; can execution exit before a commit or final result; where
+can an exception be handled, rethrown, or terminate work; does transaction
+state affect the available recovery path; and is any dynamic SQL hiding
+behavior from static analysis?
 
 When automatic dialect detection is uncertain, select the dialect explicitly
 and refresh the analysis.
@@ -138,11 +118,10 @@ statements.
    analysis to another engineer.
 
 ProcFlow imports SQL text directly, and since v1.12.0 it also imports
-SSRS/RDL report definitions (README roadmap item 4): paste or import an `.rdl`
-file, and the **Reports** menu links the report to its datasets, distinguishes
-embedded, shared, and unresolved datasets, and opens each embedded dataset's
-query for analysis. Report dependency views and report export arrive with
-v1.13.0.
+SSRS/RDL report definitions: paste or import an `.rdl` file, and the
+**Reports** menu links the report to its datasets, distinguishes embedded,
+shared, and unresolved datasets, and opens each embedded dataset's query for
+analysis. Report dependency views and report export arrive with v1.13.0.
 
 ## What ProcFlow can show
 
@@ -183,43 +162,39 @@ v1.13.0.
 - object → table read
 - object → table write
 
-Known imported objects are linked. Selecting one can open its internal logic.
-With a catalogue loaded, unmatched references the catalogue proves — an exact
-full-name match, or an explicit synonym — resolve to their canonical identity
-instead of a conservative label. Unmatched three-/four-part names keep their
-complete identity as `external: [server].[database].[schema].[object]` nodes
-rather than collapsing to a bare last-part match.
+Known imported objects are linked — selecting one opens its internal logic.
+With a catalogue loaded, references the catalogue proves (an exact full-name
+match, or an explicit synonym) resolve to their canonical identity instead of a
+conservative label. Unmatched three-/four-part names keep their complete
+identity as `external: [server].[database].[schema].[object]` nodes rather
+than collapsing to a bare last-part match.
 
 ## Reading the analysis safely
 
-The analysis panel provides four release-safety signals:
+The analysis panel gives four signals for how much to trust a diagram:
 
-- **Confidence** is a single headline number from a versioned formula
-  (v1.6.0) built on per-region signals: dialect certainty × the token-weighted
-  quality of each statement region (resolved / approximate / opaque / error) ×
-  a coverage factor. The health band (`high`/`medium`/`low`) is derived from
-  the same formula, so it can never disagree with the percentage. Coverage
-  alone never raises confidence: an object whose tokens all land in opaque
-  dynamic-SQL regions stays at 40 % even at 100 % coverage.
-- **Coverage** is the percentage of body tokens consumed by the parser.
-- **Diagnostics** reports uncertain dialects, balance errors, missing block
+- **Confidence** — a single headline number from a versioned formula (v1.6.0)
+  built on per-region signals: dialect certainty × the token-weighted quality of
+  each statement region (resolved / approximate / opaque / error) × a coverage
+  factor. The health band (`high`/`medium`/`low`) comes from the same formula,
+  so it can never contradict the percentage. Coverage alone never raises
+  confidence: an object whose tokens all land in opaque dynamic-SQL regions
+  stays at 40 % even at 100 % coverage.
+- **Coverage** — the percentage of body tokens consumed by the parser.
+- **Diagnostics** — uncertain dialects, balance errors, missing block
   terminators, unconsumed input, invalid actions, opaque dynamic SQL, opaque
   table expressions, heuristic `APPLY` targets, ambiguous and opaque column
-  references (v1.10.0), opaque column-flow reaching definitions across
-  statements (v1.11.0), catalogue problems
-  (malformed or conflicting catalogue data, and unproven partial matches
-  reported at the exact reference), and report/dataset parsing uncertainty
-  (v1.12.0: malformed RDL or a missing `<Report>` root is a document-scoped
-  finding with no fabricated span, while an unresolved dataset is reported at
-  its own XML element span). Informational annotations
-  (for example a correctly resolved recursive CTE) are displayed separately and
+  references (v1.10.0), opaque column-flow reaching definitions (v1.11.0),
+  catalogue problems (malformed or conflicting data, unproven partial matches),
+  and report/dataset parsing uncertainty (v1.12.0). Informational annotations
+  (for example a correctly resolved recursive CTE) are shown separately and
   never inflate the findings count. Document-scoped findings such as dialect
   ambiguity carry no fabricated source span.
-- **Constructs** reports how many branches, loops, handlers, CTEs, source
+- **Constructs** — how many branches, loops, handlers, CTEs, source
   references, temp-flow links, and column-flow objects and edges were detected,
   resolved, or left opaque.
 
-Use this rule of thumb:
+Rule of thumb:
 
 - High confidence and complete coverage: review the chart, then verify material
   findings in the SQL.
@@ -233,33 +208,21 @@ than silently disappearing from the diagram.
 
 ## Supported SQL
 
-ProcFlow v1.12.0 recognises:
+ProcFlow v1.12.0 recognises Microsoft T-SQL, IBM DB2 SQL PL, PostgreSQL
+PL/pgSQL, and SQLite — covering procedures, functions, triggers, views, plain
+SQL statements, report dataset queries, and multi-object scripts.
 
-- Microsoft T-SQL
-- IBM DB2 SQL PL
-- PostgreSQL PL/pgSQL
-- SQLite
+Dialect coverage highlights:
 
-Supported inputs include procedures, functions, triggers, views, plain SQL
-statements, report dataset queries, and multi-object scripts where those object
-types apply to the selected dialect.
-
-Dialect-specific v1.11.0 coverage includes:
-
-- **T-SQL:** mixed one-line and block `IF`/`WHILE` control flow (single
-  statement and `BEGIN`/`END` bodies in one AST), labelled `GOTO` and labels
-  with source spans plus a `goto_unresolved` diagnostic and explicit
-  "Unresolved label" node, cursor queries (`DECLARE … CURSOR FOR`) in the query
-  graph, concise `GRANT`/`WAITFOR`/`KILL`/cursor-operation labels, semicolon-free
-  statements with grammar-driven boundaries, `TRY`/`CATCH`, `THROW`,
-  `RAISERROR` severity, `XACT_STATE()`, `@@TRANCOUNT`, nested transaction depth,
-  savepoints (including savepoint-only recovery declared in `TRY` and rolled
-  back in `CATCH`), `SET XACT_ABORT` (annotated when set inside a `CATCH`),
-  invalid transaction-action termination, and temporary-table
-  producer→consumer data-flow edges with conservative branch merges, and column
-  flow across statements through temp tables (`SELECT … INTO`, `INSERT …
-  SELECT`, `CREATE TABLE`, `UPDATE … SET`), views, CTEs, and catalogue-resolved
-  boundaries (v1.11.0).
+- **T-SQL:** mixed one-line and block `IF`/`WHILE` control flow, labelled
+  `GOTO` with source spans and an explicit "Unresolved label" node, cursor
+  queries in the query graph, concise `GRANT`/`WAITFOR`/`KILL` labels,
+  semicolon-free statements with grammar-driven boundaries, `TRY`/`CATCH`,
+  `THROW`, `RAISERROR` severity, transaction depth and savepoints (including
+  savepoint-only recovery in `CATCH`), `SET XACT_ABORT` annotation, invalid
+  transaction-action termination, temporary-table producer→consumer data-flow
+  edges, and column flow across statements through temp tables, views, CTEs,
+  and catalogue-resolved boundaries (v1.11.0).
 - **DB2 SQL PL:** mixed `THEN` and `BEGIN`/`END` `IF` forms, `BEGIN ATOMIC`
   rollback scope, labelled loop control and `LEAVE`/`ITERATE` target validation,
   `FOR … CURSOR FOR` queries in the query graph, scoped handlers, and
@@ -275,36 +238,34 @@ comma-separated `FROM` list, an `APPLY` or tabular function, a `MERGE…USING` /
 appear as source nodes.
 
 Since v1.10.0, each query-bearing `SELECT` statement also gets column-level
-analysis (README roadmap item 6 foundations): qualified references, aliases,
-projections, CTE and derived-table scopes, and catalogue-backed wildcard
-expansion produce exact input→output column bindings with source spans. An
-unqualified reference that matches several sources is reported as ambiguous and
-never invents a binding, and unsupported expressions (for example a scalar
-subquery) become opaque with a region-scoped diagnostic.
+analysis: qualified references, aliases, projections, CTE and derived-table
+scopes, and catalogue-backed wildcard expansion produce exact input→output
+column bindings with source spans. An unqualified reference that matches
+several sources is reported as ambiguous and never invents a binding;
+unsupported expressions become opaque with a region-scoped diagnostic.
 
-Since v1.11.0, column lineage flows across statements as a pipeline (README
-roadmap item 6 delivered): `SELECT col INTO #t`, `INSERT … SELECT`, `CREATE
-TABLE`, and `UPDATE … SET` transformations define an object's columns, later
-consumers bind back through them, and each produced column is traced end-to-end
-to its original source object — through temp tables, views defined earlier in
-the same script, catalogue-resolved object boundaries, and CTE scopes. When a
-reaching definition is ambiguous (a conditional write or a branch merge) the
-consumer stays explicitly opaque with a region-scoped `column_flow_opaque`
-diagnostic, and no binding is invented. The column-flow graph exports to Mermaid
-and draw.io with provenance metadata and is laid out on its own documented
-`column` graph class. Interactive column views remain scheduled for v1.13.0.
+Since v1.11.0, column lineage flows across statements as a pipeline:
+`SELECT col INTO #t`, `INSERT … SELECT`, `CREATE TABLE`, and `UPDATE … SET`
+transformations define an object's columns, later consumers bind back through
+them, and each produced column is traced end-to-end to its original source
+object — through temp tables, same-script views, catalogue-resolved object
+boundaries, and CTE scopes. When a reaching definition is ambiguous (a
+conditional write or a branch merge) the consumer stays explicitly opaque with
+a region-scoped `column_flow_opaque` diagnostic, and no binding is invented.
+The column-flow graph exports to Mermaid and draw.io with provenance metadata
+and is laid out on its own documented `column` graph class. Interactive column
+views remain scheduled for v1.13.0.
 
-Since v1.12.0, SSRS/RDL report definitions can be imported (README roadmap
-item 4 delivered): the **Reports** menu parses a report definition, links the
-report to its datasets, distinguishes embedded (query text is in the report),
-shared (a reference to an external shared dataset definition), and unresolved
-datasets, and attaches each embedded dataset's query text to the SQL analysis.
-XML source locations are preserved where the element tags are locatable, and
-parser uncertainty is scoped: malformed RDL or a missing `<Report>` root is a
-document-scoped diagnostic, while an unresolved dataset is a region-scoped
-diagnostic at its own element span. Selecting an embedded dataset in the
-Dataset picker loads and analyses its query. Combined report dependency views
-and report export remain scheduled for v1.13.0.
+Since v1.12.0, SSRS/RDL report definitions can be imported: the **Reports**
+menu parses a report definition, links the report to its datasets, and
+distinguishes embedded (query text is in the report), shared (a reference to an
+external shared dataset definition), and unresolved datasets. XML source
+locations are preserved where element tags are locatable, and parser
+uncertainty is scoped: malformed RDL or a missing `<Report>` root is a
+document-scoped diagnostic, while an unresolved dataset is region-scoped at its
+own element span. Selecting an embedded dataset in the Dataset picker loads and
+analyses its query. Combined report dependency views and report export remain
+scheduled for v1.13.0.
 
 Detection is automatic and can be overridden from the **Dialect** selector.
 When detection is uncertain and several dialects score equally, an explicit
@@ -333,15 +294,14 @@ report's datasets link to their SQL analysis.
 
 - **Paste or import.** Type an RDL/XML report definition into the textarea (or
   press **Import file** for `.rdl`/`.xml` files) and press **Apply report**.
-- **Report → dataset linking.** The report is linked to its datasets. Each
-  dataset is distinguished as **embedded** (its query text is in the report and
-  is analysed), **shared** (a reference to an external shared dataset
-  definition, so there is no SQL to analyse here), or **unresolved** (neither a
-  query text nor a shared reference, so it cannot be linked).
+- **Dataset kinds.** Each dataset is **embedded** (its query text is in the
+  report and is analysed), **shared** (a reference to an external shared
+  dataset definition, so there is no SQL to analyse here), or **unresolved**
+  (neither a query text nor a shared reference, so it cannot be linked).
 - **Open a dataset.** The **Dataset** picker lists every dataset with its
   source kind; selecting an embedded dataset loads its query into the editor
   and runs the normal SQL analysis.
-- **Honest diagnostics.** XML source locations are preserved where the element
+- **Honest diagnostics.** XML source locations are preserved where element
   tags are locatable. Malformed RDL or a missing `<Report>` root is a
   document-scoped diagnostic with no fabricated span; an unresolved dataset is
   a region-scoped diagnostic at its own element span. These findings appear in
@@ -382,10 +342,11 @@ The **Workspace** menu keeps your work usable across sessions, entirely on your
 terms:
 
 - **Save to this browser** persists the current workspace (files, analysis
-  options, and any applied catalogue text) to this browser's `localStorage`.
-  This is strictly opt-in — nothing is written or restored on load.
-- **Restore saved workspace** replays the saved files, options, and catalogue
-  into an identical analysis.
+  options, and any applied catalogue or report text) to this browser's
+  `localStorage`. This is strictly opt-in — nothing is written or restored on
+  load.
+- **Restore saved workspace** replays the saved files, options, catalogue, and
+  report text into an identical analysis.
 - **Export workspace file** / **Import workspace file** transfer a workspace as
   portable JSON.
 - **Forget saved workspace** removes the local copy explicitly.
@@ -435,10 +396,10 @@ endorsed by draw.io.
 | Is there analytics or telemetry? | No. |
 | Is internet access required? | No for local or internally hosted use. |
 | Are imported files uploaded? | No. The browser File API reads them into the current tab. |
-| Is SQL retained after closing the tab? | No by default. ProcFlow does not use cookies, `sessionStorage`, or IndexedDB, and does not write to `localStorage` on load. A workspace is kept across sessions only when you explicitly choose **Save to this browser** in the Workspace menu. |
-| Is a saved workspace stored on this computer? | Only if you choose **Save to this browser**. It is written to this browser's `localStorage`, is local-only, versioned, exportable to a JSON file, and removed by **Forget saved workspace** or by clearing browser site data. |
+| Is SQL retained after closing the tab? | No by default — no cookies, `sessionStorage`, IndexedDB, or `localStorage` writes on load. A workspace persists only when you explicitly choose **Save to this browser**. |
+| Is a saved workspace stored on this computer? | Only if you choose **Save to this browser**: written to `localStorage`, local-only, versioned, exportable to JSON, and removable via **Forget saved workspace** or clearing site data. |
 | Does ProcFlow write to the clipboard automatically? | No. Clipboard writes follow an explicit copy action. |
-| Are exports local? | Yes. SVG and draw.io files are generated in memory and downloaded by the browser. (Column-flow graphs export with full provenance metadata; interactive column views arrive with v1.13.0.) |
+| Are exports local? | Yes. SVG and draw.io files are generated in memory and downloaded by the browser. |
 | Does it call an AI service? | No. It can copy a narration prompt but never submits it. |
 
 ### Runtime files
@@ -513,19 +474,15 @@ and contains no automatic data-submission path.
 
 ## Known limitations
 
-- Parsing is heuristic and does not provide the guarantees of the target
-  database engine's parser.
-- Dynamic SQL is opaque.
+- Parsing is heuristic, not compiler-grade.
+- Dynamic SQL is opaque by design.
 - Statement boundaries no longer depend on newline position: semicolons are
   authoritative and omitted semicolons are split by control keywords and
   statement grammar. Exceptionally malformed batches can still produce imperfect
   splits.
-- Query lineage is object-level; a single query statement also reports
-  column-level scopes and bindings (v1.10.0), and since v1.11.0 column flow
-  crosses statements through temp tables, transformations, views, CTEs, and
-  catalogue-resolved object boundaries. Column resolution remains conservative:
-  an ambiguous reaching definition stays opaque and is never resolved by
-  invention.
+- Column resolution is conservative: an ambiguous reaching definition stays
+  opaque and is never resolved by invention. Interactive column views in the
+  app are scheduled for v1.13.0.
 - Some vendor-specific table expressions might not be detected.
 - Temporary-table data flow is shown within one object; cross-object temp flow
   remains unresolved.
@@ -534,16 +491,9 @@ and contains no automatic data-submission path.
   without a catalogue synonym, and unknown linked-server layouts stay external
   (with a `catalogue_partial` diagnostic where a plausible but unproven
   candidate exists) until the catalogue proves them.
-- Columns are parsed and validated by the catalogue import and, since v1.10.0,
-  drive wildcard expansion and column bindings inside a single statement.
-  Since v1.11.0, column flow also crosses statements through temp tables,
-  transformations, views, CTEs, and catalogue-resolved object boundaries;
-  interactive column views in the app are scheduled for v1.13.0.
-- Since v1.12.0, SSRS/RDL report definitions are imported and linked to their
-  datasets; shared dataset references and unresolved datasets stay explicit and
-  are reported rather than guessed. Report dependency views and report export
-  are scheduled for v1.13.0, so this release reports on the definition and its
-  datasets without drawing a combined report graph.
+- SSRS/RDL definitions are imported and linked to their datasets; shared and
+  unresolved datasets stay explicit and are reported rather than guessed.
+  Report dependency views and report export are scheduled for v1.13.0.
 - draw.io layout is deterministic for the documented graph classes at
   documented size limits; very large or non-planar graphs are laid out without
   overlapping boxes and reported honestly rather than claimed crossing-free.
