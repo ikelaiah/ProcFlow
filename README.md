@@ -44,7 +44,7 @@ installation, no database connection, no backend, no sign-in.
 **Release notes:** [v1.12.0](docs/RELEASE_NOTE_v1.12.0.md) · earlier releases
 live in [`docs/`](docs/) alongside the per-release PR notes.
 
-## Start here
+## 🧭 Start here
 
 | I want to… | Go to |
 |---|---|
@@ -56,7 +56,7 @@ live in [`docs/`](docs/) alongside the per-release PR notes.
 | Build, test, or change the project | [Developer guide](#developer-guide) |
 | Prepare a release | [Release checklist](#release-checklist) |
 
-## 60-second quick start
+## ⚡ 60-second quick start
 
 1. Download the `v1.12.0` archive from
    [GitHub Releases](https://github.com/ikelaiah/ProcFlow/releases) or clone
@@ -73,7 +73,7 @@ for normal use. If the diagram does not render, the archive was probably
 extracted incompletely — an `index.html` without its sibling `dist/` and
 `vendor/` directories will not work.
 
-## Workflow for database administrators
+## 🗄️ Workflow for database administrators
 
 Use ProcFlow to shorten the first pass through unfamiliar routines and change
 reviews.
@@ -100,7 +100,7 @@ behavior from static analysis?
 When automatic dialect detection is uncertain, select the dialect explicitly
 and refresh the analysis.
 
-## Workflow for SQL report engineers
+## 📊 Workflow for SQL report engineers
 
 Use ProcFlow to understand report datasets, extracts, views, and large SELECT
 statements.
@@ -123,7 +123,7 @@ SSRS/RDL report definitions: paste or import an `.rdl` file, and the
 shared, and unresolved datasets, and opens each embedded dataset's query for
 analysis. Report dependency views and report export arrive with v1.13.0.
 
-## What ProcFlow can show
+## 🧩 What ProcFlow can show
 
 ### Internal control flow
 
@@ -169,7 +169,7 @@ conservative label. Unmatched three-/four-part names keep their complete
 identity as `external: [server].[database].[schema].[object]` nodes rather
 than collapsing to a bare last-part match.
 
-## Reading the analysis safely
+## 🛡️ Reading the analysis safely
 
 The analysis panel gives four signals for how much to trust a diagram:
 
@@ -206,7 +206,7 @@ Rule of thumb:
 Input the parser cannot consume is represented as an unresolved node rather
 than silently disappearing from the diagram.
 
-## Supported SQL
+## 📜 Supported SQL
 
 ProcFlow v1.12.0 recognises Microsoft T-SQL, IBM DB2 SQL PL, PostgreSQL
 PL/pgSQL, and SQLite — covering procedures, functions, triggers, views, plain
@@ -277,7 +277,7 @@ dialects: when a catalogue is loaded, object references the catalogue proves
 are shown as verified identity instead of external labels. See
 [Working with a catalogue](#working-with-a-catalogue).
 
-## Importing SQL
+## 📂 Importing SQL
 
 **Import SQL files** accepts multiple `.sql`, `.ddl`, and `.txt` files. Files
 are read into memory by the current browser tab; they are not uploaded and are
@@ -287,7 +287,7 @@ Multi-object scripts are split into selectable objects. If the split cannot be
 made confidently, ProcFlow keeps the input as one script and reports the
 uncertainty.
 
-## Working with reports
+## 📑 Working with reports
 
 The **Reports** menu (v1.12.0) imports SSRS/RDL report definitions so each
 report's datasets link to their SQL analysis.
@@ -309,7 +309,7 @@ report's datasets link to their SQL analysis.
 - **Clear** removes the report. The report is an analysis input, so a saved
   workspace captures it and Restore reproduces an identical analysis.
 
-## Working with a catalogue
+## 🗂️ Working with a catalogue
 
 The **Catalogue** menu imports table/view/column metadata so ProcFlow can
 resolve object references to their exact identity instead of a conservative
@@ -336,7 +336,7 @@ resolve object references to their exact identity instead of a conservative
   current analysis. The catalogue is an analysis input, so a saved workspace
   captures it and Restore reproduces an identical analysis.
 
-## Workspace
+## 💾 Workspace
 
 The **Workspace** menu keeps your work usable across sessions, entirely on your
 terms:
@@ -354,7 +354,7 @@ terms:
 Saved workspaces are versioned (so future releases can migrate them) and, if
 corrupt or unreadable, are recovered by starting fresh rather than crashing.
 
-## Dependency filtering
+## 🎯 Dependency filtering
 
 In **Object dependencies** scope, the **Filter dependencies** menu offers
 presentation-only filters over the estate diagram: show/hide **Reads**,
@@ -364,7 +364,7 @@ neighbours. Filtering derives a filtered view at render time and never changes
 the underlying analysis graph, so confidence, coverage, diagnostics, and the
 reported stats stay exactly as analysed.
 
-## Exporting and sharing
+## 📤 Exporting and sharing
 
 The **Export** menu provides:
 
@@ -384,7 +384,7 @@ sharing confidential SQL.
 draw.io is a trademark of draw.io AG. ProcFlow is not affiliated with or
 endorsed by draw.io.
 
-## Security and privacy
+## 🔒 Security and privacy
 
 ### Quick answers
 
@@ -472,7 +472,7 @@ browser, installed extensions, modified source files, or external destination.
 ProcFlow's boundary is that its own application code performs analysis locally
 and contains no automatic data-submission path.
 
-## Known limitations
+## ⚠️ Known limitations
 
 - Parsing is heuristic, not compiler-grade.
 - Dynamic SQL is opaque by design.
@@ -501,7 +501,7 @@ and contains no automatic data-submission path.
 Always confirm critical dependencies, execution paths, transaction behavior,
 and security conclusions against the original SQL and target database.
 
-## Developer guide
+## 🛠️ Developer guide
 
 ### Prerequisites
 
@@ -714,7 +714,7 @@ The shared model uses a discriminated TypeScript AST and records source spans,
 branches, loops, scoped handlers, reads, writes, calls, result sets,
 diagnostics, and graph structures.
 
-## Release checklist
+## ✅ Release checklist
 
 Run the following from a clean checkout before tagging a release:
 
@@ -741,7 +741,7 @@ Then verify:
 The release can then be created manually from the `v1.12.0` tag using
 [RELEASE_NOTE_v1.12.0.md](docs/RELEASE_NOTE_v1.12.0.md).
 
-## Roadmap after v1.0.0
+## 🗺️ Roadmap after v1.0.0
 
 1. Expand the anonymised golden SQL fixture corpus.
 2. Improve table-function, `APPLY`, comma-source, and DML lineage.
@@ -762,7 +762,7 @@ The release can then be created manually from the `v1.12.0` tag using
 8. Separate graph, transaction, and estate-analysis internals while preserving
    the v1.0.0 behavior through golden tests. **Delivered in v1.1.0.**
 
-## Contributing and reporting problems
+## 🤝 Contributing and reporting problems
 
 A useful bug report includes:
 
