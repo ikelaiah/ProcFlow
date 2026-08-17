@@ -272,6 +272,40 @@
                 pass: /No report definition loaded/i.test(get('report-status').textContent || '') &&
                     get('report-dataset-select').disabled === true,
                 detail: { status: get('report-status').textContent } });
+            /* v1.13.0 report intelligence — the Report dependencies scope renders the
+               report → dataset → object → column chain and its presentation-only
+               filter hides the column layer without changing the underlying graph. */
+            get('report-text').value = rdlText;
+            get('btn-report-apply').click();
+            get('opt-scope').value = 'report';
+            get('opt-scope').dispatchEvent(new Event('change'));
+            var reportGraphCode = get('mermaid-out').textContent;
+            var reportStats = get('stats').textContent || '';
+            results.push({ name: 'report dependencies scope renders the report chain',
+                pass: reportGraphCode.indexOf('Report') >= 0 &&
+                    reportGraphCode.indexOf('Students') >= 0 &&
+                    reportGraphCode.indexOf('dbo.Student') >= 0 &&
+                    reportGraphCode.indexOf('StudentId') >= 0 &&
+                    /Reports · 1 report/i.test(get('proc-name').textContent || '') &&
+                    /Reports/.test(reportStats) &&
+                    get('report-filter-menu').style.display !== 'none',
+                detail: { code: reportGraphCode.slice(0, 160), stats: reportStats,
+                    name: get('proc-name').textContent } });
+            var fullReportCode = get('mermaid-out').textContent;
+            get('rf-cols').checked = false;
+            get('rf-cols').dispatchEvent(new Event('change'));
+            var filteredReportCode = get('mermaid-out').textContent;
+            results.push({ name: 'report filter hides columns presentation-only in the UI',
+                pass: filteredReportCode.indexOf('StudentId') < 0 &&
+                    fullReportCode.indexOf('StudentId') >= 0 &&
+                    filteredReportCode.length < fullReportCode.length,
+                detail: { full: fullReportCode.slice(0, 120),
+                    filtered: filteredReportCode.slice(0, 120) } });
+            get('btn-report-filter-reset').click();
+            get('rf-cols').checked = true;
+            get('btn-report-clear').click();
+            get('opt-scope').value = 'internal';
+            get('opt-scope').dispatchEvent(new Event('change'));
             finish(results);
         }, 1200);
     });

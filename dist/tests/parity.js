@@ -298,6 +298,11 @@ var PROCFLOW_LAYOUT_CLASSES = [
        the documented sizes it stays overlap-free, monotonically ranked, and
        crossing-free. Enforced by tests/column-flow.ts with per-fixture budgets. */
     { cls: 'column', nodeLimit: 28, crossingBudget: 0, large: false },
+    /* v1.13.0 report-graph class. The report graph is a report→dataset→object→
+       column chain; at the documented sizes it stays overlap-free, monotonically
+       ranked, and crossing-free. Enforced by tests/report-graph.ts with
+       per-fixture budgets. */
+    { cls: 'report', nodeLimit: 30, crossingBudget: 0, large: false },
     { cls: 'nonplanar', nodeLimit: 80, crossingBudget: 30, large: true }
 ];
 /* ---------- export-parity runner ---------- */

@@ -1,0 +1,101 @@
+<!--
+    v1.13.0 demo — report intelligence.
+
+    This definition exercises the v1.13.0 territory (ROADMAP v1.13.0) in one
+    report: the Report dependencies scope draws the report → dataset → object
+    → column chain built on the v1.9.0 catalogue and the v1.11.0 column
+    contract.
+
+    What to observe in the app after Apply in the Reports menu, then switch
+    Scope to "Report dependencies":
+
+      1. The report node links to each dataset (embedded, shared, unresolved).
+      2. Each embedded dataset links to the objects its query reads/writes/
+         calls, and each object links to the columns its query references.
+      3. The Filter report menu hides datasets by kind, the column layer, or
+         external objects — presentation only, never changing the graph.
+      4. The report graph exports to Mermaid and draw.io with provenance
+         metadata on its documented `report` layout class.
+
+    The embedded dataset queries are plain T-SQL, so they also analyse cleanly
+    as query structure when selected from the Dataset picker:
+
+       SELECT StudentId, StudentName FROM dbo.Student WHERE SchoolYear = @Year
+       SELECT CourseId, CourseName FROM dbo.Course
+
+    To resolve dbo.* objects to their canonical identity and verify the
+    object→column layer by catalogue evidence, paste this catalogue in the
+    Catalogue menu and Apply, then re-run:
+
+       dbo.Student TABLE student
+       dbo.Course TABLE
+       COL dbo.Student.StudentId
+       COL dbo.Student.StudentName
+       COL dbo.Student.SchoolYear
+       COL dbo.Course.CourseId
+       COL dbo.Course.CourseName
+
+    Large-graph report layout convergence remains scheduled for v1.14.0.
+
+    This demo is an illustration, not an input to the fixture-corpus metrics
+    (docs/metrics-v1.13.0.json). No user input or runtime telemetry is
+    collected.
+-->
+<Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
+  <DataSources>
+    <DataSource Name="SchoolDB">
+      <ConnectionProperties>
+        <DataProvider>SQL</DataProvider>
+        <ConnectString>Data Source=.;Initial Catalog=School;Integrated Security=true</ConnectString>
+      </ConnectionProperties>
+    </DataSource>
+    <DataSource Name="SharedStore">
+      <DataSourceReference>Shared/SharedStore</DataSourceReference>
+    </DataSource>
+  </DataSources>
+  <DataSets>
+    <DataSet Name="StudentMaster">
+      <Query>
+        <DataSourceName>SchoolDB</DataSourceName>
+        <CommandText>SELECT StudentId, StudentName FROM dbo.Student WHERE SchoolYear = @Year</CommandText>
+        <QueryParameters>
+          <QueryParameter Name="Year">
+            <Value>=Parameters!Year.Value</Value>
+          </QueryParameter>
+        </QueryParameters>
+      </Query>
+      <Fields>
+        <Field Name="StudentId"><DataField>StudentId</DataField></Field>
+        <Field Name="StudentName"><DataField>StudentName</DataField></Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="CourseLookup">
+      <Query>
+        <DataSourceName>SchoolDB</DataSourceName>
+        <CommandText>SELECT CourseId, CourseName FROM dbo.Course</CommandText>
+      </Query>
+    </DataSet>
+    <DataSet Name="SharedRollup">
+      <SharedDataSet>
+        <SharedDataSetReference>Shared/Rollup</SharedDataSetReference>
+      </SharedDataSet>
+    </DataSet>
+    <DataSet Name="Broken">
+      <Query>
+        <DataSourceName>SchoolDB</DataSourceName>
+      </Query>
+    </DataSet>
+  </DataSets>
+  <Body>
+    <ReportItems>
+      <Textbox Name="Header">
+        <Value>= "Student directory"</Value>
+      </Textbox>
+      <Tablix Name="StudentTable">
+        <TablixDataRegion>
+          <DataSetName>StudentMaster</DataSetName>
+        </TablixDataRegion>
+      </Tablix>
+    </ReportItems>
+  </Body>
+</Report>

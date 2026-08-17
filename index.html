@@ -97,6 +97,7 @@
           <select id="opt-scope">
             <option value="internal">Internal logic</option>
             <option value="dependencies">Object dependencies</option>
+            <option value="report">Report dependencies</option>
           </select>
         </label>
         <label class="opt">Direction
@@ -209,6 +210,21 @@
               <input type="text" id="f-focus" placeholder="object name" spellcheck="false">
             </label>
             <button class="menu-action" id="btn-filter-reset">Reset filters</button>
+          </div>
+        </details>
+        <details class="command-menu" id="report-filter-menu" style="display:none">
+          <summary class="btn">Filter report</summary>
+          <div class="command-menu-panel settings-panel filter-panel" aria-label="Report dependency graph filters (presentation only)">
+            <p class="ws-note">Filters affect the report view only; the analysis graph is unchanged.</p>
+            <label class="opt"><input type="checkbox" id="rf-cols" checked> Columns</label>
+            <label class="opt"><input type="checkbox" id="rf-embedded" checked> Embedded datasets</label>
+            <label class="opt"><input type="checkbox" id="rf-shared" checked> Shared datasets</label>
+            <label class="opt"><input type="checkbox" id="rf-unresolved" checked> Unresolved datasets</label>
+            <label class="opt"><input type="checkbox" id="rf-external" checked> External objects</label>
+            <label class="opt filter-focus">Focus
+              <input type="text" id="rf-focus" placeholder="report, dataset, or object name" spellcheck="false">
+            </label>
+            <button class="menu-action" id="btn-report-filter-reset">Reset filters</button>
           </div>
         </details>
       </div>

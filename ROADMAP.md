@@ -388,6 +388,8 @@ v1.11.0, item 4 → v1.12.0.**
 
 ### v1.13.0 — Report intelligence
 
+**Delivered in v1.13.0.**
+
 - **Ships:** report → dataset → object → column dependency views built on the
   v1.9.0 catalogue and v1.11.0 column contract; F export fidelity for report
   graphs.

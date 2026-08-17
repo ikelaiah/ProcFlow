@@ -221,9 +221,12 @@
     return 'Very heavy. A materialised staging table may cost less than rebuilding this every run.';
   }
 
-  function setStats(mode: 'flow' | 'query' | 'dependencies', s: GraphStats): void {
-    var q = mode==='query', deps=mode==='dependencies';
-    var rows = deps
+  function setStats(mode: 'flow' | 'query' | 'dependencies' | 'report', s: GraphStats): void {
+    var q = mode==='query', deps=mode==='dependencies', rep=mode==='report';
+    var rows = rep
+      ? [[s.reports,'Reports'],[s.datasets,'Datasets'],[s.objects,'Objects'],
+         [s.columns,'Columns'],[s.embedded,'Embedded'],[s.shared,'Shared']]
+      : deps
       ? [[s.objects,'Objects'],[s.external,'External objects'],[s.reads,'Reads'],
          [s.writes,'Writes'],[s.calls,'Calls']]
       : q
@@ -234,11 +237,12 @@
     $('stats').innerHTML = rows.map(function(r){
       return '<div class="stat"><b>'+r[0]+'</b><span>'+r[1]+'</span></div>';
     }).join('');
-    var val = deps ? s.objects+s.external : (q ? s.parts : s.cc);
-    var band = (q||deps) ? (val<=8?1:val<=20?2:val<=40?3:4) :
+    var val = rep ? (s.reports||0)+(s.datasets||0)+(s.objects||0)+(s.columns||0)
+      : deps ? s.objects+s.external : (q ? s.parts : s.cc);
+    var band = (q||deps||rep) ? (val<=8?1:val<=20?2:val<=40?3:4) :
       (val<=5?1:val<=10?2:val<=20?3:4);
-    var filled = Math.max(1, Math.min(20,(q||deps)?Math.round(val/2):val));
-    $('cc-label').textContent = deps ? 'Estate objects' : (q ? 'Moving parts' : 'Cyclomatic complexity');
+    var filled = Math.max(1, Math.min(20,(q||deps||rep)?Math.round(val/2):val));
+    $('cc-label').textContent = rep ? 'Report chain' : (deps ? 'Estate objects' : (q ? 'Moving parts' : 'Cyclomatic complexity'));
     $('cc-val').textContent = val;
     var meter=$('meter'), html='';
     meter.setAttribute('data-band', String(band));
@@ -247,7 +251,9 @@
     meter.innerHTML=html;
     $('cc-note').textContent = deps
       ? 'Select an object to move from estate dependencies into its internal logic.'
-      : (q ? qNote(val) : ccNote(val));
+      : (rep
+        ? 'Select a dataset in the Reports menu to open its SQL analysis.'
+        : (q ? qNote(val) : ccNote(val)));
   }
 
   function showMsg(text: string, kind?: 'warn'): void {
@@ -358,6 +364,20 @@
       external:$('f-e').checked,
       temp:$('f-t').checked,
       focus:$('f-focus').value
+    };
+  }
+
+  /* v1.13.0 report filtering — presentation only. Reads the report filter panel
+     and derives a filtered report view at render time; the underlying report
+     graph (and the analysis) is never mutated. */
+  function currentReportFilter(): ReportGraphFilter {
+    return {
+      columns:$('rf-cols').checked,
+      embedded:$('rf-embedded').checked,
+      shared:$('rf-shared').checked,
+      unresolved:$('rf-unresolved').checked,
+      external:$('rf-external').checked,
+      focus:$('rf-focus').value
     };
   }
 
@@ -515,6 +535,51 @@
 
   function run(): void {
     var text=sql.value;
+    var opts=analysisOptions(), object, result, scope=$('opt-scope').value;
+    /* v1.8.0: the dependency filter panel is only relevant in dependency scope.
+       v1.13.0: the report filter panel is only relevant in report scope. */
+    $('filter-menu').style.display=scope==='dependencies'?'':'none';
+    $('report-filter-menu').style.display=scope==='report'?'':'none';
+
+    /* v1.13.0 report intelligence — report → dataset → object → column
+       dependency view built from the parsed report definition (Reports menu).
+       Presentation-only filtering never mutates the report graph. */
+    if(scope==='report'){
+      $('opt-view').disabled=true;
+      $('lbl-group').style.display='none';
+      $('lbl-number').style.display='none';
+      $('lbl-fanin').style.display='none';
+      $('lbl-sources').style.display='none';
+      if(!currentReport||!currentReport.reportCount){
+        showMsg('Load a report definition in the Reports menu, then switch to Report dependencies scope.');
+        out.textContent='flowchart TD';
+        stage.innerHTML='<div class="empty"><p>Apply a report definition in the Reports menu to see its report → dataset → object → column dependencies.</p></div>';
+        stage.classList.add('empty-stage');
+        setStats('report',{reports:0,datasets:0,objects:0,columns:0,
+          embedded:0,shared:0,unresolved:0});
+        setAnalysisHealth(0,0,0);
+        setConstructCoverage(null);
+        $('proc-name').textContent='';
+        lastCode=''; lastGraph=null; lastTitle=''; lastResult=null;
+        return;
+      }
+      var reportGraph=buildReportGraph(currentReport,
+        {catalogue:currentCatalogue||undefined});
+      var filteredReport=filterReportGraph(reportGraph,currentReportFilter());
+      var reportCode=toMermaid(filteredReport,opts.dir||'TD');
+      $('proc-name').textContent='Reports · '+currentReport.reportCount+' report'+(currentReport.reportCount===1?'':'s');
+      setStats('report',reportGraph.stats);
+      setAnalysisHealth(0,0,currentReportDiagnostics.filter(function(d){
+        return d.severity!=='info';}).length);
+      setConstructCoverage(null);
+      showDiagnostics(currentReportDiagnostics);
+      out.textContent=reportCode;
+      lastCode=reportCode; lastGraph=filteredReport; lastResult=null;
+      lastTitle='procflow-report'; lastDirection=opts.dir||'TD';
+      render(reportCode,filteredReport);
+      return;
+    }
+
     if(!text.trim()&&!(workspaceFiles&&workspaceFiles.length)){
       showMsg('');
       out.textContent='flowchart TD';
@@ -528,9 +593,6 @@
       lastCode=''; lastGraph=null; lastTitle=''; lastResult=null; estate=null;
       return;
     }
-    var opts=analysisOptions(), object, result, scope=$('opt-scope').value;
-    /* v1.8.0: the dependency filter panel is only relevant in dependency scope. */
-    $('filter-menu').style.display=scope==='dependencies'?'':'none';
     try{
       if(!workspaceFiles) workspaceFiles=[{name:'Pasted SQL',text:text}];
       estate=analyseEstate(workspaceFiles,opts);
@@ -777,6 +839,18 @@
     $('f-e').checked=true; $('f-t').checked=true; $('f-focus').value='';
     run();
   };
+  /* v1.13.0 report filter controls (presentation-only; re-run derives a new
+     filtered report view without touching the underlying report graph). */
+  $('rf-cols').onchange=run; $('rf-embedded').onchange=run;
+  $('rf-shared').onchange=run; $('rf-unresolved').onchange=run;
+  $('rf-external').onchange=run;
+  $('rf-focus').addEventListener('input',schedule);
+  $('btn-report-filter-reset').onclick=function(){
+    $('rf-cols').checked=true; $('rf-embedded').checked=true;
+    $('rf-shared').checked=true; $('rf-unresolved').checked=true;
+    $('rf-external').checked=true; $('rf-focus').value='';
+    run();
+  };
   $('object-select').onchange=function(){
     activeObjectId=this.value;
     loadObjectSource(activeObject());
@@ -962,7 +1036,9 @@
     typeof toDrawio==='function'&&
     typeof buildWorkspaceSnapshot==='function'&&
     typeof filterDependencyGraph==='function'&&
-    typeof parseReport==='function'
+    typeof parseReport==='function'&&
+    typeof buildReportGraph==='function'&&
+    typeof filterReportGraph==='function'
   ));
 })();
 

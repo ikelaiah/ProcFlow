@@ -4,7 +4,7 @@
   "corpus": {
     "golden": 107,
     "fuzz": 400,
-    "ui": 25,
+    "ui": 27,
     "parity": 10,
     "layout": 11,
     "workspace": 14,
@@ -12,7 +12,9 @@
     "columns": 18,
     "columnFlow": 15,
     "columnLayout": 2,
-    "report": 12
+    "report": 12,
+    "reportGraph": 9,
+    "reportGraphLayout": 2
   },
   "attributionRate": 1,
   "unresolvedTokenRate": 0.04432,
@@ -31,6 +33,8 @@
   "columnFlowPassRate": 1,
   "columnLayoutPassRate": 1,
   "reportPassRate": 1,
+  "reportGraphPassRate": 1,
+  "reportGraphLayoutPassRate": 1,
   "aggregate": {
     "totalTokens": 2685,
     "accountedTokens": 2685,
