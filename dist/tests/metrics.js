@@ -4,11 +4,13 @@
    including the v1.7.0 export-parity, export-traceability, and layout-budget
    pass rates reported by tests/parity.ts, the v1.8.0 workspace
    persistence/dependency-filtering pass rate from tests/workspace.ts, the
-   v1.9.0 catalogue pass rate from tests/catalogue.ts, and the v1.10.0 column
-   lineage pass rate from tests/columns.ts.
+   v1.9.0 catalogue pass rate from tests/catalogue.ts, the v1.10.0 column
+   lineage pass rate from tests/columns.ts, the v1.11.0 column-flow pass rate
+   from tests/column-flow.ts, and the v1.12.0 report-import pass rate from
+   tests/report.ts.
    Purely deterministic and fixture-only: no user inputs and no runtime
    telemetry are ever collected. scripts/metrics.mjs drives this page to
-   produce or verify docs/metrics-v1.10.0.json. */
+   produce or verify docs/metrics-v1.12.0.json. */
 (function () {
     var corpus = PROCFLOW_FIXTURES || [];
     var totalTokens = 0, attributedAll = 0, unresolvedTokens = 0, opaqueTokens = 0, tailUnconsumed = 0;
@@ -87,7 +89,7 @@
                `npm run metrics:write`; CI then refuses to merge a stale snapshot. */
             golden: corpus.length,
             fuzz: 400,
-            ui: 22,
+            ui: 25,
             parity: window.PROCFLOW_PARITY_RESULT ? window.PROCFLOW_PARITY_RESULT.total / 2 : 0,
             layout: window.PROCFLOW_LAYOUT_RESULT ? window.PROCFLOW_LAYOUT_RESULT.total : 0,
             workspace: window.PROCFLOW_WORKSPACE_RESULT
@@ -99,7 +101,9 @@
             columnFlow: window.PROCFLOW_COLUMNFLOW_RESULT
                 ? window.PROCFLOW_COLUMNFLOW_RESULT.total : 0,
             columnLayout: window.PROCFLOW_COLUMNFLOW_RESULT
-                ? window.PROCFLOW_COLUMNFLOW_RESULT.layoutTotal : 0
+                ? window.PROCFLOW_COLUMNFLOW_RESULT.layoutTotal : 0,
+            report: window.PROCFLOW_REPORT_RESULT
+                ? window.PROCFLOW_REPORT_RESULT.total : 0
         },
         attributionRate: rate(attributedAll, totalTokens),
         unresolvedTokenRate: rate(unresolvedTokens, totalTokens),
@@ -152,6 +156,13 @@
         columnLayoutPassRate: window.PROCFLOW_COLUMNFLOW_RESULT
             ? rate(window.PROCFLOW_COLUMNFLOW_RESULT.layoutPassed, window.PROCFLOW_COLUMNFLOW_RESULT.layoutTotal)
             : 1,
+        /* v1.12.0 report import: SSRS/RDL fixtures link reports to datasets,
+           preserve XML source locations where available, distinguish embedded,
+           shared, and unresolved datasets, and keep parser-uncertainty diagnostics
+           region- or document-scoped as appropriate. */
+        reportPassRate: window.PROCFLOW_REPORT_RESULT
+            ? rate(window.PROCFLOW_REPORT_RESULT.passed, window.PROCFLOW_REPORT_RESULT.total)
+            : 0,
         aggregate: {
             totalTokens: totalTokens,
             accountedTokens: attributedAll,

@@ -27,36 +27,24 @@
 
 <hr>
 
-`proc>flow` is a local-first SQL logic and dependency visualiser for database
-administrators, SQL report engineers, developers, analysts, and reviewers.
-Paste SQL or import a group of SQL files to see:
+`proc>flow` turns complicated SQL into diagrams you can actually follow. Paste
+SQL — or import a folder of files — and see:
 
 - how a procedure, function, trigger, view, or query works internally; and
 - how database objects read, write, and call one another.
 
-There is no installation, database connection, backend service, or sign-in.
-The application runs entirely in a browser and works from the local filesystem.
+It runs entirely in your browser, straight from the local filesystem: no
+installation, no database connection, no backend, no sign-in.
 
 > [!IMPORTANT]
 > ProcFlow uses a heuristic parser rather than a database engine's compiler.
 > Treat diagrams as investigation aids. Check important findings against the
 > source SQL and the target database.
 
-For the first stable release, see
-[RELEASE_NOTE_v1.0.0.md](docs/RELEASE_NOTE_v1.0.0.md). For the v1.1.0 release, see
-[RELEASE_NOTE_1.1.0.md](docs/RELEASE_NOTE_1.1.0.md). For the v1.2.0 release, see
-[RELEASE_NOTE_1.2.0.md](docs/RELEASE_NOTE_1.2.0.md). For the v1.3.0 release, see
-[RELEASE_NOTE_1.3.0.md](docs/RELEASE_NOTE_1.3.0.md). For the v1.4.0 release, see
-[RELEASE_NOTE_v1.4.0.md](docs/RELEASE_NOTE_v1.4.0.md). For the v1.5.0 release, see
-[RELEASE_NOTE_v1.5.0.md](docs/RELEASE_NOTE_v1.5.0.md). For the v1.6.0 release, see
-[RELEASE_NOTE_v1.6.0.md](docs/RELEASE_NOTE_v1.6.0.md). For the v1.7.0 release, see
-[RELEASE_NOTE_v1.7.0.md](docs/RELEASE_NOTE_v1.7.0.md). For the v1.8.0 release, see
-[RELEASE_NOTE_v1.8.0.md](docs/RELEASE_NOTE_v1.8.0.md). For the v1.9.0 release, see
-[RELEASE_NOTE_v1.9.0.md](docs/RELEASE_NOTE_v1.9.0.md). For the v1.10.0 release, see
-[RELEASE_NOTE_v1.10.0.md](docs/RELEASE_NOTE_v1.10.0.md). For the v1.11.0 release, see
-[RELEASE_NOTE_v1.11.0.md](docs/RELEASE_NOTE_v1.11.0.md).
+**Release notes:** [v1.12.0](docs/RELEASE_NOTE_v1.12.0.md) · earlier releases
+live in [`docs/`](docs/) alongside the per-release PR notes.
 
-## Start here
+## 🧭 Start here
 
 | I want to… | Go to |
 |---|---|
@@ -68,28 +56,24 @@ For the first stable release, see
 | Build, test, or change the project | [Developer guide](#developer-guide) |
 | Prepare a release | [Release checklist](#release-checklist) |
 
-## 60-second quick start
+## ⚡ 60-second quick start
 
-1. Download the `v1.11.0` archive from
+1. Download the `v1.12.0` archive from
    [GitHub Releases](https://github.com/ikelaiah/ProcFlow/releases) or clone
    this repository.
-2. Extract the complete archive. Keep `index.html`, `styles.css`, `dist/`, and
-   `vendor/` together.
+2. Extract the complete archive — `index.html`, `styles.css`, `dist/`, and
+   `vendor/` must stay together.
 3. Open `index.html` in a recent Chrome, Edge, Firefox, or Chromium browser.
-4. Choose one input:
-   - press **Load sample**;
-   - paste SQL into **SQL source**; or
-   - press **Import SQL files** and select one or more files.
+4. Choose one input: press **Load sample**, paste SQL into **SQL source**, or
+   press **Import SQL files** and select one or more files.
 5. Press **Refresh** or use `Ctrl+Enter` (`Cmd+Enter` on macOS).
 
 No `npm install`, local server, database, or internet connection is required
-for normal use.
+for normal use. If the diagram does not render, the archive was probably
+extracted incompletely — an `index.html` without its sibling `dist/` and
+`vendor/` directories will not work.
 
-If the page opens but the diagram does not render, first confirm that the whole
-archive was extracted. Opening a copied `index.html` without its sibling
-`dist/` and `vendor/` directories will not work.
-
-## Workflow for database administrators
+## 🗄️ Workflow for database administrators
 
 Use ProcFlow to shorten the first pass through unfamiliar routines and change
 reviews.
@@ -107,19 +91,16 @@ reviews.
 8. Use **Export** to save SVG or editable draw.io XML when the diagram is ready
    to share.
 
-Useful DBA review questions include:
-
-- Which tables are read or changed?
-- Which routines are called?
-- Can execution exit before a commit or final result?
-- Where can an exception or error be handled, rethrown, or terminate work?
-- Does transaction state affect the available recovery path?
-- Is any dynamic SQL hiding behavior from static analysis?
+Useful DBA review questions include: which tables are read or changed; which
+routines are called; can execution exit before a commit or final result; where
+can an exception be handled, rethrown, or terminate work; does transaction
+state affect the available recovery path; and is any dynamic SQL hiding
+behavior from static analysis?
 
 When automatic dialect detection is uncertain, select the dialect explicitly
 and refresh the analysis.
 
-## Workflow for SQL report engineers
+## 📊 Workflow for SQL report engineers
 
 Use ProcFlow to understand report datasets, extracts, views, and large SELECT
 statements.
@@ -136,10 +117,13 @@ statements.
 7. Export the result as SVG or draw.io when documenting a report or handing
    analysis to another engineer.
 
-ProcFlow imports SQL text, not report-definition files. SSRS/RDL import is on
-the roadmap; for v1.11.0, paste or export the dataset SQL itself.
+ProcFlow imports SQL text directly, and since v1.12.0 it also imports
+SSRS/RDL report definitions: paste or import an `.rdl` file, and the
+**Reports** menu links the report to its datasets, distinguishes embedded,
+shared, and unresolved datasets, and opens each embedded dataset's query for
+analysis. Report dependency views and report export arrive with v1.13.0.
 
-## What ProcFlow can show
+## 🧩 What ProcFlow can show
 
 ### Internal control flow
 
@@ -178,40 +162,39 @@ the roadmap; for v1.11.0, paste or export the dataset SQL itself.
 - object → table read
 - object → table write
 
-Known imported objects are linked. Selecting one can open its internal logic.
-With a catalogue loaded, unmatched references the catalogue proves — an exact
-full-name match, or an explicit synonym — resolve to their canonical identity
-instead of a conservative label. Unmatched three-/four-part names keep their
-complete identity as `external: [server].[database].[schema].[object]` nodes
-rather than collapsing to a bare last-part match.
+Known imported objects are linked — selecting one opens its internal logic.
+With a catalogue loaded, references the catalogue proves (an exact full-name
+match, or an explicit synonym) resolve to their canonical identity instead of a
+conservative label. Unmatched three-/four-part names keep their complete
+identity as `external: [server].[database].[schema].[object]` nodes rather
+than collapsing to a bare last-part match.
 
-## Reading the analysis safely
+## 🛡️ Reading the analysis safely
 
-The analysis panel provides four release-safety signals:
+The analysis panel gives four signals for how much to trust a diagram:
 
-- **Confidence** is a single headline number from a versioned formula
-  (v1.6.0) built on per-region signals: dialect certainty × the token-weighted
-  quality of each statement region (resolved / approximate / opaque / error) ×
-  a coverage factor. The health band (`high`/`medium`/`low`) is derived from
-  the same formula, so it can never disagree with the percentage. Coverage
-  alone never raises confidence: an object whose tokens all land in opaque
-  dynamic-SQL regions stays at 40 % even at 100 % coverage.
-- **Coverage** is the percentage of body tokens consumed by the parser.
-- **Diagnostics** reports uncertain dialects, balance errors, missing block
+- **Confidence** — a single headline number from a versioned formula (v1.6.0)
+  built on per-region signals: dialect certainty × the token-weighted quality of
+  each statement region (resolved / approximate / opaque / error) × a coverage
+  factor. The health band (`high`/`medium`/`low`) comes from the same formula,
+  so it can never contradict the percentage. Coverage alone never raises
+  confidence: an object whose tokens all land in opaque dynamic-SQL regions
+  stays at 40 % even at 100 % coverage.
+- **Coverage** — the percentage of body tokens consumed by the parser.
+- **Diagnostics** — uncertain dialects, balance errors, missing block
   terminators, unconsumed input, invalid actions, opaque dynamic SQL, opaque
   table expressions, heuristic `APPLY` targets, ambiguous and opaque column
-  references (v1.10.0), opaque column-flow reaching definitions across
-  statements (v1.11.0), and catalogue problems
-  (malformed or conflicting catalogue data, and unproven partial matches
-  reported at the exact reference). Informational annotations
-  (for example a correctly resolved recursive CTE) are displayed separately and
+  references (v1.10.0), opaque column-flow reaching definitions (v1.11.0),
+  catalogue problems (malformed or conflicting data, unproven partial matches),
+  and report/dataset parsing uncertainty (v1.12.0). Informational annotations
+  (for example a correctly resolved recursive CTE) are shown separately and
   never inflate the findings count. Document-scoped findings such as dialect
   ambiguity carry no fabricated source span.
-- **Constructs** reports how many branches, loops, handlers, CTEs, source
+- **Constructs** — how many branches, loops, handlers, CTEs, source
   references, temp-flow links, and column-flow objects and edges were detected,
   resolved, or left opaque.
 
-Use this rule of thumb:
+Rule of thumb:
 
 - High confidence and complete coverage: review the chart, then verify material
   findings in the SQL.
@@ -223,35 +206,23 @@ Use this rule of thumb:
 Input the parser cannot consume is represented as an unresolved node rather
 than silently disappearing from the diagram.
 
-## Supported SQL
+## 📜 Supported SQL
 
-ProcFlow v1.11.0 recognises:
+ProcFlow v1.12.0 recognises Microsoft T-SQL, IBM DB2 SQL PL, PostgreSQL
+PL/pgSQL, and SQLite — covering procedures, functions, triggers, views, plain
+SQL statements, report dataset queries, and multi-object scripts.
 
-- Microsoft T-SQL
-- IBM DB2 SQL PL
-- PostgreSQL PL/pgSQL
-- SQLite
+Dialect coverage highlights:
 
-Supported inputs include procedures, functions, triggers, views, plain SQL
-statements, report dataset queries, and multi-object scripts where those object
-types apply to the selected dialect.
-
-Dialect-specific v1.11.0 coverage includes:
-
-- **T-SQL:** mixed one-line and block `IF`/`WHILE` control flow (single
-  statement and `BEGIN`/`END` bodies in one AST), labelled `GOTO` and labels
-  with source spans plus a `goto_unresolved` diagnostic and explicit
-  "Unresolved label" node, cursor queries (`DECLARE … CURSOR FOR`) in the query
-  graph, concise `GRANT`/`WAITFOR`/`KILL`/cursor-operation labels, semicolon-free
-  statements with grammar-driven boundaries, `TRY`/`CATCH`, `THROW`,
-  `RAISERROR` severity, `XACT_STATE()`, `@@TRANCOUNT`, nested transaction depth,
-  savepoints (including savepoint-only recovery declared in `TRY` and rolled
-  back in `CATCH`), `SET XACT_ABORT` (annotated when set inside a `CATCH`),
-  invalid transaction-action termination, and temporary-table
-  producer→consumer data-flow edges with conservative branch merges, and column
-  flow across statements through temp tables (`SELECT … INTO`, `INSERT …
-  SELECT`, `CREATE TABLE`, `UPDATE … SET`), views, CTEs, and catalogue-resolved
-  boundaries (v1.11.0).
+- **T-SQL:** mixed one-line and block `IF`/`WHILE` control flow, labelled
+  `GOTO` with source spans and an explicit "Unresolved label" node, cursor
+  queries in the query graph, concise `GRANT`/`WAITFOR`/`KILL` labels,
+  semicolon-free statements with grammar-driven boundaries, `TRY`/`CATCH`,
+  `THROW`, `RAISERROR` severity, transaction depth and savepoints (including
+  savepoint-only recovery in `CATCH`), `SET XACT_ABORT` annotation, invalid
+  transaction-action termination, temporary-table producer→consumer data-flow
+  edges, and column flow across statements through temp tables, views, CTEs,
+  and catalogue-resolved boundaries (v1.11.0).
 - **DB2 SQL PL:** mixed `THEN` and `BEGIN`/`END` `IF` forms, `BEGIN ATOMIC`
   rollback scope, labelled loop control and `LEAVE`/`ITERATE` target validation,
   `FOR … CURSOR FOR` queries in the query graph, scoped handlers, and
@@ -267,24 +238,34 @@ comma-separated `FROM` list, an `APPLY` or tabular function, a `MERGE…USING` /
 appear as source nodes.
 
 Since v1.10.0, each query-bearing `SELECT` statement also gets column-level
-analysis (README roadmap item 6 foundations): qualified references, aliases,
-projections, CTE and derived-table scopes, and catalogue-backed wildcard
-expansion produce exact input→output column bindings with source spans. An
-unqualified reference that matches several sources is reported as ambiguous and
-never invents a binding, and unsupported expressions (for example a scalar
-subquery) become opaque with a region-scoped diagnostic.
+analysis: qualified references, aliases, projections, CTE and derived-table
+scopes, and catalogue-backed wildcard expansion produce exact input→output
+column bindings with source spans. An unqualified reference that matches
+several sources is reported as ambiguous and never invents a binding;
+unsupported expressions become opaque with a region-scoped diagnostic.
 
-Since v1.11.0, column lineage flows across statements as a pipeline (README
-roadmap item 6 delivered): `SELECT col INTO #t`, `INSERT … SELECT`, `CREATE
-TABLE`, and `UPDATE … SET` transformations define an object's columns, later
-consumers bind back through them, and each produced column is traced end-to-end
-to its original source object — through temp tables, views defined earlier in
-the same script, catalogue-resolved object boundaries, and CTE scopes. When a
-reaching definition is ambiguous (a conditional write or a branch merge) the
-consumer stays explicitly opaque with a region-scoped `column_flow_opaque`
-diagnostic, and no binding is invented. The column-flow graph exports to Mermaid
-and draw.io with provenance metadata and is laid out on its own documented
-`column` graph class. Interactive column views remain scheduled for v1.13.0.
+Since v1.11.0, column lineage flows across statements as a pipeline:
+`SELECT col INTO #t`, `INSERT … SELECT`, `CREATE TABLE`, and `UPDATE … SET`
+transformations define an object's columns, later consumers bind back through
+them, and each produced column is traced end-to-end to its original source
+object — through temp tables, same-script views, catalogue-resolved object
+boundaries, and CTE scopes. When a reaching definition is ambiguous (a
+conditional write or a branch merge) the consumer stays explicitly opaque with
+a region-scoped `column_flow_opaque` diagnostic, and no binding is invented.
+The column-flow graph exports to Mermaid and draw.io with provenance metadata
+and is laid out on its own documented `column` graph class. Interactive column
+views remain scheduled for v1.13.0.
+
+Since v1.12.0, SSRS/RDL report definitions can be imported: the **Reports**
+menu parses a report definition, links the report to its datasets, and
+distinguishes embedded (query text is in the report), shared (a reference to an
+external shared dataset definition), and unresolved datasets. XML source
+locations are preserved where element tags are locatable, and parser
+uncertainty is scoped: malformed RDL or a missing `<Report>` root is a
+document-scoped diagnostic, while an unresolved dataset is region-scoped at its
+own element span. Selecting an embedded dataset in the Dataset picker loads and
+analyses its query. Combined report dependency views and report export remain
+scheduled for v1.13.0.
 
 Detection is automatic and can be overridden from the **Dialect** selector.
 When detection is uncertain and several dialects score equally, an explicit
@@ -296,7 +277,7 @@ dialects: when a catalogue is loaded, object references the catalogue proves
 are shown as verified identity instead of external labels. See
 [Working with a catalogue](#working-with-a-catalogue).
 
-## Importing SQL
+## 📂 Importing SQL
 
 **Import SQL files** accepts multiple `.sql`, `.ddl`, and `.txt` files. Files
 are read into memory by the current browser tab; they are not uploaded and are
@@ -306,7 +287,29 @@ Multi-object scripts are split into selectable objects. If the split cannot be
 made confidently, ProcFlow keeps the input as one script and reports the
 uncertainty.
 
-## Working with a catalogue
+## 📑 Working with reports
+
+The **Reports** menu (v1.12.0) imports SSRS/RDL report definitions so each
+report's datasets link to their SQL analysis.
+
+- **Paste or import.** Type an RDL/XML report definition into the textarea (or
+  press **Import file** for `.rdl`/`.xml` files) and press **Apply report**.
+- **Dataset kinds.** Each dataset is **embedded** (its query text is in the
+  report and is analysed), **shared** (a reference to an external shared
+  dataset definition, so there is no SQL to analyse here), or **unresolved**
+  (neither a query text nor a shared reference, so it cannot be linked).
+- **Open a dataset.** The **Dataset** picker lists every dataset with its
+  source kind; selecting an embedded dataset loads its query into the editor
+  and runs the normal SQL analysis.
+- **Honest diagnostics.** XML source locations are preserved where element
+  tags are locatable. Malformed RDL or a missing `<Report>` root is a
+  document-scoped diagnostic with no fabricated span; an unresolved dataset is
+  a region-scoped diagnostic at its own element span. These findings appear in
+  the Diagnostics panel alongside the SQL analysis.
+- **Clear** removes the report. The report is an analysis input, so a saved
+  workspace captures it and Restore reproduces an identical analysis.
+
+## 🗂️ Working with a catalogue
 
 The **Catalogue** menu imports table/view/column metadata so ProcFlow can
 resolve object references to their exact identity instead of a conservative
@@ -333,16 +336,17 @@ resolve object references to their exact identity instead of a conservative
   current analysis. The catalogue is an analysis input, so a saved workspace
   captures it and Restore reproduces an identical analysis.
 
-## Workspace
+## 💾 Workspace
 
 The **Workspace** menu keeps your work usable across sessions, entirely on your
 terms:
 
 - **Save to this browser** persists the current workspace (files, analysis
-  options, and any applied catalogue text) to this browser's `localStorage`.
-  This is strictly opt-in — nothing is written or restored on load.
-- **Restore saved workspace** replays the saved files, options, and catalogue
-  into an identical analysis.
+  options, and any applied catalogue or report text) to this browser's
+  `localStorage`. This is strictly opt-in — nothing is written or restored on
+  load.
+- **Restore saved workspace** replays the saved files, options, catalogue, and
+  report text into an identical analysis.
 - **Export workspace file** / **Import workspace file** transfer a workspace as
   portable JSON.
 - **Forget saved workspace** removes the local copy explicitly.
@@ -350,7 +354,7 @@ terms:
 Saved workspaces are versioned (so future releases can migrate them) and, if
 corrupt or unreadable, are recovered by starting fresh rather than crashing.
 
-## Dependency filtering
+## 🎯 Dependency filtering
 
 In **Object dependencies** scope, the **Filter dependencies** menu offers
 presentation-only filters over the estate diagram: show/hide **Reads**,
@@ -360,7 +364,7 @@ neighbours. Filtering derives a filtered view at render time and never changes
 the underlying analysis graph, so confidence, coverage, diagnostics, and the
 reported stats stay exactly as analysed.
 
-## Exporting and sharing
+## 📤 Exporting and sharing
 
 The **Export** menu provides:
 
@@ -380,11 +384,11 @@ sharing confidential SQL.
 draw.io is a trademark of draw.io AG. ProcFlow is not affiliated with or
 endorsed by draw.io.
 
-## Security and privacy
+## 🔒 Security and privacy
 
 ### Quick answers
 
-| Question | ProcFlow v1.11.0 behavior |
+| Question | ProcFlow v1.12.0 behavior |
 |---|---|
 | Is SQL uploaded? | No. Analysis and rendering happen in the browser tab. |
 | Does it connect to a database? | No. There is no driver, connection string, or query execution. |
@@ -392,10 +396,10 @@ endorsed by draw.io.
 | Is there analytics or telemetry? | No. |
 | Is internet access required? | No for local or internally hosted use. |
 | Are imported files uploaded? | No. The browser File API reads them into the current tab. |
-| Is SQL retained after closing the tab? | No by default. ProcFlow does not use cookies, `sessionStorage`, or IndexedDB, and does not write to `localStorage` on load. A workspace is kept across sessions only when you explicitly choose **Save to this browser** in the Workspace menu. |
-| Is a saved workspace stored on this computer? | Only if you choose **Save to this browser**. It is written to this browser's `localStorage`, is local-only, versioned, exportable to a JSON file, and removed by **Forget saved workspace** or by clearing browser site data. |
+| Is SQL retained after closing the tab? | No by default — no cookies, `sessionStorage`, IndexedDB, or `localStorage` writes on load. A workspace persists only when you explicitly choose **Save to this browser**. |
+| Is a saved workspace stored on this computer? | Only if you choose **Save to this browser**: written to `localStorage`, local-only, versioned, exportable to JSON, and removable via **Forget saved workspace** or clearing site data. |
 | Does ProcFlow write to the clipboard automatically? | No. Clipboard writes follow an explicit copy action. |
-| Are exports local? | Yes. SVG and draw.io files are generated in memory and downloaded by the browser. (Column-flow graphs export with full provenance metadata; interactive column views arrive with v1.13.0.) |
+| Are exports local? | Yes. SVG and draw.io files are generated in memory and downloaded by the browser. |
 | Does it call an AI service? | No. It can copy a narration prompt but never submits it. |
 
 ### Runtime files
@@ -411,6 +415,8 @@ dist/src/dialects.js
 dist/src/lineage.js
 dist/src/ir.js
 dist/src/columns.js
+dist/src/columnflow.js
+dist/src/report.js
 dist/src/exporters.js
 dist/src/workspace.js
 dist/src/app.js
@@ -426,10 +432,11 @@ The opt-in persistence module (`dist/src/workspace.js`) is the only runtime
 that touches browser storage, and it does so only through explicit
 **Workspace** menu actions (Save / Restore / Forget) — never on load. Its
 import/export uses the browser download API, which also requires an explicit
-action. The catalogue module (`dist/src/catalogue.js`) parses pasted or
-imported metadata in memory only; it never reads or writes storage.
+action. The catalogue module (`dist/src/catalogue.js`) and the report module
+(`dist/src/report.js`) parse pasted or imported metadata/report definitions in
+memory only; they never read or write storage.
 
-The SHA-256 of `vendor/mermaid/mermaid.min.js` in v1.11.0 is:
+The SHA-256 of `vendor/mermaid/mermaid.min.js` in v1.12.0 is:
 
 ```text
 61B335A46DF05A7CE1C98378F60E5F3E77A7FB608A1056997E8A649304A936D6
@@ -440,7 +447,7 @@ so the release checksum remains reproducible across operating systems.
 
 ### Guidance for security review
 
-1. Review and pin the `v1.11.0` tag or its exact commit.
+1. Review and pin the `v1.12.0` tag or its exact commit.
 2. Verify the vendored Mermaid checksum.
 3. Review the runtime files listed above.
 4. Open the reviewed files locally or serve them from an approved internal
@@ -465,21 +472,17 @@ browser, installed extensions, modified source files, or external destination.
 ProcFlow's boundary is that its own application code performs analysis locally
 and contains no automatic data-submission path.
 
-## Known limitations
+## ⚠️ Known limitations
 
-- Parsing is heuristic and does not provide the guarantees of the target
-  database engine's parser.
-- Dynamic SQL is opaque.
+- Parsing is heuristic, not compiler-grade.
+- Dynamic SQL is opaque by design.
 - Statement boundaries no longer depend on newline position: semicolons are
   authoritative and omitted semicolons are split by control keywords and
   statement grammar. Exceptionally malformed batches can still produce imperfect
   splits.
-- Query lineage is object-level; a single query statement also reports
-  column-level scopes and bindings (v1.10.0), and since v1.11.0 column flow
-  crosses statements through temp tables, transformations, views, CTEs, and
-  catalogue-resolved object boundaries. Column resolution remains conservative:
-  an ambiguous reaching definition stays opaque and is never resolved by
-  invention.
+- Column resolution is conservative: an ambiguous reaching definition stays
+  opaque and is never resolved by invention. Interactive column views in the
+  app are scheduled for v1.13.0.
 - Some vendor-specific table expressions might not be detected.
 - Temporary-table data flow is shown within one object; cross-object temp flow
   remains unresolved.
@@ -488,12 +491,9 @@ and contains no automatic data-submission path.
   without a catalogue synonym, and unknown linked-server layouts stay external
   (with a `catalogue_partial` diagnostic where a plausible but unproven
   candidate exists) until the catalogue proves them.
-- Columns are parsed and validated by the catalogue import and, since v1.10.0,
-  drive wildcard expansion and column bindings inside a single statement.
-  Since v1.11.0, column flow also crosses statements through temp tables,
-  transformations, views, CTEs, and catalogue-resolved object boundaries;
-  interactive column views in the app are scheduled for v1.13.0.
-- SSRS/RDL files are not imported in v1.9.0.
+- SSRS/RDL definitions are imported and linked to their datasets; shared and
+  unresolved datasets stay explicit and are reported rather than guessed.
+  Report dependency views and report export are scheduled for v1.13.0.
 - draw.io layout is deterministic for the documented graph classes at
   documented size limits; very large or non-planar graphs are laid out without
   overlapping boxes and reported honestly rather than claimed crossing-free.
@@ -501,7 +501,7 @@ and contains no automatic data-submission path.
 Always confirm critical dependencies, execution paths, transaction behavior,
 and security conclusions against the original SQL and target database.
 
-## Developer guide
+## 🛠️ Developer guide
 
 ### Prerequisites
 
@@ -561,16 +561,16 @@ Then open:
 - `http://127.0.0.1:8000/tests/ui.html` — browser interaction and local-runtime
   tests
 
-The v1.11.0 baseline is:
+The v1.12.0 baseline is:
 
-- 210 golden and boundary assertions
+- 211 golden and boundary assertions
 - 400 deterministic mutation cases
-- 22 browser interaction tests
+- 25 browser interaction tests
 - 20 export-parity checks (10 fixtures × TD + LR), 11 layout-budget fixtures,
   and 100 % export-traceability on the export fixtures
-- 13 workspace-persistence and dependency-filtering fixtures (save→reload
+- 14 workspace-persistence and dependency-filtering fixtures (save→reload
   identity, schema migration, corrupt recovery, explicit clear, non-mutating
-  filters)
+  filters, and the report-definition round-trip)
 - 13 catalogue fixtures (JSON and line import, synonym / linked-server /
   cross-database verification, conservative conflict and partial diagnostics,
   export metadata, workspace round-trip)
@@ -582,13 +582,16 @@ The v1.11.0 baseline is:
   same-script view and catalogue-boundary resolution, clean invariants, and
   export parity) plus 2 column layout-budget fixtures on the documented
   `column` graph class
+- 12 report-import fixtures (report→dataset linking, embedded/shared/unresolved
+  dataset distinction, XML source locations, and region/document-scoped parser
+  diagnostics)
 
 Fixture-corpus accuracy metrics (attribution, unresolved-token, tail-unconsumed,
 fallback, opaque-dynamic, semantic-edge coverage, provenance,
 region-diagnostic-to-span, export-parity, export-traceability, layout-budget,
-workspace, catalogue, column, and column-flow pass-rate ratios) are published
-from the checked-in golden corpus in
-[docs/metrics-v1.11.0.json](docs/metrics-v1.11.0.json). Generation
+workspace, catalogue, column, column-flow, and report pass-rate ratios) are
+published from the checked-in golden corpus in
+[docs/metrics-v1.12.0.json](docs/metrics-v1.12.0.json). Generation
 is deterministic and fixture-only — no user inputs or runtime telemetry are
 collected — and CI refuses to merge when the snapshot is stale. Regenerate with
 `npm run metrics:write`.
@@ -627,6 +630,8 @@ docs/
 ├── PR_NOTE_1.8.0.md
 ├── PR_NOTE_1.9.0.md
 ├── PR_NOTE_1.10.0.md
+├── PR_NOTE_1.11.0.md
+├── PR_NOTE_1.12.0.md
 ├── RELEASE_NOTE_1.1.0.md
 ├── RELEASE_NOTE_1.2.0.md
 ├── RELEASE_NOTE_1.3.0.md
@@ -642,7 +647,8 @@ docs/
 ├── RELEASE_NOTE_v1.9.0.md
 ├── RELEASE_NOTE_v1.10.0.md
 ├── RELEASE_NOTE_v1.11.0.md
-└── metrics-v1.11.0.json   # deterministic fixture-only accuracy metrics snapshot
+├── RELEASE_NOTE_v1.12.0.md
+└── metrics-v1.12.0.json   # deterministic fixture-only accuracy metrics snapshot
 examples/
 ├── dbo.v110_demo.sql    # per-release outcome demos
 ├── dbo.v120_demo.sql
@@ -654,7 +660,8 @@ examples/
 ├── dbo.v180_demo.sql    # v1.8.0: usable local workspace demo
 ├── dbo.v190_demo.sql    # v1.9.0: resolve by catalogue demo
 ├── dbo.v1100_demo.sql   # v1.10.0: column lineage foundations demo
-└── dbo.v1110_demo.sql   # v1.11.0: column lineage pipelines demo
+├── dbo.v1110_demo.sql   # v1.11.0: column lineage pipelines demo
+└── dbo.v1120_demo.rdl   # v1.12.0: SSRS/RDL report import demo
 scripts/
 ├── file-smoke.mjs    # dependency-free local-file release smoke test
 └── metrics.mjs       # generate/verify the fixture-corpus metric snapshot
@@ -667,6 +674,7 @@ src/
 ├── ir.ts             # graphs, diagnostics, confidence, and estate analysis
 ├── columns.ts        # v1.10.0: single-statement column scopes and bindings
 ├── columnflow.ts     # v1.11.0: cross-statement column-flow pipelines + export graph
+├── report.ts         # v1.12.0: SSRS/RDL report import and dataset linking
 ├── exporters.ts      # Mermaid, draw.io, and narration output
 ├── workspace.ts      # opt-in persistence + presentation-only dependency filtering
 └── app.ts            # browser UI and workspace interaction
@@ -686,6 +694,7 @@ tests/
 ├── catalogue.ts
 ├── columns.ts        # v1.10.0: column lineage foundations fixtures
 ├── column-flow.ts    # v1.11.0: column-flow pipelines, export, and layout fixtures
+├── report.ts         # v1.12.0: report import, dataset linking, diagnostics fixtures
 ├── tests.ts
 ├── fuzz.ts
 ├── ui-tests.ts
@@ -705,7 +714,7 @@ The shared model uses a discriminated TypeScript AST and records source spans,
 branches, loops, scoped handlers, reads, writes, calls, result sets,
 diagnostics, and graph structures.
 
-## Release checklist
+## ✅ Release checklist
 
 Run the following from a clean checkout before tagging a release:
 
@@ -724,20 +733,21 @@ Then verify:
 3. Generated `dist/` files match their TypeScript sources.
 4. The Mermaid SHA-256 matches the value in this README and the workflow.
 5. `npm run metrics` reports the metric snapshot is current.
-6. `RELEASE_NOTE_v1.11.0.md` matches the final tag contents.
+6. `RELEASE_NOTE_v1.12.0.md` matches the final tag contents.
 7. The complete archive opens locally with `index.html`, and the local-file
    smoke test reports the opt-in workspace assertion.
-8. The tag is named `v1.11.0`.
+8. The tag is named `v1.12.0`.
 
-The release can then be created manually from the `v1.11.0` tag using
-[RELEASE_NOTE_v1.11.0.md](docs/RELEASE_NOTE_v1.11.0.md).
+The release can then be created manually from the `v1.12.0` tag using
+[RELEASE_NOTE_v1.12.0.md](docs/RELEASE_NOTE_v1.12.0.md).
 
-## Roadmap after v1.0.0
+## 🗺️ Roadmap after v1.0.0
 
 1. Expand the anonymised golden SQL fixture corpus.
 2. Improve table-function, `APPLY`, comma-source, and DML lineage.
 3. Model more multi-statement and temporary-table transformations.
 4. Import SSRS/RDL definitions and link reports to datasets.
+   **Delivered in v1.12.0.**
 5. Accept database catalogue metadata for more accurate object resolution.
    **Delivered in v1.9.0.**
 6. Add column-level lineage where it can be resolved safely.
@@ -752,7 +762,7 @@ The release can then be created manually from the `v1.11.0` tag using
 8. Separate graph, transaction, and estate-analysis internals while preserving
    the v1.0.0 behavior through golden tests. **Delivered in v1.1.0.**
 
-## Contributing and reporting problems
+## 🤝 Contributing and reporting problems
 
 A useful bug report includes:
 

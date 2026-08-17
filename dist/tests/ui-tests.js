@@ -227,6 +227,51 @@
             results.push({ name: 'clearing the catalogue resets its status',
                 pass: /No catalogue loaded/i.test(get('catalogue-status').textContent || ''),
                 detail: { status: get('catalogue-status').textContent } });
+            /* v1.12.0 report import — paste an SSRS/RDL definition, Apply, verify the
+               status summary distinguishes embedded/shared/unresolved datasets, and
+               select an embedded dataset so its SQL loads and analyses. */
+            get('opt-scope').value = 'internal';
+            get('opt-dialect').value = 'tsql';
+            var rdlText = '<Report xmlns="http' + '://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition">\n' +
+                '<DataSets>\n' +
+                '  <DataSet Name="Students"><Query>\n' +
+                '    <DataSourceName>SchoolDB</DataSourceName>\n' +
+                '    <CommandText>SELECT StudentId FROM dbo.Student</CommandText>\n' +
+                '  </Query></DataSet>\n' +
+                '  <DataSet Name="Rollup"><SharedDataSet>\n' +
+                '    <SharedDataSetReference>Shared/Rollup</SharedDataSetReference>\n' +
+                '  </SharedDataSet></DataSet>\n' +
+                '  <DataSet Name="Broken"></DataSet>\n' +
+                '</DataSets>\n</Report>';
+            get('report-text').value = rdlText;
+            get('btn-report-apply').click();
+            var reportStatus = get('report-status').textContent || '';
+            var datasetOptions = Array.prototype.map.call(get('report-dataset-select').options, function (o) { return String(o.textContent); });
+            results.push({ name: 'report import distinguishes embedded, shared, and unresolved datasets',
+                pass: /1 report · 3 datasets · 1 embedded · 1 shared · 1 unresolved/i.test(reportStatus) &&
+                    datasetOptions.length === 3 &&
+                    datasetOptions.some(function (t) { return /Students — embedded/i.test(t); }) &&
+                    datasetOptions.some(function (t) { return /Rollup — shared/i.test(t); }) &&
+                    datasetOptions.some(function (t) { return /Broken — unresolved/i.test(t); }),
+                detail: { status: reportStatus, options: datasetOptions } });
+            var beforeCode = get('mermaid-out').textContent;
+            Array.prototype.forEach.call(get('report-dataset-select').options, function (o) {
+                if (/Students/.test(o.textContent))
+                    get('report-dataset-select').value = o.value;
+            });
+            get('report-dataset-select').dispatchEvent(new Event('change'));
+            var afterCode = get('mermaid-out').textContent;
+            results.push({ name: 'selecting an embedded dataset loads and analyses its SQL',
+                pass: get('sql').value.indexOf('SELECT StudentId FROM dbo.Student') >= 0 &&
+                    afterCode !== beforeCode && /dbo\.Student/i.test(afterCode) &&
+                    /Students — embedded/.test(get('report-dataset-select').selectedOptions[0].textContent || ''),
+                detail: { sql: get('sql').value.slice(0, 80),
+                    code: afterCode.slice(0, 120), before: beforeCode.slice(0, 120) } });
+            get('btn-report-clear').click();
+            results.push({ name: 'clearing the report resets its status and picker',
+                pass: /No report definition loaded/i.test(get('report-status').textContent || '') &&
+                    get('report-dataset-select').disabled === true,
+                detail: { status: get('report-status').textContent } });
             finish(results);
         }, 1200);
     });

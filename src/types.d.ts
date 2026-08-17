@@ -367,6 +367,12 @@ interface AnalyseOptions {
      so column flow can cross object boundaries within the workspace. Read-only
      references resolved by the catalogue are seeded automatically. */
   define?: Record<string, ColumnFlowObject>;
+  /* v1.12.0 — report import. A parsed report definition (SSRS/RDL) whose
+     report- and dataset-parsing diagnostics are surfaced alongside the SQL
+     analysis and whose parsed reports are attached to the result. The dataset
+     SQL itself is analysed through the normal pipeline; this option links the
+     report model to the current object's analysis. */
+  reports?: ReportParseResult;
 }
 
 interface DrawioOptions {
@@ -464,6 +470,12 @@ interface AnalysisResult {
      boundaries, plus the exported column-flow graph (its own layout class). */
   columnFlow?: ColumnFlow;
   columnFlowGraph?: Graph;
+  /* v1.12.0 — report import. The parsed report definition linked to this
+     analysis plus its report- and dataset-parsing diagnostics (merged into
+     `diagnostics`). `reportDiagnostics` keeps the report-scoped findings
+     separate so the UI can show them with their own source scope. */
+  reportParse?: ReportParseResult;
+  reportDiagnostics?: Diagnostic[];
 }
 
 interface WorkspaceFile {
@@ -531,6 +543,11 @@ interface WorkspaceSnapshot {
      analysis input, so it is captured with the snapshot so Restore reproduces
      an identical analysis. Null/absent means no catalogue. */
   catalogue?: string | null;
+  /* v1.12.0 — the raw SSRS/RDL report definition text. It is an analysis input
+     (its dataset SQL and diagnostics feed the analysis), so it is captured with
+     the snapshot so Restore reproduces an identical analysis. Null/absent means
+     no report definition. */
+  report?: string | null;
   activeObjectId: string | null;
 }
 
@@ -751,6 +768,58 @@ interface ColumnFlow {
   };
 }
 
+/* v1.12.0 — report import (README post-v1.0.0 item 4).
+   SSRS/RDL import: parse report definitions and link reports to datasets and
+   each dataset to its SQL analysis. Combined report dependency views and report
+   export are deferred to v1.13.0; this release ships the parser, the
+   report→dataset linkage, XML source locations where available, and E
+   diagnostics for report- and dataset-parsing uncertainty. */
+type ReportDatasetSource = 'embedded' | 'shared' | 'unresolved';
+
+/* One report data source: embedded (connection properties are in the RDL) or
+   shared (a reference to an external shared data source definition). */
+interface ReportDataSource {
+  name: string;
+  kind: 'embedded' | 'shared';
+  provider?: string | null;
+  xmlSpan: SourceSpan | null;
+}
+
+/* One dataset inside a report. `source` distinguishes an embedded dataset
+   (its command text is in the report and is analysed), a shared dataset (a
+   reference to an external shared dataset definition, so there is no SQL to
+   analyse here), and an unresolved dataset (no command text and no shared
+   reference, so it cannot be linked to any SQL analysis). `analysis` holds the
+   SQL analysis of an embedded dataset's command text. */
+interface ReportDataset {
+  name: string;
+  source: ReportDatasetSource;
+  dataSourceName?: string | null;
+  sql?: string | null;
+  sqlSpan?: SourceSpan | null;
+  sharedReference?: string | null;
+  xmlSpan: SourceSpan | null;
+  analysis?: AnalysisResult | null;
+}
+
+interface ReportDefinition {
+  name: string;
+  dataSources: ReportDataSource[];
+  datasets: ReportDataset[];
+  xmlSpan: SourceSpan | null;
+}
+
+interface ReportParseResult {
+  reports: ReportDefinition[];
+  datasets: ReportDataset[];
+  diagnostics: Diagnostic[];
+  reportCount: number;
+  datasetCount: number;
+  embeddedCount: number;
+  sharedCount: number;
+  unresolvedCount: number;
+}
+
 interface FixtureExpectation {
   mode?: 'flow' | 'query';
   branch?: number;
@@ -865,6 +934,15 @@ interface Window {
     layoutTotal: number;
   };
   PROCFLOW_COLUMNFLOW_DETAIL?: Array<{name: string; pass: boolean; detail: unknown}>;
+  /* v1.12.0 report-import suite results (SSRS/RDL parse, report→dataset
+     linking, XML source locations, and region/document-scoped diagnostics),
+     published for the golden and metrics pages. */
+  PROCFLOW_REPORT_PASS?: boolean;
+  PROCFLOW_REPORT_RESULT?: {
+    passed: number;
+    total: number;
+  };
+  PROCFLOW_REPORT_DETAIL?: Array<{name: string; pass: boolean; detail: unknown}>;
   /* v1.8.0 opt-in workspace persistence globals (src/workspace.ts), exposed for
      the browser UI tests. */
   clearWorkspace(): void;

@@ -16,7 +16,10 @@
 */
 /* v1.8.0 schema was version 1. v1.9.0 adds the optional catalogue text (an
    analysis input) as a top-level snapshot field, so a saved workspace still
-   reproduces an identical analysis when a catalogue was in use. */
+   reproduces an identical analysis when a catalogue was in use. v1.12.0 adds
+   the optional report definition text (also an analysis input) the same way,
+   without a schema bump: the field is optional and older snapshots simply lack
+   it. */
 var WORKSPACE_SCHEMA_VERSION = 2;
 var WORKSPACE_STORAGE_KEY = 'procflow.workspace'; /* schema base key; versioned payload */
 var DIALECT_SELECT_ORDER = ['auto', 'tsql', 'db2', 'plpgsql', 'sqlite'];
@@ -57,6 +60,7 @@ function buildWorkspaceSnapshot(state) {
         }),
         options: opt,
         catalogue: state.catalogue == null ? null : String(state.catalogue),
+        report: state.report == null ? null : String(state.report),
         activeObjectId: state.activeObjectId || null
     };
     return snap;
@@ -91,6 +95,7 @@ function migrateWorkspace(raw) {
         sources: src.sources === undefined ? d.sources : !!src.sources
     };
     migrated.catalogue = raw && raw.catalogue != null ? String(raw.catalogue) : null;
+    migrated.report = raw && raw.report != null ? String(raw.report) : null;
     migrated.activeObjectId = raw && raw.activeObjectId ? String(raw.activeObjectId) : null;
     return migrated;
 }

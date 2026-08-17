@@ -833,6 +833,19 @@
     catch (err) {
         record('v1.11.0 column-flow pipelines, exports, and column layout fixtures', false, String(err && err.stack || err));
     }
+    /* v1.12.0: report import — SSRS/RDL parsing links reports to datasets and
+       each embedded dataset to its SQL analysis, distinguishes embedded, shared,
+       and unresolved datasets, preserves XML source locations, and keeps
+       parser-uncertainty diagnostics region- or document-scoped as appropriate.
+       Runs ahead in tests/report.ts; gate the whole golden page on them. */
+    try {
+        record('v1.12.0 report import, dataset linking, and diagnostics fixtures', window.PROCFLOW_REPORT_PASS === true &&
+            !!window.PROCFLOW_REPORT_RESULT &&
+            window.PROCFLOW_REPORT_RESULT.passed === window.PROCFLOW_REPORT_RESULT.total, window.PROCFLOW_REPORT_RESULT);
+    }
+    catch (err) {
+        record('v1.12.0 report import, dataset linking, and diagnostics fixtures', false, String(err && err.stack || err));
+    }
     var passed = results.filter(function (r) { return r.pass; }).length;
     document.body.className = passed === results.length ? 'pass' : 'fail';
     document.getElementById('summary').textContent = passed + '/' + results.length + ' tests passed';

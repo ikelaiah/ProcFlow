@@ -1807,6 +1807,13 @@ function analyse(sql: string, opts?: AnalyseOptions): AnalysisResult {
      identity is verified rather than estimated. */
   if(opts.catalogueDiagnostics)
     opts.catalogueDiagnostics.forEach(function(d){ diagnostics.push(d); });
+  /* v1.12.0 — report import. Report- and dataset-parsing diagnostics from a
+     parsed SSRS/RDL definition surface alongside the object analysis with their
+     correct region/document scope (report parse failures are document-scoped
+     and carry no fabricated span; an unresolved dataset is region-scoped at its
+     element span). */
+  if(opts.reports)
+    opts.reports.diagnostics.forEach(function(d){ diagnostics.push(d); });
   if(opts.catalogue){
     walkAst(ast,function(st){
       if(st.type!=='stmt'||!st.toks||!st.toks.length) return;
@@ -2004,5 +2011,9 @@ function analyse(sql: string, opts?: AnalyseOptions): AnalysisResult {
           mermaid:toMermaid(selected, opts.dir||'TD'),
           attribution:attribution, constructCoverage:constructCoverage,
           columns:columnLineages, columnFlow:columnFlow||undefined,
-          columnFlowGraph:columnFlowGraph||undefined};
+          columnFlowGraph:columnFlowGraph||undefined,
+          /* v1.12.0 — the parsed report definition linked to this analysis and
+             its report-scoped diagnostics (already merged into `diagnostics`). */
+          reportParse:opts.reports||undefined,
+          reportDiagnostics:opts.reports?(opts.reports.diagnostics||[]):undefined};
 }

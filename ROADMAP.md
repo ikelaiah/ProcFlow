@@ -375,6 +375,8 @@ v1.11.0, item 4 → v1.12.0.**
 
 ### v1.12.0 — Report import
 
+**Delivered in v1.12.0.**
+
 - **Ships:** README item 4 — SSRS/RDL import: parse report definitions and link
   reports to datasets and each dataset to its SQL analysis; E diagnostics for
   report- and dataset-parsing uncertainty.
