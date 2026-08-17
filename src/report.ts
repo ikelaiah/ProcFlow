@@ -267,3 +267,234 @@ function reportSummary(parse: ReportParseResult | null): string {
   if(nDiag) bits.push(nDiag+(nDiag===1?' diagnostic':' diagnostics'));
   return bits.join(' · ');
 }
+
+/* ===== v1.13.0 Report intelligence (report → dataset → object → column) =====
+   A report dependency graph built on the v1.9.0 catalogue and the v1.11.0
+   column contract: each report links to its datasets, each embedded dataset's
+   SQL analysis links to the objects it reads/writes/calls (catalogue-verified
+   where possible), and each object links to the columns its query references
+   (from the column-lineage model, only when the columns are known — never
+   invented). Shared datasets keep their external shared-dataset identity and
+   unresolved datasets stay explicit. The graph is a plain `Graph` exported on
+   its own documented `report` layout class with full provenance metadata
+   (F export fidelity). filterReportGraph is presentation-only: it derives a
+   filtered view at render time and never mutates the underlying graph.
+   Large-graph convergence stays deferred to v1.14.0. */
+
+/* Build the report dependency graph for a parsed report definition. The
+   `analysis` attached to each embedded dataset (v1.12.0) provides the object
+   facts (reads/writes/calls) and the column-lineage sources that name the
+   columns each query actually references. */
+function buildReportGraph(parse: ReportParseResult | null,
+    opts?: {catalogue?: Catalogue | null; dialect?: Dialect}): Graph {
+  var nodes: GraphNode[]=[], edges: GraphEdge[]=[];
+  var seq=0;
+  var repIds: Record<string, string>={};
+  var dsIds: Record<string, string>={};
+  var objIds: Record<string, string>={};
+  var colIds: Record<string, string>={};
+  var cat=opts&&opts.catalogue||null;
+
+  function add(text: string, cls: string, shape: string,
+      source: SourceSpan | null, provenance: NodeProvenance,
+      objectId?: string | null, reason?: string, lines?: string[],
+      resolution?: CatalogueResolution, resolvedName?: string): string {
+    var id='r'+(++seq);
+    var structured=lines&&lines.length
+      ? lines.map(function(l){return String(l).trim();}).filter(function(l){return l.length>0;})
+      : undefined;
+    var node: GraphNode={id:id,shape:shape,
+      text:structured?structured.join('\n'):text,
+      cls:cls,
+      source:source||null,objectId:objectId||null,
+      provenance:provenance||(source?'source':'synthetic'),
+      reason:reason||undefined};
+    if(structured) node.lines=structured;
+    if(resolution) node.resolution=resolution;
+    if(resolvedName) node.resolvedName=resolvedName;
+    nodes.push(node);
+    return id;
+  }
+
+  function datasetNode(ds: ReportDataset, reportName: string): string {
+    var dkey=reportName.toUpperCase()+'|'+ds.name.toUpperCase();
+    if(dsIds[dkey]) return dsIds[dkey];
+    var cls=ds.source==='shared'?'dsshared':
+      (ds.source==='unresolved'?'dsunresolved':'dsembedded');
+    var lines=[ds.name, ds.source];
+    if(ds.source==='shared'&&ds.sharedReference) lines[1]=lines[1]+' · '+ds.sharedReference;
+    if(ds.dataSourceName) lines.push(ds.dataSourceName);
+    var id=add(ds.name,cls,'io',ds.xmlSpan,'source',undefined,
+      ds.source==='unresolved'?'no command text or shared dataset reference':undefined,
+      lines);
+    dsIds[dkey]=id;
+    return id;
+  }
+
+  function objectNode(name: string, readType: 'read'|'write'|'call'): string {
+    var key=name.toUpperCase();
+    if(objIds[key]) return objIds[key];
+    var id: string;
+    if(name.charAt(0)==='#'){
+      id=add(name,'repobj','io',null,'synthetic',name,'temporary table placeholder',
+        [name,'temp table']);
+    } else {
+      var remote=name.split('.').length>=3;
+      var res=cat?resolveCatalogue(cat,name):{resolution:'external' as CatalogueResolution};
+      if(res.resolution==='verified'&&res.resolvedName){
+        id=add(res.resolvedName,'repobj','io',null,'external',name,undefined,
+          [res.resolvedName,'verified'], 'verified', res.resolvedName);
+      } else {
+        id=add(remote?'external: '+name:name,'repobj','io',null,'external',name,
+          res.resolution==='conflict'?'conflicting catalogue evidence; identity unresolved':undefined,
+          [remote?'external: '+name:name,
+           readType==='call'?'call':(readType==='write'?'write':'read')],
+          res.resolution==='conflict'?'conflict':undefined,
+          undefined);
+      }
+    }
+    objIds[key]=id;
+    return id;
+  }
+
+  function columnNode(objName: string, colName: string, span: SourceSpan | null): string {
+    var key=objName.toUpperCase()+'|'+colName.toUpperCase();
+    if(colIds[key]) return colIds[key];
+    var id=add(colName,'repcol','rect',span,'source');
+    colIds[key]=id;
+    return id;
+  }
+
+  (parse&&parse.reports||[]).forEach(function(report){
+    var rid=add(report.name,'report','rect',report.xmlSpan,'source',undefined,undefined,
+      [report.name,'report']);
+    repIds[report.name.toUpperCase()]=rid;
+    (report.datasets||[]).forEach(function(ds){
+      var did=datasetNode(ds,report.name);
+      edges.push({from:rid,to:did,label:'',style:'solid',kind:'dependency'});
+      if(ds.source!=='embedded'||!ds.analysis) return;
+      /* Object facts come from the dataset's SQL analysis (v1.12.0). */
+      var unit={id:'dataset-'+ds.name,sql:ds.sql||'',name:ds.name,file:'report'};
+      var facts=buildObjectIR(ds.analysis,unit);
+      var seen: StringSet={};
+      function link(type: 'read'|'write'|'call', name: string): void {
+        var key=type+':'+name.toUpperCase();
+        if(seen[key]) return;
+        seen[key]=1;
+        var oid=objectNode(name,type);
+        var kind: EdgeKind=type==='call'?'call':(type==='write'?'data':'dependency');
+        edges.push({from:did,to:oid,label:type,style:type==='write'?'dotted':'solid',kind:kind});
+      }
+      (facts.reads||[]).forEach(function(n){ link('read',n); });
+      (facts.writes||[]).forEach(function(n){ link('write',n); });
+      (facts.calls||[]).forEach(function(n){ link('call',n); });
+      /* Columns referenced by the query, from the v1.11.0 column contract.
+         Two provable sources contribute and nothing is ever invented:
+           - sources with known columns (catalogue/CTE-backed wildcards);
+           - exact output bindings (binding.source is the source key, mapped
+             back to its object name; binding.column is the referenced column).
+         Column keys (aliases) are resolved to their real object name so a
+         column node hangs off the object it belongs to. */
+      var srcKeyToName: Record<string, string>={};
+      (ds.analysis.columns||[]).forEach(function(lin){
+        (lin.sources||[]).forEach(function(src){
+          if(src.key) srcKeyToName[String(src.key).toUpperCase()]=src.name;
+        });
+      });
+      function linkColumn(objName: string, colName: string, span: SourceSpan | null): void {
+        var okey=objName.toUpperCase();
+        if(!objIds[okey]) return;
+        var cid=columnNode(objName,colName,span);
+        edges.push({from:objIds[okey],to:cid,label:'',style:'solid',kind:'data'});
+      }
+      (ds.analysis.columns||[]).forEach(function(lin){
+        (lin.sources||[]).forEach(function(src){
+          if(!src.columnsKnown||!src.columns||!src.columns.length) return;
+          src.columns.forEach(function(cname){ linkColumn(src.name,cname,src.span); });
+        });
+        (lin.outputs||[]).forEach(function(out){
+          (out.bindings||[]).forEach(function(b){
+            var objName=srcKeyToName[String(b.source).toUpperCase()]||b.source;
+            if(b.column) linkColumn(objName,b.column,b.span);
+          });
+        });
+      });
+    });
+  });
+
+  return {nodes:nodes,edges:edges,stats:{
+    reports:Object.keys(repIds).length,
+    datasets:Object.keys(dsIds).length,
+    embedded:(parse&&parse.embeddedCount)||0,
+    shared:(parse&&parse.sharedCount)||0,
+    unresolved:(parse&&parse.unresolvedCount)||0,
+    objects:Object.keys(objIds).length,
+    columns:Object.keys(colIds).length
+  }};
+}
+
+/* Presentation-only filtering over a report graph. The returned graph is a
+   fresh copy; the input graph is never mutated, so toggling a filter or
+   clearing the focus never changes the analysis. A non-empty focus keeps a
+   report, dataset, or object and its direct neighbours (one hop). */
+function filterReportGraph(graph: Graph, filter?: ReportGraphFilter): Graph {
+  var f: ReportGraphFilter={
+    columns:filter&&filter.columns!==undefined?filter.columns:true,
+    embedded:filter&&filter.embedded!==undefined?filter.embedded:true,
+    shared:filter&&filter.shared!==undefined?filter.shared:true,
+    unresolved:filter&&filter.unresolved!==undefined?filter.unresolved:true,
+    external:filter&&filter.external!==undefined?filter.external:true,
+    focus:filter&&filter.focus?String(filter.focus):''
+  };
+  if(!graph||!graph.nodes||!graph.nodes.length)
+    return {nodes:[],edges:[],stats:graph&&graph.stats||{}};
+
+  var keep: Record<string, 1|undefined>={};
+  graph.nodes.forEach(function(n){
+    if(n.cls==='report'){ keep[n.id]=1; return; }
+    if(n.cls==='repcol'){ if(f.columns) keep[n.id]=1; return; }
+    if(n.cls==='dsembedded'){ if(f.embedded) keep[n.id]=1; return; }
+    if(n.cls==='dsshared'){ if(f.shared) keep[n.id]=1; return; }
+    if(n.cls==='dsunresolved'){ if(f.unresolved) keep[n.id]=1; return; }
+    if(n.cls==='repobj'){ if(n.provenance==='external'&&!f.external) return; keep[n.id]=1; return; }
+    keep[n.id]=1;
+  });
+
+  var focus=String(f.focus||'').trim().toUpperCase();
+  if(focus){
+    var matched: Record<string, 1|undefined>={};
+    var neighbour: Record<string, 1|undefined>={};
+    graph.nodes.forEach(function(n){
+      if(keep[n.id]&&(String(n.text||'').toUpperCase().indexOf(focus)>=0||
+         String(n.objectId||'').toUpperCase().indexOf(focus)>=0))
+        matched[n.id]=1;
+    });
+    if(focus&&!Object.keys(matched).length)
+      return {nodes:[],edges:[],stats:graph.stats,empty:true};
+    graph.edges.forEach(function(e){
+      if(matched[e.from]) neighbour[e.to]=1;
+      if(matched[e.to]) neighbour[e.from]=1;
+    });
+    var narrowed: Record<string, 1|undefined>={};
+    graph.nodes.forEach(function(n){
+      if(keep[n.id]&&(matched[n.id]||neighbour[n.id])) narrowed[n.id]=1;
+    });
+    keep=narrowed;
+  }
+
+  var nodes=(graph.nodes||[]).filter(function(n){
+    return keep[n.id]===1;
+  }).map(function(n){
+    var c: any={};
+    for(var k in n) c[k]=n[k];
+    return c;
+  });
+  var edges=(graph.edges||[]).filter(function(e){
+    return keep[e.from]===1&&keep[e.to]===1;
+  }).map(function(e){
+    var c: any={};
+    for(var k in e) c[k]=e[k];
+    return c;
+  });
+  return {nodes:nodes,edges:edges,stats:graph.stats};
+}

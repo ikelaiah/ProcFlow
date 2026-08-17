@@ -846,6 +846,19 @@
     catch (err) {
         record('v1.12.0 report import, dataset linking, and diagnostics fixtures', false, String(err && err.stack || err));
     }
+    /* v1.13.0: report intelligence — the report → dataset → object → column
+       dependency chain, export parity and `.drawio` round-trip identity for
+       report graphs, and presentation-only report filtering. Runs ahead in
+       tests/report-graph.ts; gate the whole golden page on them. */
+    try {
+        record('v1.13.0 report dependency chain, export parity, and filter fixtures', window.PROCFLOW_REPORTGRAPH_PASS === true &&
+            !!window.PROCFLOW_REPORTGRAPH_RESULT &&
+            window.PROCFLOW_REPORTGRAPH_RESULT.passed === window.PROCFLOW_REPORTGRAPH_RESULT.total &&
+            window.PROCFLOW_REPORTGRAPH_RESULT.layoutPassed === window.PROCFLOW_REPORTGRAPH_RESULT.layoutTotal, window.PROCFLOW_REPORTGRAPH_RESULT);
+    }
+    catch (err) {
+        record('v1.13.0 report dependency chain, export parity, and filter fixtures', false, String(err && err.stack || err));
+    }
     var passed = results.filter(function (r) { return r.pass; }).length;
     document.body.className = passed === results.length ? 'pass' : 'fail';
     document.getElementById('summary').textContent = passed + '/' + results.length + ' tests passed';

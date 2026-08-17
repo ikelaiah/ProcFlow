@@ -24,7 +24,17 @@ var CANONICAL_NODE_STYLE = {
        boundary). Both exporters derive these from the same canonical registry,
        so Mermaid and draw.io can never disagree about the column graph class. */
     colstep: { mermaid: 'fill:#12302c,stroke:#3fd0b0,color:#dcfff5', fill: '#d5f5ef', stroke: '#0d9488', font: '#082f2a' },
-    colobj: { mermaid: 'fill:#2c1c3f,stroke:#b18ce8,color:#f0e6ff', fill: '#f1e6ff', stroke: '#8b5cf6', font: '#2e1065' }
+    colobj: { mermaid: 'fill:#2c1c3f,stroke:#b18ce8,color:#f0e6ff', fill: '#f1e6ff', stroke: '#8b5cf6', font: '#2e1065' },
+    /* v1.13.0 report-graph styles: `report` is a report definition, `dsembedded`/
+       `dsshared`/`dsunresolved` are dataset kinds, `repobj` is an object the
+       dataset SQL reads/writes/calls, and `repcol` is a column referenced by the
+       dataset query. Both exporters derive from the same canonical registry. */
+    report: { mermaid: 'fill:#2a2438,stroke:#a98fd6,color:#ece4ff', fill: '#f3e8ff', stroke: '#9333ea', font: '#3b0764' },
+    dsembedded: { mermaid: 'fill:#12302c,stroke:#3fd0b0,color:#dcfff5', fill: '#d5f5ef', stroke: '#0d9488', font: '#082f2a' },
+    dsshared: { mermaid: 'fill:#1b3140,stroke:#7ea6e0,color:#dcebff', fill: '#dbeafe', stroke: '#3b82f6', font: '#172554' },
+    dsunresolved: { mermaid: 'fill:#332b1f,stroke:#f59e0b,color:#fef3c7,stroke-dasharray:5 3', fill: '#fff7ed', stroke: '#f59e0b', font: '#451a03' },
+    repobj: { mermaid: 'fill:#1c2f3f,stroke:#7ea6e0,color:#dcebff', fill: '#e0e7ff', stroke: '#6366f1', font: '#1e1b4b' },
+    repcol: { mermaid: 'fill:#1b242c,stroke:#4c6274,color:#a9bccb', fill: '#f1f5f9', stroke: '#64748b', font: '#0f172a' }
 };
 var CANONICAL_EDGE_STYLE = {
     control: 'solid', exception: 'dotted', data: 'solid', dependency: 'solid', call: 'solid'

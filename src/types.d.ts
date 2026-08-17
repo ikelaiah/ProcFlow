@@ -820,6 +820,26 @@ interface ReportParseResult {
   unresolvedCount: number;
 }
 
+/* v1.13.0 — report intelligence (report → dataset → object → column dependency
+   views built on the v1.9.0 catalogue and the v1.11.0 column contract, plus F
+   export fidelity for report graphs). A presentation-only filter over the
+   report graph: it derives a filtered view at render time and never mutates
+   the underlying graph, so toggling a filter never changes the analysis.
+   Large-graph convergence stays deferred to v1.14.0. */
+interface ReportGraphFilter {
+  /* Show/hide the object→column layer (columns referenced by each dataset's
+     query, from the column contract). Default true. */
+  columns?: boolean;
+  /* Show/hide datasets by source kind. Defaults true for each present kind. */
+  embedded?: boolean;
+  shared?: boolean;
+  unresolved?: boolean;
+  /* Show/hide external (unproven) object nodes. Default true. */
+  external?: boolean;
+  /* Keep a report, dataset, or object and its direct neighbours. */
+  focus?: string;
+}
+
 interface FixtureExpectation {
   mode?: 'flow' | 'query';
   branch?: number;
@@ -943,6 +963,17 @@ interface Window {
     total: number;
   };
   PROCFLOW_REPORT_DETAIL?: Array<{name: string; pass: boolean; detail: unknown}>;
+  /* v1.13.0 report-graph suite results (report → dataset → object → column
+     dependency chain, export parity, `.drawio` round-trip identity, and
+     presentation-only filtering), published for the golden and metrics pages. */
+  PROCFLOW_REPORTGRAPH_PASS?: boolean;
+  PROCFLOW_REPORTGRAPH_RESULT?: {
+    passed: number;
+    total: number;
+    layoutPassed: number;
+    layoutTotal: number;
+  };
+  PROCFLOW_REPORTGRAPH_DETAIL?: Array<{name: string; pass: boolean; detail: unknown}>;
   /* v1.8.0 opt-in workspace persistence globals (src/workspace.ts), exposed for
      the browser UI tests. */
   clearWorkspace(): void;
