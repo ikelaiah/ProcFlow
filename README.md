@@ -54,7 +54,8 @@ For the first stable release, see
 [RELEASE_NOTE_v1.8.0.md](docs/RELEASE_NOTE_v1.8.0.md). For the v1.9.0 release, see
 [RELEASE_NOTE_v1.9.0.md](docs/RELEASE_NOTE_v1.9.0.md). For the v1.10.0 release, see
 [RELEASE_NOTE_v1.10.0.md](docs/RELEASE_NOTE_v1.10.0.md). For the v1.11.0 release, see
-[RELEASE_NOTE_v1.11.0.md](docs/RELEASE_NOTE_v1.11.0.md).
+[RELEASE_NOTE_v1.11.0.md](docs/RELEASE_NOTE_v1.11.0.md). For the v1.12.0 release, see
+[RELEASE_NOTE_v1.12.0.md](docs/RELEASE_NOTE_v1.12.0.md).
 
 ## Start here
 
@@ -70,7 +71,7 @@ For the first stable release, see
 
 ## 60-second quick start
 
-1. Download the `v1.11.0` archive from
+1. Download the `v1.12.0` archive from
    [GitHub Releases](https://github.com/ikelaiah/ProcFlow/releases) or clone
    this repository.
 2. Extract the complete archive. Keep `index.html`, `styles.css`, `dist/`, and
@@ -136,8 +137,12 @@ statements.
 7. Export the result as SVG or draw.io when documenting a report or handing
    analysis to another engineer.
 
-ProcFlow imports SQL text, not report-definition files. SSRS/RDL import is on
-the roadmap; for v1.11.0, paste or export the dataset SQL itself.
+ProcFlow imports SQL text directly, and since v1.12.0 it also imports
+SSRS/RDL report definitions (README roadmap item 4): paste or import an `.rdl`
+file, and the **Reports** menu links the report to its datasets, distinguishes
+embedded, shared, and unresolved datasets, and opens each embedded dataset's
+query for analysis. Report dependency views and report export arrive with
+v1.13.0.
 
 ## What ProcFlow can show
 
@@ -201,9 +206,12 @@ The analysis panel provides four release-safety signals:
   terminators, unconsumed input, invalid actions, opaque dynamic SQL, opaque
   table expressions, heuristic `APPLY` targets, ambiguous and opaque column
   references (v1.10.0), opaque column-flow reaching definitions across
-  statements (v1.11.0), and catalogue problems
+  statements (v1.11.0), catalogue problems
   (malformed or conflicting catalogue data, and unproven partial matches
-  reported at the exact reference). Informational annotations
+  reported at the exact reference), and report/dataset parsing uncertainty
+  (v1.12.0: malformed RDL or a missing `<Report>` root is a document-scoped
+  finding with no fabricated span, while an unresolved dataset is reported at
+  its own XML element span). Informational annotations
   (for example a correctly resolved recursive CTE) are displayed separately and
   never inflate the findings count. Document-scoped findings such as dialect
   ambiguity carry no fabricated source span.
@@ -225,7 +233,7 @@ than silently disappearing from the diagram.
 
 ## Supported SQL
 
-ProcFlow v1.11.0 recognises:
+ProcFlow v1.12.0 recognises:
 
 - Microsoft T-SQL
 - IBM DB2 SQL PL
@@ -286,6 +294,18 @@ diagnostic, and no binding is invented. The column-flow graph exports to Mermaid
 and draw.io with provenance metadata and is laid out on its own documented
 `column` graph class. Interactive column views remain scheduled for v1.13.0.
 
+Since v1.12.0, SSRS/RDL report definitions can be imported (README roadmap
+item 4 delivered): the **Reports** menu parses a report definition, links the
+report to its datasets, distinguishes embedded (query text is in the report),
+shared (a reference to an external shared dataset definition), and unresolved
+datasets, and attaches each embedded dataset's query text to the SQL analysis.
+XML source locations are preserved where the element tags are locatable, and
+parser uncertainty is scoped: malformed RDL or a missing `<Report>` root is a
+document-scoped diagnostic, while an unresolved dataset is a region-scoped
+diagnostic at its own element span. Selecting an embedded dataset in the
+Dataset picker loads and analyses its query. Combined report dependency views
+and report export remain scheduled for v1.13.0.
+
 Detection is automatic and can be overridden from the **Dialect** selector.
 When detection is uncertain and several dialects score equally, an explicit
 `dialect_ambiguous` diagnostic is reported along with the usual
@@ -305,6 +325,29 @@ not persisted automatically.
 Multi-object scripts are split into selectable objects. If the split cannot be
 made confidently, ProcFlow keeps the input as one script and reports the
 uncertainty.
+
+## Working with reports
+
+The **Reports** menu (v1.12.0) imports SSRS/RDL report definitions so each
+report's datasets link to their SQL analysis.
+
+- **Paste or import.** Type an RDL/XML report definition into the textarea (or
+  press **Import file** for `.rdl`/`.xml` files) and press **Apply report**.
+- **Report → dataset linking.** The report is linked to its datasets. Each
+  dataset is distinguished as **embedded** (its query text is in the report and
+  is analysed), **shared** (a reference to an external shared dataset
+  definition, so there is no SQL to analyse here), or **unresolved** (neither a
+  query text nor a shared reference, so it cannot be linked).
+- **Open a dataset.** The **Dataset** picker lists every dataset with its
+  source kind; selecting an embedded dataset loads its query into the editor
+  and runs the normal SQL analysis.
+- **Honest diagnostics.** XML source locations are preserved where the element
+  tags are locatable. Malformed RDL or a missing `<Report>` root is a
+  document-scoped diagnostic with no fabricated span; an unresolved dataset is
+  a region-scoped diagnostic at its own element span. These findings appear in
+  the Diagnostics panel alongside the SQL analysis.
+- **Clear** removes the report. The report is an analysis input, so a saved
+  workspace captures it and Restore reproduces an identical analysis.
 
 ## Working with a catalogue
 
@@ -384,7 +427,7 @@ endorsed by draw.io.
 
 ### Quick answers
 
-| Question | ProcFlow v1.11.0 behavior |
+| Question | ProcFlow v1.12.0 behavior |
 |---|---|
 | Is SQL uploaded? | No. Analysis and rendering happen in the browser tab. |
 | Does it connect to a database? | No. There is no driver, connection string, or query execution. |
@@ -411,6 +454,8 @@ dist/src/dialects.js
 dist/src/lineage.js
 dist/src/ir.js
 dist/src/columns.js
+dist/src/columnflow.js
+dist/src/report.js
 dist/src/exporters.js
 dist/src/workspace.js
 dist/src/app.js
@@ -426,10 +471,11 @@ The opt-in persistence module (`dist/src/workspace.js`) is the only runtime
 that touches browser storage, and it does so only through explicit
 **Workspace** menu actions (Save / Restore / Forget) — never on load. Its
 import/export uses the browser download API, which also requires an explicit
-action. The catalogue module (`dist/src/catalogue.js`) parses pasted or
-imported metadata in memory only; it never reads or writes storage.
+action. The catalogue module (`dist/src/catalogue.js`) and the report module
+(`dist/src/report.js`) parse pasted or imported metadata/report definitions in
+memory only; they never read or write storage.
 
-The SHA-256 of `vendor/mermaid/mermaid.min.js` in v1.11.0 is:
+The SHA-256 of `vendor/mermaid/mermaid.min.js` in v1.12.0 is:
 
 ```text
 61B335A46DF05A7CE1C98378F60E5F3E77A7FB608A1056997E8A649304A936D6
@@ -440,7 +486,7 @@ so the release checksum remains reproducible across operating systems.
 
 ### Guidance for security review
 
-1. Review and pin the `v1.11.0` tag or its exact commit.
+1. Review and pin the `v1.12.0` tag or its exact commit.
 2. Verify the vendored Mermaid checksum.
 3. Review the runtime files listed above.
 4. Open the reviewed files locally or serve them from an approved internal
@@ -493,7 +539,11 @@ and contains no automatic data-submission path.
   Since v1.11.0, column flow also crosses statements through temp tables,
   transformations, views, CTEs, and catalogue-resolved object boundaries;
   interactive column views in the app are scheduled for v1.13.0.
-- SSRS/RDL files are not imported in v1.9.0.
+- Since v1.12.0, SSRS/RDL report definitions are imported and linked to their
+  datasets; shared dataset references and unresolved datasets stay explicit and
+  are reported rather than guessed. Report dependency views and report export
+  are scheduled for v1.13.0, so this release reports on the definition and its
+  datasets without drawing a combined report graph.
 - draw.io layout is deterministic for the documented graph classes at
   documented size limits; very large or non-planar graphs are laid out without
   overlapping boxes and reported honestly rather than claimed crossing-free.
@@ -561,16 +611,16 @@ Then open:
 - `http://127.0.0.1:8000/tests/ui.html` — browser interaction and local-runtime
   tests
 
-The v1.11.0 baseline is:
+The v1.12.0 baseline is:
 
-- 210 golden and boundary assertions
+- 211 golden and boundary assertions
 - 400 deterministic mutation cases
-- 22 browser interaction tests
+- 25 browser interaction tests
 - 20 export-parity checks (10 fixtures × TD + LR), 11 layout-budget fixtures,
   and 100 % export-traceability on the export fixtures
-- 13 workspace-persistence and dependency-filtering fixtures (save→reload
+- 14 workspace-persistence and dependency-filtering fixtures (save→reload
   identity, schema migration, corrupt recovery, explicit clear, non-mutating
-  filters)
+  filters, and the report-definition round-trip)
 - 13 catalogue fixtures (JSON and line import, synonym / linked-server /
   cross-database verification, conservative conflict and partial diagnostics,
   export metadata, workspace round-trip)
@@ -582,13 +632,16 @@ The v1.11.0 baseline is:
   same-script view and catalogue-boundary resolution, clean invariants, and
   export parity) plus 2 column layout-budget fixtures on the documented
   `column` graph class
+- 12 report-import fixtures (report→dataset linking, embedded/shared/unresolved
+  dataset distinction, XML source locations, and region/document-scoped parser
+  diagnostics)
 
 Fixture-corpus accuracy metrics (attribution, unresolved-token, tail-unconsumed,
 fallback, opaque-dynamic, semantic-edge coverage, provenance,
 region-diagnostic-to-span, export-parity, export-traceability, layout-budget,
-workspace, catalogue, column, and column-flow pass-rate ratios) are published
-from the checked-in golden corpus in
-[docs/metrics-v1.11.0.json](docs/metrics-v1.11.0.json). Generation
+workspace, catalogue, column, column-flow, and report pass-rate ratios) are
+published from the checked-in golden corpus in
+[docs/metrics-v1.12.0.json](docs/metrics-v1.12.0.json). Generation
 is deterministic and fixture-only — no user inputs or runtime telemetry are
 collected — and CI refuses to merge when the snapshot is stale. Regenerate with
 `npm run metrics:write`.
@@ -627,6 +680,8 @@ docs/
 ├── PR_NOTE_1.8.0.md
 ├── PR_NOTE_1.9.0.md
 ├── PR_NOTE_1.10.0.md
+├── PR_NOTE_1.11.0.md
+├── PR_NOTE_1.12.0.md
 ├── RELEASE_NOTE_1.1.0.md
 ├── RELEASE_NOTE_1.2.0.md
 ├── RELEASE_NOTE_1.3.0.md
@@ -642,7 +697,8 @@ docs/
 ├── RELEASE_NOTE_v1.9.0.md
 ├── RELEASE_NOTE_v1.10.0.md
 ├── RELEASE_NOTE_v1.11.0.md
-└── metrics-v1.11.0.json   # deterministic fixture-only accuracy metrics snapshot
+├── RELEASE_NOTE_v1.12.0.md
+└── metrics-v1.12.0.json   # deterministic fixture-only accuracy metrics snapshot
 examples/
 ├── dbo.v110_demo.sql    # per-release outcome demos
 ├── dbo.v120_demo.sql
@@ -654,7 +710,8 @@ examples/
 ├── dbo.v180_demo.sql    # v1.8.0: usable local workspace demo
 ├── dbo.v190_demo.sql    # v1.9.0: resolve by catalogue demo
 ├── dbo.v1100_demo.sql   # v1.10.0: column lineage foundations demo
-└── dbo.v1110_demo.sql   # v1.11.0: column lineage pipelines demo
+├── dbo.v1110_demo.sql   # v1.11.0: column lineage pipelines demo
+└── dbo.v1120_demo.rdl   # v1.12.0: SSRS/RDL report import demo
 scripts/
 ├── file-smoke.mjs    # dependency-free local-file release smoke test
 └── metrics.mjs       # generate/verify the fixture-corpus metric snapshot
@@ -667,6 +724,7 @@ src/
 ├── ir.ts             # graphs, diagnostics, confidence, and estate analysis
 ├── columns.ts        # v1.10.0: single-statement column scopes and bindings
 ├── columnflow.ts     # v1.11.0: cross-statement column-flow pipelines + export graph
+├── report.ts         # v1.12.0: SSRS/RDL report import and dataset linking
 ├── exporters.ts      # Mermaid, draw.io, and narration output
 ├── workspace.ts      # opt-in persistence + presentation-only dependency filtering
 └── app.ts            # browser UI and workspace interaction
@@ -686,6 +744,7 @@ tests/
 ├── catalogue.ts
 ├── columns.ts        # v1.10.0: column lineage foundations fixtures
 ├── column-flow.ts    # v1.11.0: column-flow pipelines, export, and layout fixtures
+├── report.ts         # v1.12.0: report import, dataset linking, diagnostics fixtures
 ├── tests.ts
 ├── fuzz.ts
 ├── ui-tests.ts
@@ -724,13 +783,13 @@ Then verify:
 3. Generated `dist/` files match their TypeScript sources.
 4. The Mermaid SHA-256 matches the value in this README and the workflow.
 5. `npm run metrics` reports the metric snapshot is current.
-6. `RELEASE_NOTE_v1.11.0.md` matches the final tag contents.
+6. `RELEASE_NOTE_v1.12.0.md` matches the final tag contents.
 7. The complete archive opens locally with `index.html`, and the local-file
    smoke test reports the opt-in workspace assertion.
-8. The tag is named `v1.11.0`.
+8. The tag is named `v1.12.0`.
 
-The release can then be created manually from the `v1.11.0` tag using
-[RELEASE_NOTE_v1.11.0.md](docs/RELEASE_NOTE_v1.11.0.md).
+The release can then be created manually from the `v1.12.0` tag using
+[RELEASE_NOTE_v1.12.0.md](docs/RELEASE_NOTE_v1.12.0.md).
 
 ## Roadmap after v1.0.0
 
@@ -738,6 +797,7 @@ The release can then be created manually from the `v1.11.0` tag using
 2. Improve table-function, `APPLY`, comma-source, and DML lineage.
 3. Model more multi-statement and temporary-table transformations.
 4. Import SSRS/RDL definitions and link reports to datasets.
+   **Delivered in v1.12.0.**
 5. Accept database catalogue metadata for more accurate object resolution.
    **Delivered in v1.9.0.**
 6. Add column-level lineage where it can be resolved safely.

@@ -149,6 +149,32 @@
             <p class="ws-note" id="catalogue-status">No catalogue loaded.</p>
           </div>
         </details>
+        <details class="command-menu" id="report-menu">
+          <summary class="btn">Reports</summary>
+          <div class="command-menu-panel settings-panel report-panel" aria-label="SSRS/RDL report definition import">
+            <p class="ws-note">Paste or import an SSRS/RDL report definition so
+            its datasets link to their SQL analysis. Embedded, shared, and
+            unresolved datasets are distinguished, and each embedded dataset's
+            query can be opened and analysed from the Dataset picker.</p>
+            <label class="opt">Report definition (RDL/XML)
+              <textarea id="report-text" rows="7" spellcheck="false"
+                placeholder="&lt;Report&gt;&#10;  &lt;DataSources&gt;…&lt;/DataSources&gt;&#10;  &lt;DataSets&gt;&#10;    &lt;DataSet Name=&quot;Students&quot;&gt;&#10;      &lt;Query&gt;&#10;        &lt;CommandText&gt;SELECT * FROM dbo.Student&lt;/CommandText&gt;&#10;      &lt;/Query&gt;&#10;    &lt;/DataSet&gt;&#10;  &lt;/DataSets&gt;&#10;&lt;/Report&gt;"></textarea>
+            </label>
+            <div class="catalogue-actions">
+              <input id="report-file-input" type="file"
+                accept=".rdl,.xml,text/xml,application/xml" hidden>
+              <button class="menu-action" id="btn-report-import">Import file</button>
+              <button class="menu-action primary-action" id="btn-report-apply">Apply report</button>
+              <button class="menu-action" id="btn-report-clear">Clear</button>
+            </div>
+            <label class="opt">Dataset
+              <select id="report-dataset-select" disabled>
+                <option value="">No report loaded</option>
+              </select>
+            </label>
+            <p class="ws-note" id="report-status">No report definition loaded.</p>
+          </div>
+        </details>
         <details class="command-menu" id="export-menu">
           <summary class="btn">Export</summary>
           <div class="command-menu-panel export-actions" aria-label="Copy and export diagram">
@@ -215,6 +241,7 @@
 <script src="dist/src/columns.js"></script>
 <script src="dist/src/columnflow.js"></script>
 <script src="dist/src/exporters.js"></script>
+<script src="dist/src/report.js"></script>
 <script src="dist/src/workspace.js"></script>
 <script src="dist/src/app.js"></script>
 </body>

@@ -120,6 +120,29 @@
       false,String(err&&err.stack||err));
   }
 
+  /* v1.12.0 — the optional report definition text is an analysis input like the
+     catalogue, so a saved workspace must round-trip it and restore the same
+     report link. Older snapshots without the field still migrate cleanly. */
+  try{
+    var reportText='<Report><DataSets><DataSet Name="S"><Query><CommandText>SELECT 1</CommandText></Query></DataSet></DataSets></Report>';
+    var snapR=buildWorkspaceSnapshot({files:files,options:optionsRecord,
+      activeObjectId:null, catalogue:'dbo.a TABLE', report:reportText});
+    var parsedR=parseWorkspace(serializeWorkspace(snapR));
+    var migratedLegacyReport=parseWorkspace(JSON.stringify({savedAt:'2026-01-01T00:00:00.000Z',
+      files:[{name:'old.sql',text:'SELECT 1;'}],options:{dialect:'tsql',scope:'internal'}}));
+    record('v1.12.0 report definition round-trips in a saved workspace',
+      !!parsedR.snapshot&&!parsedR.error&&
+        parsedR.snapshot.report===reportText&&
+        parsedR.snapshot.catalogue==='dbo.a TABLE'&&
+        !!migratedLegacyReport.snapshot&&
+        migratedLegacyReport.snapshot.report===null,
+      {report:parsedR.snapshot&&parsedR.snapshot.report,
+       legacyReport:migratedLegacyReport.snapshot&&migratedLegacyReport.snapshot.report});
+  }catch(err){
+    record('v1.12.0 report definition round-trips in a saved workspace',
+      false,String(err&&err.stack||err));
+  }
+
   /* Corrupt-state recovery: bad input yields an error and no snapshot. */
   try{
     var corruptJson=parseWorkspace('{not valid json');

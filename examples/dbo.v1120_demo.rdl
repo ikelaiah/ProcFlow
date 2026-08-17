@@ -1,0 +1,105 @@
+<!--
+    v1.12.0 demo — report import (SSRS/RDL).
+
+    This definition exercises the v1.12.0 territory (ROADMAP v1.12.0, README
+    roadmap item 4) in one report: SSRS/RDL report import parses the report and
+    links it to its datasets, distinguishing embedded, shared, and unresolved
+    datasets, preserving XML source locations where the element tags are
+    locatable, and keeping parser uncertainty region- or document-scoped.
+
+    What to observe in the "Reports" menu after Apply:
+
+      1. The status line summarises the parse, e.g.
+         "1 report · 3 datasets · 2 embedded · 1 shared · 1 unresolved".
+      2. The Dataset picker lists each dataset with its source kind.
+      3. Selecting an embedded dataset (StudentMaster or CourseLookup) loads
+         its query into the editor and runs the normal SQL analysis.
+      4. The shared dataset (SharedRollup) references an external shared
+         dataset definition and has no SQL to analyse in this file.
+      5. The unresolved dataset (Broken) has neither a command text nor a
+         shared reference, so it cannot be linked and is reported with a
+         region-scoped report_dataset_unresolved diagnostic at its own element
+         span.
+
+    The embedded dataset queries are plain T-SQL, so they also analyse cleanly
+    as query structure when selected:
+
+       SELECT StudentId, StudentName FROM dbo.Student WHERE SchoolYear = @Year
+       SELECT CourseId, CourseName FROM dbo.Course
+
+    To resolve the secondary dbo.* objects by catalogue evidence, paste this
+    catalogue in the Catalogue menu and Apply, then re-run:
+
+       dbo.Student TABLE student
+       dbo.Course TABLE
+       COL dbo.Student.StudentId
+       COL dbo.Student.StudentName
+       COL dbo.Student.SchoolYear
+       COL dbo.Course.CourseId
+       COL dbo.Course.CourseName
+
+    Combined report dependency views and report export remain scheduled for
+    v1.13.0.
+
+    This demo is an illustration, not an input to the fixture-corpus metrics
+    (docs/metrics-v1.12.0.json). No user input or runtime telemetry is
+    collected.
+-->
+<Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
+  <DataSources>
+    <DataSource Name="SchoolDB">
+      <ConnectionProperties>
+        <DataProvider>SQL</DataProvider>
+        <ConnectString>Data Source=.;Initial Catalog=School;Integrated Security=true</ConnectString>
+      </ConnectionProperties>
+    </DataSource>
+    <DataSource Name="SharedStore">
+      <DataSourceReference>Shared/SharedStore</DataSourceReference>
+    </DataSource>
+  </DataSources>
+  <DataSets>
+    <DataSet Name="StudentMaster">
+      <Query>
+        <DataSourceName>SchoolDB</DataSourceName>
+        <CommandText>SELECT StudentId, StudentName FROM dbo.Student WHERE SchoolYear = @Year</CommandText>
+        <QueryParameters>
+          <QueryParameter Name="Year">
+            <Value>=Parameters!Year.Value</Value>
+          </QueryParameter>
+        </QueryParameters>
+      </Query>
+      <Fields>
+        <Field Name="StudentId"><DataField>StudentId</DataField></Field>
+        <Field Name="StudentName"><DataField>StudentName</DataField></Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="CourseLookup">
+      <Query>
+        <DataSourceName>SchoolDB</DataSourceName>
+        <CommandText>SELECT CourseId, CourseName FROM dbo.Course</CommandText>
+      </Query>
+    </DataSet>
+    <DataSet Name="SharedRollup">
+      <SharedDataSet>
+        <SharedDataSetReference>Shared/Rollup</SharedDataSetReference>
+      </SharedDataSet>
+    </DataSet>
+    <DataSet Name="Broken">
+      <Query>
+        <DataSourceName>SchoolDB</DataSourceName>
+      </Query>
+    </DataSet>
+  </DataSets>
+  <Body>
+    <ReportItems>
+      <Textbox Name="Header">
+        <Value>= "Student directory"</Value>
+      </Textbox>
+      <Tablix Name="StudentTable">
+        <TablixDataRegion>
+          <DataSetName>StudentMaster</DataSetName>
+        </TablixDataRegion>
+      </Tablix>
+    </ReportItems>
+  </Body>
+</Report>

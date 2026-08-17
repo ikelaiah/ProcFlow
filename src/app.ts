@@ -14,6 +14,12 @@
   var currentCatalogue: Catalogue | null=null,
       currentCatalogueText: string='',
       currentCatalogueDiagnostics: Diagnostic[]=[];
+  /* v1.12.0 — the active parsed report definition (SSRS/RDL) plus its raw text
+     and parse diagnostics, so Apply/Clear re-run the analysis with (or
+     without) the report linked to the current object. */
+  var currentReport: ReportParseResult | null=null,
+      currentReportText: string='',
+      currentReportDiagnostics: Diagnostic[]=[];
 
   var SAMPLES = {} as Record<Dialect, string>;
   SAMPLES.tsql = [
@@ -257,7 +263,8 @@
       group:$('opt-group').checked, number:$('opt-number').checked,
       fanIn:$('opt-fanin').checked, sources:$('opt-sources').checked,
       catalogue:currentCatalogue||undefined,
-      catalogueDiagnostics:currentCatalogueDiagnostics.slice()
+      catalogueDiagnostics:currentCatalogueDiagnostics.slice(),
+      reports:currentReport||undefined
     };
   }
 
@@ -287,6 +294,57 @@
     }
     updateCatalogueStatus();
     run();
+  }
+
+  /* v1.12.0 — report import. Apply the current Report panel text: parse the
+     SSRS/RDL definition, store the parsed report plus its diagnostics, link the
+     report to the current analysis, populate the Dataset picker, and re-run. */
+  function applyReport(): void {
+    currentReportText=$('report-text').value;
+    if(!currentReportText.trim()){
+      currentReport=null; currentReportDiagnostics=[];
+    } else {
+      var parsed=parseReport(currentReportText);
+      currentReport=parsed;
+      currentReportDiagnostics=(parsed.diagnostics||[]).slice();
+    }
+    updateReportStatus();
+    populateReportDatasets();
+    run();
+  }
+
+  /* Populate the Dataset picker from the parsed report: each report's datasets
+     are listed with their source kind (embedded / shared / unresolved). */
+  function populateReportDatasets(): void {
+    var sel=$('report-dataset-select'), opt;
+    sel.innerHTML='';
+    if(!currentReport||!currentReport.datasets.length){
+      opt=document.createElement('option');
+      opt.value=''; opt.textContent='No report loaded';
+      sel.appendChild(opt);
+      sel.disabled=true;
+      return;
+    }
+    sel.disabled=false;
+    currentReport.datasets.forEach(function(ds,idx){
+      var label=ds.name+' — '+ds.source+(ds.dataSourceName?(' · '+ds.dataSourceName):'');
+      opt=document.createElement('option');
+      opt.value=String(idx);
+      opt.textContent=label;
+      sel.appendChild(opt);
+    });
+  }
+
+  /* v1.12.0 — report status panel. */
+  function updateReportStatus(): void {
+    var el=$('report-status');
+    if(!currentReport){
+      el.textContent='No report definition loaded.';
+      return;
+    }
+    var summary=reportSummary(currentReport);
+    var nDiag=currentReportDiagnostics.length;
+    el.textContent=summary+(nDiag?'; '+nDiag+(nDiag===1?' diagnostic':' diagnostics'):'');
   }
 
   /* v1.8.0 dependency filtering — presentation only. currentFilter() reads the
@@ -343,6 +401,17 @@
       currentCatalogueDiagnostics=parsed.diagnostics.slice();
     } else { currentCatalogue=null; currentCatalogueDiagnostics=[]; }
     updateCatalogueStatus();
+    /* v1.12.0 — restore the report definition (an analysis input) so an
+       identical analysis is reproduced. */
+    currentReportText=snap.report==null?'':snap.report;
+    $('report-text').value=currentReportText;
+    if(currentReportText.trim()){
+      var rp=parseReport(currentReportText);
+      currentReport=rp;
+      currentReportDiagnostics=(rp.diagnostics||[]).slice();
+    } else { currentReport=null; currentReportDiagnostics=[]; }
+    updateReportStatus();
+    populateReportDatasets();
     if(workspaceFiles&&workspaceFiles.length) sql.value=workspaceFiles[0].text;
     drawGutter();
     run();
@@ -760,7 +829,8 @@
   $('btn-ws-save').onclick=function(){
     var files=workspaceFiles||[{name:'Pasted SQL',text:sql.value}];
     var snap=buildWorkspaceSnapshot({files:files,options:snapshotOptions(),
-      activeObjectId:activeObjectId, catalogue:currentCatalogueText});
+      activeObjectId:activeObjectId, catalogue:currentCatalogueText,
+      report:currentReportText});
     var ok=writeWorkspace(snap);
     updateWsStatus();
     flash($('btn-ws-save'),ok?'Saved':'Save failed');
@@ -823,6 +893,50 @@
   };
   updateCatalogueStatus();
 
+  /* v1.12.0 — report import (paste or file), Apply, and Clear. Apply parses the
+     SSRS/RDL definition, stores the parsed report, links it to the current
+     analysis, populates the Dataset picker, and re-runs so report diagnostics
+     surface in the findings panel. */
+  $('btn-report-import').onclick=function(){ $('report-file-input').click(); };
+  $('report-file-input').onchange=function(){
+    var file=(this.files&&this.files[0]);
+    if(!file) return;
+    file.text().then(function(text){
+      $('report-text').value=text;
+      applyReport();
+    }).catch(function(err){ showMsg('Could not read that report file: '+err.message); });
+    this.value='';
+  };
+  $('btn-report-apply').onclick=applyReport;
+  $('btn-report-clear').onclick=function(){
+    $('report-text').value='';
+    currentReport=null; currentReportDiagnostics=[]; currentReportText='';
+    updateReportStatus();
+    populateReportDatasets();
+    run();
+  };
+  /* Selecting a dataset loads its embedded SQL into the editor and re-runs the
+     analysis so each dataset links to its SQL analysis. Shared and unresolved
+     datasets have no command text; they stay listed for provenance. */
+  $('report-dataset-select').onchange=function(){
+    var idx=parseInt(this.value,10);
+    if(!currentReport||isNaN(idx)) return;
+    var ds=currentReport.datasets[idx];
+    if(!ds) return;
+    if(ds.source!=='embedded'||!ds.sql){
+      showMsg('Dataset "'+ds.name+'" is '+(ds.source==='shared'
+        ? 'a shared dataset (reference '+(ds.sharedReference||'?')+'); its SQL lives in the shared dataset definition.'
+        : 'unresolved and has no command text to analyse.'));
+      return;
+    }
+    sql.value=ds.sql;
+    workspaceFiles=[{name:'Dataset: '+ds.name,text:ds.sql}];
+    estate=null; activeObjectId=null;
+    drawGutter(); run();
+  };
+  updateReportStatus();
+  populateReportDatasets();
+
   if(typeof mermaid!=='undefined'){
     mermaid.initialize({
       startOnLoad:false, theme:'base', securityLevel:'strict',
@@ -847,7 +961,8 @@
     typeof analyse==='function'&&
     typeof toDrawio==='function'&&
     typeof buildWorkspaceSnapshot==='function'&&
-    typeof filterDependencyGraph==='function'
+    typeof filterDependencyGraph==='function'&&
+    typeof parseReport==='function'
   ));
 })();
 

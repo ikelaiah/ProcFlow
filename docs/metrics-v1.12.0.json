@@ -4,14 +4,15 @@
   "corpus": {
     "golden": 107,
     "fuzz": 400,
-    "ui": 22,
+    "ui": 25,
     "parity": 10,
     "layout": 11,
-    "workspace": 13,
+    "workspace": 14,
     "catalogue": 13,
     "columns": 18,
     "columnFlow": 15,
-    "columnLayout": 2
+    "columnLayout": 2,
+    "report": 12
   },
   "attributionRate": 1,
   "unresolvedTokenRate": 0.04432,
@@ -29,6 +30,7 @@
   "columnPassRate": 1,
   "columnFlowPassRate": 1,
   "columnLayoutPassRate": 1,
+  "reportPassRate": 1,
   "aggregate": {
     "totalTokens": 2685,
     "accountedTokens": 2685,
