@@ -74,6 +74,33 @@
     results.push({name:'Ctrl+Enter refresh shortcut',
       pass:get('proc-name').textContent!=='Shortcut pending'&&
         /refresh_students/i.test(get('proc-name').textContent)});
+    try{
+      var beforeLargeInput=get('mermaid-out').textContent;
+      var largeSource='SELECT 1;\n'+new Array(w.PROCFLOW_LARGE_INPUT_THRESHOLD+16).join(' ');
+      get('sql').value=largeSource;
+      get('sql').dispatchEvent(new Event('input'));
+      results.push({name:'large input pauses automatic analysis without losing SQL',
+        pass:!get('large-input-notice').hidden&&
+          get('large-input-notice').textContent.indexOf('Automatic analysis is paused')>=0&&
+          get('mermaid-out').textContent===beforeLargeInput&&get('sql').value===largeSource,
+        detail:{length:largeSource.length,notice:get('large-input-notice').textContent}});
+      get('btn-draw').click();
+      results.push({name:'large input still analyses on explicit Refresh',
+        pass:get('mermaid-out').textContent!==beforeLargeInput&&
+          get('sql').value===largeSource});
+      /* Restore the multi-object source used by the remaining interaction
+         checks; the large-input fixture must not change their baseline. */
+      get('sql').value=source;
+      get('sql').dispatchEvent(new Event('input'));
+      get('btn-draw').click();
+      if(get('object-select').options.length>1){
+        get('object-select').value=get('object-select').options[1].value;
+        get('object-select').dispatchEvent(new Event('change'));
+      }
+    }catch(err){
+      results.push({name:'large input safeguard interaction',pass:false,
+        detail:String(err&&err.stack||err)});
+    }
     results.push({name:'confidence and coverage display',
       pass:get('coverage-val').textContent==='100%'&&
         /%$/.test(get('confidence-val').textContent)&&
@@ -315,7 +342,25 @@
       get('btn-report-clear').click();
       get('opt-scope').value='internal';
       get('opt-scope').dispatchEvent(new Event('change'));
-      finish(results);
+      /* Exercise the debounce boundary after a real wait. The earlier checks
+         validate the immediate notice and explicit refresh; this second pass
+         proves no automatic run appears after the normal 350 ms delay. */
+      var delayedLargeSource='SELECT 1;\n'+
+        new Array(w.PROCFLOW_LARGE_INPUT_THRESHOLD+16).join(' ');
+      var delayedBefore=get('mermaid-out').textContent;
+      get('sql').value=delayedLargeSource;
+      get('sql').dispatchEvent(new Event('input'));
+      setTimeout(function(){
+        results.push({name:'large input remains paused beyond debounce',
+          pass:!get('large-input-notice').hidden&&
+            get('mermaid-out').textContent===delayedBefore&&
+            get('sql').value===delayedLargeSource});
+        get('btn-draw').click();
+        results.push({name:'delayed large input refreshes explicitly',
+          pass:get('mermaid-out').textContent!==delayedBefore&&
+            get('sql').value===delayedLargeSource});
+        finish(results);
+      },500);
     },1200);
   });
 })();

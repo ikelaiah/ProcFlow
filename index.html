@@ -63,6 +63,8 @@
       <div class="gutter" id="gutter">1</div>
       <textarea id="sql" spellcheck="false" placeholder="Paste a procedure, function, trigger or script — T-SQL, DB2 SQL PL, PL/pgSQL or SQLite. Or press Load sample."></textarea>
     </div>
+    <div class="large-input-notice" id="large-input-notice" role="status"
+         aria-live="polite" hidden></div>
     <div class="readout" aria-live="polite">
       <div class="status-summary">
         <div class="analysis-health" id="analysis-health">
@@ -259,7 +261,8 @@
 <script src="dist/src/exporters.js"></script>
 <script src="dist/src/report.js"></script>
 <script src="dist/src/workspace.js"></script>
+<script src="dist/src/analysis/confidence.js"></script>
+<script src="dist/src/ui/large-input.js"></script>
 <script src="dist/src/app.js"></script>
 </body>
 </html>
-

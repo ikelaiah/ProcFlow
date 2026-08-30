@@ -63,21 +63,30 @@ function nodeLabelLines(n: GraphNode): string[] {
   return String(n.text||'').split('\u0001').join('\n').split('\n');
 }
 
+/* Mermaid comments carry provenance metadata, but they are still part of the
+   diagram source. Preserve ordinary identities byte-for-byte and percent-encode
+   markup-sensitive metadata so hostile names cannot reappear as executable
+   fragments in an exported definition. */
+function safeMermaidMetadata(value: unknown): string {
+  var text=String(value==null?'':value);
+  return /[<>&"'\r\n]/.test(text) ? encodeURIComponent(text) : text;
+}
+
 function provenanceComment(graph: Graph): string {
   var lines: string[]=['%% proc>flow provenance'];
   (graph.nodes||[]).forEach(function(n){
-    var bits: string[]=[n.id+':'+n.cls];
-    if(n.provenance) bits.push('provenance='+n.provenance);
+    var bits: string[]=[safeMermaidMetadata(n.id)+':'+safeMermaidMetadata(n.cls)];
+    if(n.provenance) bits.push('provenance='+safeMermaidMetadata(n.provenance));
     if(n.sources&&n.sources.length){
       /* Aggregated nodes keep every contributing span rather than one. */
-      bits.push('spans='+n.sources.map(function(s){return s.start+'-'+s.end;}).join(','));
+      bits.push('spans='+safeMermaidMetadata(n.sources.map(function(s){return s.start+'-'+s.end;}).join(',')));
     } else if(n.source){
-      bits.push('span='+n.source.start+'-'+n.source.end);
+      bits.push('span='+safeMermaidMetadata(n.source.start+'-'+n.source.end));
     }
-    if(n.objectId) bits.push('object='+n.objectId);
-    if(n.resolution) bits.push('resolution='+n.resolution);
-    if(n.resolvedName) bits.push('resolved='+n.resolvedName);
-    if(n.reason) bits.push('reason='+n.reason);
+    if(n.objectId) bits.push('object='+safeMermaidMetadata(n.objectId));
+    if(n.resolution) bits.push('resolution='+safeMermaidMetadata(n.resolution));
+    if(n.resolvedName) bits.push('resolved='+safeMermaidMetadata(n.resolvedName));
+    if(n.reason) bits.push('reason='+safeMermaidMetadata(n.reason));
     lines.push('%% '+bits.join(' '));
   });
   return lines.join('\n');
@@ -241,19 +250,36 @@ function layoutAnalysis(graph: Graph, dir?: DiagramDirection): LayoutAnalysis {
       adj[e.from].push(e.to);
     });
 
-    /* Deterministic DFS cycle detection for the component. */
+    /* Deterministic iterative DFS cycle detection for the component. A deeply
+       linear graph is valid input, so avoid using the JavaScript call stack for
+       rank discovery. The explicit frames preserve the former neighbour order
+       and back-edge semantics while remaining safe beyond 10,000 nodes. */
     var state: Record<string, number>={}, localBack: Array<{from: string; to: string}>=[];
-    function dfs(id: string, guard: number): void {
-      if(guard>comp.length*2+2||state[id]===2) return;
-      state[id]=1;
-      adj[id].slice().sort(function(a,b){ return creationOf(a)-creationOf(b); })
-        .forEach(function(to){
-          if(state[to]===1) localBack.push({from:id,to:to});
-          else if(state[to]!==2) dfs(to,guard+1);
-        });
-      state[id]=2;
+    var dfsLimit=comp.length*2+2;
+    function dfs(root: string): void {
+      if(state[root]===2) return;
+      var frames: Array<{id:string; guard:number; neighbours:string[]; next:number}>=[];
+      function push(id: string, guard: number): void {
+        if(guard>dfsLimit||state[id]===2) return;
+        state[id]=1;
+        frames.push({id:id,guard:guard,
+          neighbours:adj[id].slice().sort(function(a,b){ return creationOf(a)-creationOf(b); }),
+          next:0});
+      }
+      push(root,0);
+      while(frames.length){
+        var frame=frames[frames.length-1];
+        if(frame.next>=frame.neighbours.length){
+          state[frame.id]=2;
+          frames.pop();
+          continue;
+        }
+        var to=frame.neighbours[frame.next++];
+        if(state[to]===1) localBack.push({from:frame.id,to:to});
+        else if(state[to]!==2) push(to,frame.guard+1);
+      }
     }
-    comp.forEach(function(id){ if(!state[id]) dfs(id,0); });
+    comp.forEach(function(id){ if(!state[id]) dfs(id); });
 
     /* Remove back edges; Kahn longest-path layering (creation-order ties). */
     var backSet: Record<string, 1 | undefined>={};

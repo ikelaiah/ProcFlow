@@ -21,8 +21,8 @@
    (no fabricated span), while an individual dataset that cannot be linked is a
    region-scoped diagnostic at its own element span when that span is known.
 
-   Combined report dependency views and report export are deferred to v1.13.0;
-   this release ships the parser, the report→dataset linkage, XML source
+   Combined report dependency views and report export were delivered in
+   v1.13.0; this module retains the parser, report→dataset linkage, XML source
    locations, and the E diagnostics. */
 
 /* Local-name search across a DOM root, namespace-agnostic (RDL elements may

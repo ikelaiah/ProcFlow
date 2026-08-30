@@ -1,0 +1,53 @@
+{
+  "generator": "proc&gt;flow fixture-corpus metrics (deterministic, fixture-only)",
+  "formulaVersion": "1.6.0",
+  "corpus": {
+    "golden": 107,
+    "fuzz": 400,
+    "ui": 31,
+    "parity": 10,
+    "layout": 11,
+    "workspace": 14,
+    "catalogue": 13,
+    "columns": 18,
+    "columnFlow": 15,
+    "columnLayout": 2,
+    "report": 12,
+    "reportGraph": 9,
+    "reportGraphLayout": 2,
+    "scalability": 11,
+    "realistic": 4
+  },
+  "attributionRate": 1,
+  "unresolvedTokenRate": 0.04432,
+  "tailUnconsumedRate": 0,
+  "opaqueDynamicRate": 0.005214,
+  "fallbackRate": 0,
+  "semanticEdgeCoverage": 1,
+  "provenanceRate": 1,
+  "regionDiagnosticToSpanRatio": 1,
+  "exportParityPassRate": 1,
+  "exportTraceabilityRate": 1,
+  "layoutBudgetPassRate": 1,
+  "workspacePassRate": 1,
+  "cataloguePassRate": 1,
+  "columnPassRate": 1,
+  "columnFlowPassRate": 1,
+  "columnLayoutPassRate": 1,
+  "reportPassRate": 1,
+  "reportGraphPassRate": 1,
+  "reportGraphLayoutPassRate": 1,
+  "scalabilityPassRate": 1,
+  "realisticCorpusByDialect": {
+    "tsql": 1,
+    "db2": 1,
+    "plpgsql": 1,
+    "sqlite": 1
+  },
+  "aggregate": {
+    "totalTokens": 2685,
+    "accountedTokens": 2685,
+    "statementRegions": 274,
+    "unresolvedRegions": 0
+  }
+}

@@ -1,0 +1,51 @@
+name: Parser or incorrect analysis
+description: Report a suspected parser or semantic-analysis problem.
+title: "Parser: "
+labels: ["parser", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please remove credentials, production identifiers, customer data, school data, and proprietary SQL. Provide the smallest anonymised reproduction possible.
+  - type: input
+    id: version
+    attributes:
+      label: ProcFlow version
+      placeholder: v1.14.0
+    validations: {required: true}
+  - type: dropdown
+    id: dialect
+    attributes:
+      label: Selected dialect
+      options: [T-SQL, DB2 SQL PL, PostgreSQL PL/pgSQL, SQLite]
+    validations: {required: true}
+  - type: textarea
+    id: sql
+    attributes:
+      label: Minimal anonymised SQL
+      description: Do not paste confidential production SQL.
+      render: sql
+    validations: {required: true}
+  - type: textarea
+    id: expected
+    attributes: {label: Expected result}
+    validations: {required: true}
+  - type: textarea
+    id: actual
+    attributes: {label: Actual result}
+    validations: {required: true}
+  - type: input
+    id: detected
+    attributes: {label: Detected dialect}
+  - type: input
+    id: confidence
+    attributes: {label: Confidence}
+  - type: input
+    id: coverage
+    attributes: {label: Coverage}
+  - type: textarea
+    id: diagnostics
+    attributes: {label: Diagnostics}
+  - type: input
+    id: browser
+    attributes: {label: Browser and version}

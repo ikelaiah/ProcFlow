@@ -16,9 +16,10 @@
    ambiguous (`multi`), so its consumers stay opaque without ever inventing an
    edge (`column_flow_opaque` diagnostics, region-scoped).
 
-   Interactive column views are deferred to v1.13.0; this module produces the
-   model (ColumnFlow), its export graph (buildColumnGraph), and the E signals
-   wired into construct coverage by src/ir.ts. */
+   Interactive column views were delivered by the v1.13.0 report dependency
+   work; this module produces the model (ColumnFlow), its export graph
+   (buildColumnGraph), and the E signals wired into construct coverage by
+   src/ir.ts. */
 
 interface CFShared {
   steps: ColumnFlowStep[];

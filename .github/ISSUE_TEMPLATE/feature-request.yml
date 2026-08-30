@@ -1,0 +1,26 @@
+name: Feature request
+description: Describe a problem or use case for a possible improvement.
+title: "Feature: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: ProcFlow is local-first and heuristic; requests should preserve explicit uncertainty and the no-upload security model.
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: What investigation, review, or workflow would this enable?
+    validations: {required: true}
+  - type: textarea
+    id: current
+    attributes: {label: Current workaround}
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the user-visible outcome rather than prescribing an implementation.
+    validations: {required: true}
+  - type: textarea
+    id: constraints
+    attributes: {label: Accuracy, privacy, or compatibility constraints}
