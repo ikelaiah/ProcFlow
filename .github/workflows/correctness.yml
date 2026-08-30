@@ -20,7 +20,7 @@ jobs:
       - name: Verify vendored Mermaid
         shell: bash
         run: |
-          echo "1e9cd6abbdb3ea935af36967c0b997340f792b9b0f3f6625d36563ba799121a5  vendor/mermaid/mermaid.min.js" | sha256sum --check
+          echo "61b335a46df05a7ce1c98378f60e5f3e77a7fb608a1056997e8a649304a936d6  vendor/mermaid/mermaid.min.js" | sha256sum --check
 
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0

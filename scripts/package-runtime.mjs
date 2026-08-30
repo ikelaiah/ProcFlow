@@ -33,8 +33,13 @@ const distFiles = [
 for (const file of distFiles) paths.push(`dist/src/${file}`);
 const missing = paths.filter((path) => !existsSync(join(root, path)));
 if (missing.length) throw new Error(`Missing runtime files: ${missing.join(", ")}`);
-const entries = paths.map((path) => ({ name: path,
-  data: readFileSync(join(root, path)) }));
+/* Git checks out text files with platform-native line endings in some local
+   configurations. Canonicalize the archive bytes so a release ZIP has the
+   same checksum on Windows and Linux. */
+function runtimeBytes(path) {
+  return Buffer.from(readFileSync(join(root, path), "utf8").replace(/\r\n/g, "\n"), "utf8");
+}
+const entries = paths.map((path) => ({ name: path, data: runtimeBytes(path) }));
 entries.push({ name: "README.txt", data: Buffer.from(runtimeReadme, "utf8") });
 const hash = writeStoreZip(archive, entries);
 mkdirSync(outputDir, { recursive: true });
