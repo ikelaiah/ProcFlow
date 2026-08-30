@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>proc&gt;flow Firefox smoke</title>
+<style>
+body{font:14px/1.5 system-ui,sans-serif;margin:24px;background:#111a21;color:#e7eef3}
+body.pass{background:#123027}body.fail{background:#39231f}
+h1{font-size:20px}#summary{font-family:monospace}
+iframe{position:absolute;width:1280px;height:800px;left:-10000px}
+</style>
+</head>
+<body>
+<h1>proc&gt;flow Firefox smoke</h1>
+<p id="summary">Running…</p>
+<iframe id="app" src="../index.html"></iframe>
+<script>
+(function(){
+  var frame=document.getElementById('app');
+  frame.addEventListener('load',function(){
+    var w=frame.contentWindow,d=frame.contentDocument,checks=[];
+    function get(id){return d.getElementById(id);}
+    checks.push(!!d.documentElement.getAttribute('data-procflow-ready'));
+    get('sql').value='SELECT id FROM dbo.firefox_smoke_source;';
+    get('sql').dispatchEvent(new Event('input'));
+    get('btn-draw').click();
+    checks.push(/flowchart/.test(get('mermaid-out').textContent||''));
+    checks.push(!!get('file-input')&&!!get('catalogue-file-input')&&!!get('report-file-input'));
+    get('catalogue-text').value='dbo.firefox_smoke_source TABLE';
+    get('btn-catalogue-apply').click();
+    checks.push(/Loaded: 1 object/.test(get('catalogue-status').textContent||''));
+    get('report-text').value='<Report><DataSets><DataSet Name="Smoke"><Query><CommandText>SELECT id FROM dbo.firefox_smoke_source</CommandText></Query></DataSet></DataSets></Report>';
+    get('btn-report-apply').click();
+    checks.push(/1 report/.test(get('report-status').textContent||''));
+    checks.push(typeof w.toDrawio==='function'&&typeof w.buildWorkspaceSnapshot==='function');
+    setTimeout(function(){
+      checks.push(!!d.querySelector('#stage svg'));
+      var pass=checks.every(function(value){return value;});
+      document.body.className=pass?'pass':'fail';
+      document.getElementById('summary').textContent=(pass?'PASS':'FAIL')+' · '+checks.filter(function(value){return value;}).length+'/'+checks.length+' critical paths';
+      document.title='proc>flow Firefox smoke '+(pass?'PASS':'FAIL');
+    },1000);
+  });
+})();
+</script>
+</body>
+</html>

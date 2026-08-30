@@ -1876,64 +1876,6 @@ function unresolvedControlTargets(ast) {
     scan(ast, []);
     return out;
 }
-/* v1.6.0: the UI's analysis-health data-band is derived from the same
-   versioned confidence formula as the headline number, so the two can never
-   disagree about how trustworthy an analysis is. */
-function confidenceBand(confidence) {
-    return confidence >= 0.85 ? 'high' : (confidence >= 0.6 ? 'medium' : 'low');
-}
-/* v1.6.0 confidence re-score: a versioned formula derived from per-region
-   signals. Every statement region is scored by its resolution state:
-     resolved → 1.00   clean, verified construct
-     approx   → 0.75   region-scoped warning (an estimated resolution)
-     opaque   → 0.40   dynamic/unresolved node
-     error    → 0.15   region-scoped error diagnostic
-   The headline number is dialect certainty × token-weighted region quality
-   × a coverage factor (0.6 + 0.4·coverage). Coverage alone can therefore
-   never raise confidence without resolved constructs: 100 % coverage of
-   opaque regions still caps confidence at 0.4. */
-function analyseConfidence(ast, diagnostics, dialectConfidence, coverage) {
-    var regionBreakdown = { total: 0, resolved: 0, approx: 0,
-        opaque: 0, error: 0 };
-    var regionTokens = 0, regionWeighted = 0;
-    var REGION_SCORE = { resolved: 1, approx: 0.75,
-        opaque: 0.4, error: 0.15 };
-    function statusOf(span, node) {
-        if (!span)
-            return 'resolved';
-        function overlaps(severity) {
-            return diagnostics.some(function (d) {
-                return d.scope === 'region' && d.severity === severity && !!d.span &&
-                    d.span.start < span.end && d.span.end > span.start;
-            });
-        }
-        if (overlaps('error'))
-            return 'error';
-        if (node.type === 'dynamic' || node.type === 'unknown')
-            return 'opaque';
-        if (overlaps('warning'))
-            return 'approx';
-        return 'resolved';
-    }
-    walkAst(ast, function (st) {
-        var toks = st.toks;
-        var span = spanOfTokens(toks);
-        if (!toks || !toks.length || !span)
-            return;
-        var status = statusOf(span, st);
-        regionBreakdown.total++;
-        regionBreakdown[status]++;
-        regionTokens += toks.length;
-        regionWeighted += toks.length * REGION_SCORE[status];
-    }, 0);
-    var regionQuality = regionTokens ? regionWeighted / regionTokens : 1;
-    return {
-        confidence: Math.max(0, Math.min(1, dialectConfidence * regionQuality * (0.6 + 0.4 * coverage))),
-        version: '1.6.0',
-        signals: { dialect: dialectConfidence, coverage: coverage,
-            regionQuality: regionQuality, regionBreakdown: regionBreakdown }
-    };
-}
 function analyse(sql, opts) {
     opts = opts || {};
     sql = String(sql || '');

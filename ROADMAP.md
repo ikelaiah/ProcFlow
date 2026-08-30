@@ -400,13 +400,24 @@ v1.11.0, item 4 → v1.12.0.**
 
 ### v1.14.0 — Scale and convergence
 
-- **Ships:** bounded layout support for large dependency, column, and report
-  graph classes; full regression of v1.0.0–v1.13.0 fixtures; finalization and
-  trending of all fixture-corpus metrics in
-  ["Metrics that matter"](#metrics-that-matter).
+**Delivered in v1.14.0.**
+
+- **Scale:** bounded deterministic layout and iterative graph traversal for
+  large dependency, column, and report graphs; 100 KB/500 KB inputs, a
+  100-object estate, 100/250/500-node graphs, and 25 report datasets are
+  covered by structural fixtures and an indicative benchmark.
+- **Regression:** the v1.0.0–v1.13.0 golden, fuzz, browser, parity, layout,
+  workspace, catalogue, column, column-flow, report, and report-graph suites
+  remain release gates.
+- **Convergence:** v1.14 metrics are published, realistic anonymised fixtures
+  cover all four supported dialects, hostile-input checks cover Mermaid and
+  draw.io boundaries, and a self-contained runtime ZIP has a package smoke.
+- **Operations:** GitHub Actions are SHA-pinned, Dependabot and issue forms
+  are configured, and a Firefox critical-path smoke is part of CI.
 - **Deferred:** final accuracy contract (v2.0.0).
 - **Exit criteria:** documented large-graph fixture budgets pass; metric trends
-  contain no unexplained regression; full regression and CI gate green.
+  contain no unexplained regression; full regression, security, package, and CI
+  gates are green.
 
 ### v2.0.0 — Final convergence
 

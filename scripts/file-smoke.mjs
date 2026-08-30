@@ -1,10 +1,12 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, isAbsolute, join } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-const repositoryRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+const repositoryRoot = process.env.PROCFLOW_SMOKE_ROOT
+  ? resolve(process.env.PROCFLOW_SMOKE_ROOT)
+  : dirname(dirname(fileURLToPath(import.meta.url)));
 const smokePage = join(repositoryRoot, "index.html");
 const explicitBrowser = (process.env.CHROME_PATH || "").trim();
 

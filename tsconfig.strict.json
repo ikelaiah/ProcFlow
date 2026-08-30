@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "noEmit": true
+  },
+  "files": [
+    "src/types.d.ts",
+    "src/analysis/confidence.ts",
+    "src/ui/large-input.ts"
+  ],
+  "include": []
+}

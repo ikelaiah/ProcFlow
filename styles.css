@@ -116,6 +116,8 @@ button,select,textarea,input{font-family:inherit;font-size:inherit;color:inherit
   white-space:pre;overflow:auto;outline-offset:-2px;
 }
 #sql::placeholder{color:var(--ink-faint)}
+.large-input-notice{padding:8px 12px;border-top:1px solid #765422;background:#2d2519;
+  color:#f5c56d;font-size:11px;line-height:1.4}
 
 /* ---------- readout (signature) ---------- */
 .readout{border-top:1px solid var(--rule);padding:8px 12px;background:var(--panel-2);
@@ -294,4 +296,3 @@ footer{flex:0 0 auto;padding:6px 16px;color:var(--ink-faint);font-size:10.5px;
   .output-head .opt select{min-width:0;max-width:120px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
-

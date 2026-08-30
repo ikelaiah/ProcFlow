@@ -1,6 +1,6 @@
 {
   "name": "procflow",
-  "version": "1.13.0",
+  "version": "1.14.0",
   "private": true,
   "description": "Local-first SQL control-flow and dependency visualiser",
   "scripts": {
@@ -8,7 +8,10 @@
     "test:file": "node scripts/file-smoke.mjs",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "metrics": "node scripts/metrics.mjs",
-    "metrics:write": "node scripts/metrics.mjs --write"
+    "metrics:write": "node scripts/metrics.mjs --write",
+    "benchmark": "node scripts/benchmark.mjs",
+    "package:runtime": "node scripts/package-runtime.mjs",
+    "package:smoke": "node scripts/package-smoke.mjs"
   },
   "devDependencies": {
     "typescript": "5.9.3"

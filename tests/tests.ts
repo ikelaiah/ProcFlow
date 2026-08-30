@@ -982,6 +982,18 @@
       false,String(err&&err.stack||err));
   }
 
+  /* v1.14.0: deterministic large-input, large-graph, report-dataset, and
+     anonymised realistic-corpus invariants run ahead in tests/scalability.ts. */
+  try{
+    record('v1.14.0 scale and realistic-corpus invariants',
+      window.PROCFLOW_SCALABILITY_PASS===true&&
+        !!window.PROCFLOW_SCALABILITY_RESULT&&
+        window.PROCFLOW_SCALABILITY_RESULT.passed===window.PROCFLOW_SCALABILITY_RESULT.total,
+      window.PROCFLOW_SCALABILITY_RESULT);
+  }catch(err){
+    record('v1.14.0 scale and realistic-corpus invariants',false,String(err&&err.stack||err));
+  }
+
   var passed=results.filter(function(r){return r.pass;}).length;
   document.body.className=passed===results.length?'pass':'fail';
   document.getElementById('summary').textContent=passed+'/'+results.length+' tests passed';

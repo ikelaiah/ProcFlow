@@ -7,10 +7,11 @@
    lineage pass rate from tests/columns.ts, the v1.11.0 column-flow pass rate
    from tests/column-flow.ts, the v1.12.0 report-import pass rate from
    tests/report.ts, and the v1.13.0 report-graph pass rate from
-   tests/report-graph.ts.
+   tests/report-graph.ts. v1.14.0 scalability and realistic-corpus invariants
+   are published separately.
    Purely deterministic and fixture-only: no user inputs and no runtime
    telemetry are ever collected. scripts/metrics.mjs drives this page to
-   produce or verify docs/metrics-v1.13.0.json. */
+   produce or verify docs/metrics-v1.14.0.json. */
 (function(){
   var corpus=PROCFLOW_FIXTURES||[];
 
@@ -81,7 +82,7 @@
          `npm run metrics:write`; CI then refuses to merge a stale snapshot. */
       golden:corpus.length,
       fuzz:400,
-      ui:27,
+      ui:31,
       parity:window.PROCFLOW_PARITY_RESULT?window.PROCFLOW_PARITY_RESULT.total/2:0,
       layout:window.PROCFLOW_LAYOUT_RESULT?window.PROCFLOW_LAYOUT_RESULT.total:0,
       workspace:window.PROCFLOW_WORKSPACE_RESULT
@@ -99,7 +100,11 @@
       reportGraph:window.PROCFLOW_REPORTGRAPH_RESULT
         ?window.PROCFLOW_REPORTGRAPH_RESULT.total:0,
       reportGraphLayout:window.PROCFLOW_REPORTGRAPH_RESULT
-        ?window.PROCFLOW_REPORTGRAPH_RESULT.layoutTotal:0
+        ?window.PROCFLOW_REPORTGRAPH_RESULT.layoutTotal:0,
+      scalability:window.PROCFLOW_SCALABILITY_RESULT
+        ?window.PROCFLOW_SCALABILITY_RESULT.total:0,
+      realistic:window.PROCFLOW_REALISTIC_CORPUS_RESULT
+        ?window.PROCFLOW_REALISTIC_CORPUS_RESULT.total:0
     },
     attributionRate:rate(attributedAll,totalTokens),
     unresolvedTokenRate:rate(unresolvedTokens,totalTokens),
@@ -172,6 +177,13 @@
       ? rate(window.PROCFLOW_REPORTGRAPH_RESULT.layoutPassed,
              window.PROCFLOW_REPORTGRAPH_RESULT.layoutTotal)
       : 1,
+    scalabilityPassRate:window.PROCFLOW_SCALABILITY_RESULT
+      ? rate(window.PROCFLOW_SCALABILITY_RESULT.passed,
+             window.PROCFLOW_SCALABILITY_RESULT.total)
+      : 0,
+    realisticCorpusByDialect:window.PROCFLOW_REALISTIC_CORPUS_RESULT
+      ? window.PROCFLOW_REALISTIC_CORPUS_RESULT.dialects
+      : {},
     aggregate:{
       totalTokens:totalTokens,
       accountedTokens:attributedAll,

@@ -771,7 +771,7 @@ interface ColumnFlow {
 /* v1.12.0 — report import (README post-v1.0.0 item 4).
    SSRS/RDL import: parse report definitions and link reports to datasets and
    each dataset to its SQL analysis. Combined report dependency views and report
-   export are deferred to v1.13.0; this release ships the parser, the
+   export were delivered in v1.13.0; this release ships the parser, the
    report→dataset linkage, XML source locations where available, and E
    diagnostics for report- and dataset-parsing uncertainty. */
 type ReportDatasetSource = 'embedded' | 'shared' | 'unresolved';
@@ -906,6 +906,7 @@ interface Window {
     initialize(options: Record<string, unknown>): void;
     render(id: string, definition: string): Promise<{svg: string}>;
   };
+  PROCFLOW_LARGE_INPUT_THRESHOLD: number;
   PROCFLOW_TSQL_FIXTURE_COUNT?: number;
   PROCFLOW_METRICS_OUTPUT?: string;
   PROCFLOW_METRICS_READY?: boolean;
@@ -974,6 +975,15 @@ interface Window {
     layoutTotal: number;
   };
   PROCFLOW_REPORTGRAPH_DETAIL?: Array<{name: string; pass: boolean; detail: unknown}>;
+  /* v1.14.0 deterministic scale and realistic-corpus invariants. */
+  PROCFLOW_SCALABILITY_PASS?: boolean;
+  PROCFLOW_SCALABILITY_RESULT?: {passed: number; total: number};
+  PROCFLOW_SCALABILITY_DETAIL?: Array<{name: string; pass: boolean; detail?: unknown}>;
+  PROCFLOW_REALISTIC_CORPUS_RESULT?: {total: number; dialects: Record<string, number>};
+  /* v1.14.0 hostile-input security suite. */
+  PROCFLOW_SECURITY_PASS?: boolean;
+  PROCFLOW_SECURITY_RESULT?: {passed: number; total: number};
+  PROCFLOW_SECURITY_DETAIL?: Array<{name: string; pass: boolean; detail?: unknown}>;
   /* v1.8.0 opt-in workspace persistence globals (src/workspace.ts), exposed for
      the browser UI tests. */
   clearWorkspace(): void;

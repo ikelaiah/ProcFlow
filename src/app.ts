@@ -3,7 +3,7 @@
   if(typeof document==='undefined') return;
   var $=function(id: string): any { return document.getElementById(id); };
   var sql=$('sql'), gutter=$('gutter'), out=$('mermaid-out'), stage=$('stage'),
-      canvas=$('canvas'), msg=$('msg');
+      canvas=$('canvas'), msg=$('msg'), largeInputNotice=$('large-input-notice');
   var scale=1, panX=0, panY=0, lastCode='', lastDialect: Dialect='tsql',
       lastGraph: Graph | null=null, lastTitle='',
       lastDirection: DiagramDirection='TD', lastResult: AnalysisResult | null=null,
@@ -184,10 +184,21 @@
     gutter.textContent=s;
     gutter.scrollTop=sql.scrollTop;
   }
+  function updateLargeInputNotice(): LargeInputPolicy {
+    var policy=largeInputPolicy(sql.value.length);
+    if(policy.large){
+      largeInputNotice.hidden=false;
+      largeInputNotice.textContent='Large input ('+Math.round(policy.length/1000)+' KB). Automatic analysis is paused while you edit; press Refresh to analyse it.';
+    } else {
+      largeInputNotice.hidden=true;
+      largeInputNotice.textContent='';
+    }
+    return policy;
+  }
   sql.addEventListener('scroll',function(){ gutter.scrollTop=sql.scrollTop; });
   sql.addEventListener('input',function(){
     workspaceFiles=null; estate=null; activeObjectId=null;
-    drawGutter(); schedule();
+    drawGutter(); updateLargeInputNotice(); schedule(true);
   });
   sql.addEventListener('keydown',function(e){
     if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){
@@ -198,13 +209,17 @@
       var s=sql.selectionStart, en=sql.selectionEnd;
       sql.value=sql.value.slice(0,s)+'    '+sql.value.slice(en);
       sql.selectionStart=sql.selectionEnd=s+4;
-      drawGutter(); schedule();
+      drawGutter(); updateLargeInputNotice(); schedule(true);
     }
   });
 
   var timer: ReturnType<typeof setTimeout> | null=null;
-  function schedule(): void {
+  function schedule(fromEditor?: boolean): void {
     if(timer!==null) clearTimeout(timer);
+    if(fromEditor&&largeInputPolicy(sql.value.length).large){
+      timer=null;
+      return;
+    }
     timer=setTimeout(run,350);
   }
 
@@ -535,6 +550,7 @@
 
   function run(): void {
     var text=sql.value;
+    updateLargeInputNotice();
     var opts=analysisOptions(), object, result, scope=$('opt-scope').value;
     /* v1.8.0: the dependency filter panel is only relevant in dependency scope.
        v1.13.0: the report filter panel is only relevant in report scope. */
@@ -1041,4 +1057,3 @@
     typeof filterReportGraph==='function'
   ));
 })();
-
