@@ -107,7 +107,8 @@ jobs:
               cat "$output"
               exit 1
             fi
-            grep -o '<p id="summary">[^<]*' "$output" | sed 's/<p id="summary">/'"${name}"': /'
+            grep -Eo '<p id="(summary|security-summary)">[^<]*' "$output" |
+              sed -E 's/<p id="(summary|security-summary)">/'"${name}"': /'
           }
 
           run_suite golden http://127.0.0.1:8000/tests/index.html
