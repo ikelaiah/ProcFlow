@@ -1,6 +1,13 @@
 /* PL/pgSQL fixtures for condition matching, block recovery, and error propagation. */
 var PROCFLOW_PLPGSQL_GRAPH_FIXTURES: GraphFixture[] = [
   {
+    name:'PL/pgSQL query · LATERAL function source remains visible',
+    dialect:'plpgsql',
+    sql:'SELECT * FROM app.base b JOIN LATERAL app.expand_rows(b.id) x ON true;',
+    expect:{mode:'query',tables:2,noErrors:true,coverageMin:1},
+    graphExpect:{required:[],forbidden:[],sourced:[]}
+  },
+  {
     name:'PL/pgSQL graph · first matching exception handler',
     dialect:'plpgsql',
     sql:[

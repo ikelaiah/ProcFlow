@@ -46,7 +46,7 @@ npm run package:runtime
 npm run package:smoke
 ```
 
-The package script creates `.release/procflow-v1.14.0.zip` from an explicit
+The package script creates `.release/procflow-v1.14.1.zip` from an explicit
 allowlist and writes its SHA-256 to `.release/SHA256SUMS.txt`. The package
 smoke validates archive paths, required runtime files, exclusion of development
 files, and local-file startup.

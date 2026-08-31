@@ -502,7 +502,10 @@ function buildGraph(ast: AstNode[], header: SqlHeader,
      definition ambiguous (`multi`), and consumers of an ambiguous temp table
      stay unwired with an informational `temp_flow_ambiguous` annotation. */
   var ambiguousTemps: StringSet={};
-  function isTempName(name: string): boolean { return name.charAt(0)==='#'; }
+  function isTempName(name: string): boolean {
+    return name.charAt(0)==='#'||
+      (dialect==='db2'&&/^SESSION\./i.test(name));
+  }
   function lookupTemp(ctx: FlowContext | null, name: string): TempTableDef | null {
     var key=name.toUpperCase();
     while(ctx){
@@ -1357,6 +1360,9 @@ function statementFacts(toks: Token[], dynamic?: boolean){
   var reads=refsIn(toks).refs.filter(function(r){return cteNames.indexOf(r.toUpperCase())<0;});
   var writes=[], calls=[];
   toks=work;
+  /* DB2 PREPARE ... FROM accepts a statement expression/host variable, not a
+     database object. The generic FROM reader must not turn it into a read. */
+  if(head==='PREPARE') reads=[];
   var i=1;
   if(head==='INSERT'||head==='REPLACE'){
     while(toks[i]&&['INTO','OR','IGNORE','REPLACE'].indexOf(toks[i].u)>=0) i++;

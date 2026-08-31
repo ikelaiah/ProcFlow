@@ -7,11 +7,11 @@
    lineage pass rate from tests/columns.ts, the v1.11.0 column-flow pass rate
    from tests/column-flow.ts, the v1.12.0 report-import pass rate from
    tests/report.ts, and the v1.13.0 report-graph pass rate from
-   tests/report-graph.ts. v1.14.0 scalability and realistic-corpus invariants
+   tests/report-graph.ts. v1.14.1 scalability and realistic-corpus invariants
    are published separately.
    Purely deterministic and fixture-only: no user inputs and no runtime
    telemetry are ever collected. scripts/metrics.mjs drives this page to
-   produce or verify docs/metrics-v1.14.0.json. */
+   produce or verify docs/metrics-v1.14.1.json. */
 (function(){
   var corpus=PROCFLOW_FIXTURES||[];
 

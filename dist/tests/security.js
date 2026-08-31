@@ -1,5 +1,5 @@
 "use strict";
-/* v1.14.0 hostile-input regression suite. The parser treats all fixture text
+/* v1.14.1 hostile-input regression suite. The parser treats all fixture text
    as data; browser rendering is checked asynchronously in security.html with
    Mermaid's strict security level. */
 (function () {
@@ -83,7 +83,7 @@
                 failures: results.filter(function (r) { return !r.pass; }) }, null, 2);
         var summary = document.getElementById('security-summary');
         if (summary)
-            summary.textContent = 'v1.14.0 hostile-input security · ' + passed + '/' + results.length;
+            summary.textContent = 'v1.14.1 hostile-input security · ' + passed + '/' + results.length;
     }
     if (typeof mermaid === 'undefined') {
         finish({ name: 'Mermaid strict security runtime available', pass: false,

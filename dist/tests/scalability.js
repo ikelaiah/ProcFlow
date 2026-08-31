@@ -1,5 +1,5 @@
 "use strict";
-/* v1.14.0 deterministic scale and realistic-corpus invariants. Timing is
+/* v1.14.1 deterministic scale and realistic-corpus invariants. Timing is
    deliberately excluded: the repeatable benchmark command owns performance
    numbers, while this suite catches truncation, nondeterminism, and runaway
    graph construction in the normal correctness gate. */
@@ -103,6 +103,6 @@
             failures: results.filter(function (r) { return !r.pass; }) }, null, 2);
     var summary = document.getElementById('scalability-summary');
     if (summary)
-        summary.textContent = 'v1.14.0 scale/corpus · ' + passed + '/' + results.length;
+        summary.textContent = 'v1.14.1 scale/corpus · ' + passed + '/' + results.length;
 })();
 //# sourceMappingURL=scalability.js.map

@@ -470,8 +470,9 @@ function parseStatement(p: ParserState): AstNode | null {
   /* Dynamic SQL cannot be resolved statically; keep it visible as an opaque step. */
   if(t.type==='word'&&(u==='EXEC'||u==='EXECUTE')){
     var dn=peek(p,1);
-    var dynamic = p.d==='plpgsql' ||
-      (p.d==='db2'&&dn&&dn.u==='IMMEDIATE') ||
+    /* DB2 EXECUTE runs a prepared statement; its statement name is not a
+       procedure identity. CALL is the static procedure-invocation form. */
+    var dynamic = p.d==='plpgsql' || p.d==='db2' ||
       (p.d==='tsql'&&dn&&(dn.type==='str'||dn.v==='('||
         (dn.v.charAt(0)==='@'&&!(peek(p,2)&&peek(p,2).v==='='))||
         dn.u==='SP_EXECUTESQL'||/\.SP_EXECUTESQL$/i.test(dn.v)));
@@ -612,4 +613,3 @@ function findBody(toks: TokenList, dialect: Dialect, src: string): SqlHeader {
   }
   return {name:name, params:params, kind:kind, index:start, gate:null};
 }
-

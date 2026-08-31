@@ -291,6 +291,27 @@ var PROCFLOW_DB2_GRAPH_FIXTURES = [
             ],
             sourced: ['UPDATE APP.WORK', 'SIGNAL SQLSTATE', 'UPDATE APP.UNREACHABLE']
         }
+    },
+    {
+        name: 'DB2 graph · session temporary-table producer feeds consumer',
+        dialect: 'db2',
+        sql: [
+            'CREATE PROCEDURE APP.TEMP_FLOW() LANGUAGE SQL',
+            'BEGIN',
+            '  DECLARE GLOBAL TEMPORARY TABLE SESSION.WORK (ID INTEGER);',
+            '  INSERT INTO SESSION.WORK SELECT ID FROM APP.SOURCE_ROWS;',
+            '  SELECT ID FROM SESSION.WORK;',
+            'END'
+        ].join('\n'),
+        expect: { mode: 'flow', noErrors: true, coverageMin: 1 },
+        graphExpect: {
+            required: [
+                { fromText: 'INSERT INTO SESSION.WORK', toText: 'SELECT … FROM SESSION.WORK',
+                    label: 'SESSION.WORK', kind: 'data' }
+            ],
+            forbidden: [],
+            sourced: ['INSERT INTO SESSION.WORK', 'SELECT … FROM SESSION.WORK']
+        }
     }
 ];
 var PROCFLOW_GRAPH_FIXTURES = PROCFLOW_DB2_GRAPH_FIXTURES.slice();
