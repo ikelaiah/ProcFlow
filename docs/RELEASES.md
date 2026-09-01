@@ -18,10 +18,10 @@ Every release should:
 
 ## Current release
 
-[v1.14.0 — Scale and convergence](releases/v1.14.0.md)
+[v1.14.1 — Targeted correctness patch](releases/v1.14.1.md)
 
 ## Historical releases
 
 The previous release notes and implementation notes remain in this directory,
-including [v1.13.0](RELEASE_NOTE_v1.13.0.md), so old verification claims can be
-traced without rewriting history.
+including [v1.14.0](releases/v1.14.0.md) and [v1.13.0](RELEASE_NOTE_v1.13.0.md),
+so old verification claims can be traced without rewriting history.

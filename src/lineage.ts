@@ -88,7 +88,11 @@ function refsIn(toks: Token[]): QueryReferenceInfo {
   function readSourceAt(s0: number, apply?: boolean): void {
     var st=toks[s0];
     if(!st||st.v==='('||st.type!=='word') return;
-    if(st.u==='LATERAL'||st.u==='VALUES') return;   /* inner subquery handled by the scan; VALUES is literal */
+    /* LATERAL qualifies the following source. A lateral subquery is found by
+       the normal nested scan; a named lateral function/table must still be
+       recorded as a source rather than disappearing from the graph. */
+    if(st.u==='LATERAL'){ readSourceAt(s0+1); return; }
+    if(st.u==='VALUES') return;   /* VALUES is literal */
     if(TABULAR_FUNCS[st.u]>0){ addSource(s0,s0+1,st.v,'opaque', false); return; }
     var e=qnameEnd(s0);
     addSource(s0,e,qname(toks,s0),apply?'heuristic':undefined,apply);
@@ -352,4 +356,3 @@ function buildObjectQueryGraph(ast: AstNode[], header: SqlHeader, opts?: Analyse
   }
   return {nodes:nodes,edges:edges,stats:stats,empty:statements.length===0};
 }
-

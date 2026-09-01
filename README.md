@@ -34,7 +34,7 @@ browser: no backend, database connection, sign-in, or installation is required.
 
 ## Quick start
 
-1. Download the `v1.14.0` runtime ZIP from the [GitHub release](https://github.com/ikelaiah/ProcFlow/releases/tag/v1.14.0), or clone this repository.
+1. Download the `v1.14.1` runtime ZIP from the [GitHub release](https://github.com/ikelaiah/ProcFlow/releases/tag/v1.14.1), or clone this repository.
 2. Open `index.html` in a current Chromium, Firefox, or Edge browser.
 3. Paste SQL or import local files, select a dialect or **Auto**, and choose
    **Refresh**.
@@ -66,7 +66,7 @@ in the browser.
 
 ## Supported dialects
 
-ProcFlow v1.14.0 supports Microsoft T-SQL, IBM DB2 SQL PL, PostgreSQL
+ProcFlow v1.14.1 supports Microsoft T-SQL, IBM DB2 SQL PL, PostgreSQL
 PL/pgSQL, and SQLite. Detection is automatic but can be overridden. Vendor
 extensions outside these tested constructs may produce diagnostics or reduced
 coverage; see [Accuracy](docs/ACCURACY.md).
@@ -90,7 +90,7 @@ suite, and hostile labels are escaped for diagram/XML output. Read the full
   packaging.
 - [Benchmarks](docs/BENCHMARKS.md) — scale fixtures and indicative observations.
 - [Release history](docs/RELEASES.md) — versioning and release notes.
-- [v1.14.0 release note](docs/releases/v1.14.0.md) — current milestone details.
+- [v1.14.1 release note](docs/releases/v1.14.1.md) — current patch details.
 - [Roadmap](ROADMAP.md) — planned convergence work.
 
 ## Contributing

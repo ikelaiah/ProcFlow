@@ -1,4 +1,4 @@
-/* Build the self-contained v1.14.0 runtime archive from an explicit allowlist.
+/* Build the self-contained v1.14.1 runtime archive from an explicit allowlist.
    The archive is local-file compatible and contains no tests, source TypeScript,
    node_modules, maps, or development tooling. */
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";

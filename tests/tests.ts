@@ -229,6 +229,25 @@
   }catch(err){ record('Multi-object estate and dependencies',false,String(err&&err.stack||err)); }
 
   try{
+    var preparedDb2='CREATE PROCEDURE APP.PREPARED() LANGUAGE SQL BEGIN '+
+      'PREPARE stmt FROM statement_text; EXECUTE stmt; END';
+    var preparedResult=analyse(preparedDb2,
+      {dialect:'db2',mode:'flow',group:false,sources:true});
+    var preparedEstate=analyseEstate([{name:'prepared.sql',text:preparedDb2}],
+      {dialect:'db2',mode:'auto',group:false,sources:true});
+    var preparedObject=preparedEstate.objects[0];
+    record('DB2 prepared SQL stays opaque and never becomes object dependencies',
+      !!preparedObject&&preparedObject.reads.length===0&&preparedObject.calls.length===0&&
+        preparedResult.diagnostics.some(function(d){return d.code==='dynamic_sql';})&&
+        preparedResult.graph.nodes.some(function(n){return n.cls==='opaque'&&
+          n.text.indexOf('EXECUTE stmt')>=0;}),
+      JSON.stringify({analysis:preparedResult,estate:preparedEstate}));
+  }catch(err){
+    record('DB2 prepared SQL stays opaque and never becomes object dependencies',
+      false,String(err&&err.stack||err));
+  }
+
+  try{
     var alterSource='CREATE OR ALTER PROCEDURE dbo.pasted_once AS BEGIN SELECT 1; END';
     var replaceSource='CREATE OR REPLACE FUNCTION public.pasted_once() RETURNS integer '+
       'LANGUAGE plpgsql AS $$ BEGIN RETURN 1; END; $$;';
