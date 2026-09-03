@@ -5,7 +5,7 @@
 Each release has one canonical note at `docs/releases/vX.Y.Z.md`. Historical
 `RELEASE_NOTE_*` and `PR_NOTE_*` files are retained for provenance; new release
 notes do not duplicate them. The root README links the current release and
-points here for the history.
+points here and to `CHANGELOG.md` for the history.
 
 Every release should:
 
@@ -16,9 +16,13 @@ Every release should:
 4. generate the runtime ZIP and checksum;
 5. add the release note before tagging `vX.Y.Z`.
 
+v2.0.0 added the adversarial matrix, v2 metric snapshot, final accuracy
+contract, and non-destructive future-workspace rejection. See the
+[final v2 contract](V2_ACCURACY_CONTRACT.md).
+
 ## Current release
 
-[v1.14.1 — Targeted correctness patch](releases/v1.14.1.md)
+[v2.0.0 — Trustworthy SQL Analysis Contract](releases/v2.0.0.md)
 
 ## Historical releases
 

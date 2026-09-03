@@ -6,7 +6,7 @@ SSRS/RDL report definition and renders an explorable diagram.
 
 ## First run
 
-1. Download the v1.14.1 runtime ZIP from the repository release, or clone the
+1. Download the v2.0.0 runtime ZIP from the repository release, or clone the
    repository for development.
 2. Open `index.html` in a current Chromium, Firefox, or Edge browser. The
    runtime does not require a server or a database connection.
@@ -58,6 +58,8 @@ Workspace save is opt-in. **Save to this browser** stores the current files,
 options, catalogue, and report in local browser storage. **Export workspace
 file** creates a portable JSON snapshot; **Import workspace file** restores it.
 Dependency filters change presentation only and do not rewrite analysis counts.
+Older supported workspaces migrate deterministically. A workspace from a newer
+ProcFlow schema is not imported or changed; upgrade ProcFlow to open it.
 
 ## Exports
 
