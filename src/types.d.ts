@@ -980,6 +980,30 @@ interface Window {
   PROCFLOW_SCALABILITY_RESULT?: {passed: number; total: number};
   PROCFLOW_SCALABILITY_DETAIL?: Array<{name: string; pass: boolean; detail?: unknown}>;
   PROCFLOW_REALISTIC_CORPUS_RESULT?: {total: number; dialects: Record<string, number>};
+  /* v2.0.0 cross-dialect qualification matrix. Counts come only from checked-in
+     synthetic fixtures and cover required as well as forbidden semantics. */
+  PROCFLOW_ADVERSARIAL_PASS?: boolean;
+  PROCFLOW_ADVERSARIAL_RESULT?: {
+    passed: number;
+    total: number;
+    rate: number;
+    caseCount: number;
+    required: number;
+    forbidden: number;
+    byDialect: Record<string, {
+      cases: number;
+      assertions: number;
+      required: number;
+      forbidden: number;
+    }>;
+  };
+  PROCFLOW_ADVERSARIAL_FAILURES?: Array<{
+    dialect: Dialect;
+    case: string;
+    assertion: string;
+    expected: string;
+    actual: unknown;
+  }>;
   /* v1.14.0 hostile-input security suite. */
   PROCFLOW_SECURITY_PASS?: boolean;
   PROCFLOW_SECURITY_RESULT?: {passed: number; total: number};
@@ -989,6 +1013,7 @@ interface Window {
   clearWorkspace(): void;
   hasSavedWorkspace(): boolean;
   readWorkspace(): WorkspaceSnapshot | null;
+  workspaceLastError(): string | null;
   writeWorkspace(snapshot: WorkspaceSnapshot): boolean;
   buildWorkspaceSnapshot(state: {
     files: WorkspaceFile[];

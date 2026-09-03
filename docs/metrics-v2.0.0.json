@@ -1,0 +1,87 @@
+{
+  "generator": "proc&gt;flow fixture-corpus metrics (deterministic, fixture-only)",
+  "formulaVersion": "1.6.0",
+  "corpus": {
+    "golden": 109,
+    "fuzz": 400,
+    "ui": 31,
+    "parity": 10,
+    "layout": 11,
+    "workspace": 17,
+    "catalogue": 13,
+    "columns": 18,
+    "columnFlow": 15,
+    "columnLayout": 2,
+    "report": 12,
+    "reportGraph": 9,
+    "reportGraphLayout": 2,
+    "scalability": 11,
+    "realistic": 4,
+    "adversarial": 15
+  },
+  "attributionRate": 1,
+  "unresolvedTokenRate": 0.043447,
+  "tailUnconsumedRate": 0,
+  "opaqueDynamicRate": 0.005111,
+  "fallbackRate": 0,
+  "semanticEdgeCoverage": 1,
+  "provenanceRate": 1,
+  "regionDiagnosticToSpanRatio": 1,
+  "exportParityPassRate": 1,
+  "exportTraceabilityRate": 1,
+  "layoutBudgetPassRate": 1,
+  "workspacePassRate": 1,
+  "cataloguePassRate": 1,
+  "columnPassRate": 1,
+  "columnFlowPassRate": 1,
+  "columnLayoutPassRate": 1,
+  "reportPassRate": 1,
+  "reportGraphPassRate": 1,
+  "reportGraphLayoutPassRate": 1,
+  "scalabilityPassRate": 1,
+  "realisticCorpusByDialect": {
+    "tsql": 1,
+    "db2": 1,
+    "plpgsql": 1,
+    "sqlite": 1
+  },
+  "dialectAdversarialSemanticAssertionRate": 1,
+  "adversarialSemanticAssertions": {
+    "cases": 15,
+    "total": 56,
+    "required": 41,
+    "forbidden": 15,
+    "byDialect": {
+      "tsql": {
+        "cases": 7,
+        "assertions": 27,
+        "required": 20,
+        "forbidden": 7
+      },
+      "plpgsql": {
+        "cases": 4,
+        "assertions": 13,
+        "required": 9,
+        "forbidden": 4
+      },
+      "db2": {
+        "cases": 3,
+        "assertions": 12,
+        "required": 9,
+        "forbidden": 3
+      },
+      "sqlite": {
+        "cases": 1,
+        "assertions": 4,
+        "required": 3,
+        "forbidden": 1
+      }
+    }
+  },
+  "aggregate": {
+    "totalTokens": 2739,
+    "accountedTokens": 2739,
+    "statementRegions": 278,
+    "unresolvedRegions": 0
+  }
+}

@@ -7,8 +7,8 @@
    action. A saved snapshot is versioned (WORKSPACE_SCHEMA_VERSION) so a future
    release can migrate it, and exportable so it never becomes locked to a
    browser. Corrupt or malformed stored data is recovered rather than crashing
-   the app: parseWorkspace returns an error so the caller can drop it and
-   start clean.
+   the app. A workspace made by a newer schema is rejected without being
+   rewritten or deleted; treating it as old data could lose unknown fields.
 
    Dependency filtering is presentation-only: filterDependencyGraph derives a
    filtered copy at render time and never mutates the underlying estate graph.
@@ -22,6 +22,7 @@
    it. */
 var WORKSPACE_SCHEMA_VERSION = 2;
 var WORKSPACE_STORAGE_KEY = 'procflow.workspace'; /* schema base key; versioned payload */
+var WORKSPACE_LAST_ERROR = null;
 var DIALECT_SELECT_ORDER = ['auto', 'tsql', 'db2', 'plpgsql', 'sqlite'];
 function defaultWorkspaceOptions() {
     return {
@@ -100,8 +101,8 @@ function migrateWorkspace(raw) {
     return migrated;
 }
 /* Parse a serialized or exported workspace string with corrupt-state recovery.
-   Returns {snapshot} on success, or {error} on corrupt/malformed input so the
-   caller can drop the bad state and start clean instead of crashing. */
+   Older versions migrate deterministically. A newer version is rejected before
+   migration so no field is dropped, coerced, or reinterpreted as schema 2. */
 function parseWorkspace(json) {
     var raw;
     try {
@@ -113,6 +114,8 @@ function parseWorkspace(json) {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw))
         return { snapshot: null, migrated: false, error: 'not_workspace' };
     var version = typeof raw.version === 'number' ? raw.version : 0;
+    if (version > WORKSPACE_SCHEMA_VERSION)
+        return { snapshot: null, migrated: false, error: 'future_workspace_version' };
     var migrated = version !== WORKSPACE_SCHEMA_VERSION;
     var snapshot = migrateWorkspace(raw);
     if (!snapshot.files.length && !snapshot.activeObjectId)
@@ -124,21 +127,25 @@ function parseWorkspace(json) {
 function readWorkspace() {
     try {
         var raw = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
+        WORKSPACE_LAST_ERROR = null;
         if (!raw)
             return null;
         var parsed = parseWorkspace(raw);
         if (parsed.error || !parsed.snapshot) {
-            try {
-                window.localStorage.removeItem(WORKSPACE_STORAGE_KEY);
-            }
-            catch (e) { }
+            WORKSPACE_LAST_ERROR = parsed.error || 'not_workspace';
+            /* Any rejected workspace may contain user source or future fields. Keep
+               its exact bytes until the user explicitly forgets it or upgrades. */
             return null;
         }
         return parsed.snapshot;
     }
     catch (e) {
+        WORKSPACE_LAST_ERROR = 'storage_unavailable';
         return null;
     }
+}
+function workspaceLastError() {
+    return WORKSPACE_LAST_ERROR;
 }
 function hasSavedWorkspace() {
     try {
@@ -151,6 +158,7 @@ function hasSavedWorkspace() {
 function writeWorkspace(snapshot) {
     try {
         window.localStorage.setItem(WORKSPACE_STORAGE_KEY, serializeWorkspace(snapshot));
+        WORKSPACE_LAST_ERROR = null;
         return true;
     }
     catch (e) {
@@ -162,6 +170,7 @@ function clearWorkspace() {
         window.localStorage.removeItem(WORKSPACE_STORAGE_KEY);
     }
     catch (e) { }
+    WORKSPACE_LAST_ERROR = null;
 }
 function workspaceExportText() {
     var snap = readWorkspace();

@@ -927,7 +927,16 @@
   };
   $('btn-ws-restore').onclick=function(){
     var snap=readWorkspace();
-    if(!snap){ flash($('btn-ws-restore'),'None saved'); return; }
+    if(!snap){
+      if(workspaceLastError()==='future_workspace_version'){
+        showMsg('This workspace was created by a newer unsupported ProcFlow version. It was not changed; upgrade ProcFlow before restoring it.');
+        flash($('btn-ws-restore'),'Newer version');
+      }else if(workspaceLastError()){
+        showMsg('The saved workspace could not be read. It was not changed; use Forget only if you want to remove it.');
+        flash($('btn-ws-restore'),'Unreadable');
+      }else flash($('btn-ws-restore'),'None saved');
+      return;
+    }
     applySnapshot(snap);
   };
   $('btn-ws-export').onclick=function(){
@@ -952,7 +961,9 @@
     file.text().then(function(text){
       var parsed=parseWorkspace(text);
       if(parsed.error||!parsed.snapshot){
-        showMsg('That file is not a valid ProcFlow workspace export.');
+        showMsg(parsed.error==='future_workspace_version'
+          ? 'This workspace was created by a newer unsupported ProcFlow version. It was not imported or changed; upgrade ProcFlow before opening it.'
+          : 'That file is not a valid ProcFlow workspace export.');
         return;
       }
       applySnapshot(parsed.snapshot);
