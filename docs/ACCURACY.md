@@ -1,8 +1,9 @@
 # Accuracy and analysis contract
 
-ProcFlow v1.14.1 is a deterministic heuristic analyser. It is not a database
-compiler and does not execute SQL. Diagrams are investigation aids: verify
-material findings against the source and the target database.
+ProcFlow v2.0.0 is the current released version. It is a deterministic
+heuristic analyser, not a database compiler, and does not execute SQL.
+Diagrams are investigation aids: verify material findings against the source
+and the target database.
 
 ## What is measured
 
@@ -35,7 +36,7 @@ SQL into a resolved dependency.
 
 ## Fixture evidence
 
-The current snapshot is [metrics-v1.14.1.json](metrics-v1.14.1.json). It covers
+The current snapshot is [metrics-v2.0.0.json](metrics-v2.0.0.json). It covers
 the historical golden and fuzz corpus, browser interaction, parity, layout,
 workspace, catalogue, column, column-flow, report, and report-graph suites.
 The v1.14 scale suite exercises 100 KB and 500 KB inputs, 100-object estates,
@@ -45,5 +46,8 @@ SQLite. The CI gate requires the deterministic suites and all tracked metric
 rates to pass.
 
 These are regression and invariant measures, not a claim of compiler-grade
-semantic completeness. The final accuracy contract remains a v2.0.0 roadmap
-item.
+semantic completeness. v2 adds 15 cross-dialect adversarial cases with 56
+required and forbidden semantic assertions; the published
+`dialectAdversarialSemanticAssertionRate` is `1.0`. This is stronger evidence
+than attribution alone, but it is still not a universal SQL-correctness oracle.
+Read the final [v2 accuracy contract](V2_ACCURACY_CONTRACT.md).

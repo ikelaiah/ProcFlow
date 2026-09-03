@@ -1013,6 +1013,17 @@
     record('v1.14.0 scale and realistic-corpus invariants',false,String(err&&err.stack||err));
   }
 
+  try{
+    record('v2 adversarial semantic qualification matrix',
+      window.PROCFLOW_ADVERSARIAL_PASS===true&&
+        !!window.PROCFLOW_ADVERSARIAL_RESULT&&
+        window.PROCFLOW_ADVERSARIAL_RESULT.passed===window.PROCFLOW_ADVERSARIAL_RESULT.total&&
+        window.PROCFLOW_ADVERSARIAL_RESULT.rate===1,
+      window.PROCFLOW_ADVERSARIAL_FAILURES||window.PROCFLOW_ADVERSARIAL_RESULT);
+  }catch(err){
+    record('v2 adversarial semantic qualification matrix',false,String(err&&err.stack||err));
+  }
+
   var passed=results.filter(function(r){return r.pass;}).length;
   document.body.className=passed===results.length?'pass':'fail';
   document.getElementById('summary').textContent=passed+'/'+results.length+' tests passed';

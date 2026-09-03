@@ -233,7 +233,7 @@ v1.11.0, item 4 → v1.12.0.**
 | v1.12.0 | Report import | README 4 (RDL import + dataset linking); E report diagnostics |
 | v1.13.0 | Report intelligence | report → dataset → object → column views; F report export |
 | v1.14.0 | Scale and convergence | large-graph layout; full regression; metrics finalization |
-| v2.0.0 | Final convergence | accuracy contract; README + release notes; all fixtures green |
+| v2.0.0 | Final convergence | final accuracy contract; adversarial semantic matrix + metric; future-schema compatibility; README + release notes |
 
 ### v1.1.0 — Trustworthy semantic foundation
 
@@ -421,13 +421,17 @@ v1.11.0, item 4 → v1.12.0.**
 
 ### v2.0.0 — Final convergence
 
-- **Ships:** the v2.0.0 accuracy contract; README and release notes updated to
-  the contract; final verification that workstreams P and A–F and every README
-  post-v1.0.0 item scheduled here are delivered.
-- **Deferred:** nothing — this is the convergence release.
-- **Exit criteria:** all unaffected v1.0.0–v1.14.0 fixtures pass unchanged;
-  intentional corrected goldens are documented with their accuracy rationale;
-  every roadmap item is delivered and documented; full CI gate green.
+**Delivered in v2.0.0.**
+
+- **Accuracy contract:** finalised in `docs/V2_ACCURACY_CONTRACT.md` with
+  conservative semantic edge, provenance, diagnostic, confidence, export, and
+  local-first privacy guarantees.
+- **Adversarial qualification:** 15 synthetic cross-dialect cases assert 56
+  required and forbidden semantics. The checked-in v2 metric publishes
+  `dialectAdversarialSemanticAssertionRate = 1.0` with transparent counts.
+- **Workspace compatibility:** schema 2 migration remains deterministic for
+  older snapshots; unsupported future and corrupt saved workspaces are rejected
+  non-destructively until the user explicitly forgets them.
 
 ## Test and verification strategy
 

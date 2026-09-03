@@ -1,4 +1,4 @@
-/* Fixture-corpus metric publishing (v1.14.1).
+/* Fixture-corpus metric publishing for the active package release.
    Runs tests/metrics.html headlessly, extracts the deterministic, fixture-only
    metric snapshot, and either writes it (--write) or verifies the checked-in
    snapshot is still current (default). Uses the same browser discovery and
@@ -11,7 +11,14 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repositoryRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const metricsPage = join(repositoryRoot, "tests", "metrics.html");
-const snapshotFile = join(repositoryRoot, "docs", "metrics-v1.14.1.json");
+const requestedRelease = process.argv.find((arg) => arg.startsWith("--release="));
+const releaseVersion = requestedRelease
+  ? requestedRelease.slice("--release=".length)
+  : JSON.parse(readFileSync(join(repositoryRoot, "package.json"), "utf8")).version;
+if (!/^\d+\.\d+\.\d+$/.test(releaseVersion)) {
+  throw new Error(`Invalid release version: ${releaseVersion}`);
+}
+const snapshotFile = join(repositoryRoot, "docs", `metrics-v${releaseVersion}.json`);
 const writeMode = process.argv.includes("--write");
 const explicitBrowser = (process.env.CHROME_PATH || "").trim();
 
@@ -19,10 +26,10 @@ function browserCandidates() {
   if (explicitBrowser) return [explicitBrowser];
   if (process.platform === "win32") {
     return [
-      join(process.env["PROGRAMFILES(X86)"] || "", "Microsoft", "Edge", "Application", "msedge.exe"),
-      join(process.env.PROGRAMFILES || "", "Microsoft", "Edge", "Application", "msedge.exe"),
       join(process.env.PROGRAMFILES || "", "Google", "Chrome", "Application", "chrome.exe"),
       join(process.env["PROGRAMFILES(X86)"] || "", "Google", "Chrome", "Application", "chrome.exe"),
+      join(process.env["PROGRAMFILES(X86)"] || "", "Microsoft", "Edge", "Application", "msedge.exe"),
+      join(process.env.PROGRAMFILES || "", "Microsoft", "Edge", "Application", "msedge.exe"),
       join(process.env.LOCALAPPDATA || "", "Google", "Chrome", "Application", "chrome.exe")
     ].filter(Boolean);
   }

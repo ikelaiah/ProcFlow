@@ -7,11 +7,12 @@
    lineage pass rate from tests/columns.ts, the v1.11.0 column-flow pass rate
    from tests/column-flow.ts, the v1.12.0 report-import pass rate from
    tests/report.ts, and the v1.13.0 report-graph pass rate from
-   tests/report-graph.ts. v1.14.1 scalability and realistic-corpus invariants
+   tests/report-graph.ts. v2.0.0 adds adversarial semantic qualification beside
+   the existing scalability and realistic-corpus invariants.
    are published separately.
    Purely deterministic and fixture-only: no user inputs and no runtime
    telemetry are ever collected. scripts/metrics.mjs drives this page to
-   produce or verify docs/metrics-v1.14.1.json. */
+   produce or verify the active release metric snapshot. */
 (function(){
   var corpus=PROCFLOW_FIXTURES||[];
 
@@ -104,7 +105,9 @@
       scalability:window.PROCFLOW_SCALABILITY_RESULT
         ?window.PROCFLOW_SCALABILITY_RESULT.total:0,
       realistic:window.PROCFLOW_REALISTIC_CORPUS_RESULT
-        ?window.PROCFLOW_REALISTIC_CORPUS_RESULT.total:0
+        ?window.PROCFLOW_REALISTIC_CORPUS_RESULT.total:0,
+      adversarial:window.PROCFLOW_ADVERSARIAL_RESULT
+        ?window.PROCFLOW_ADVERSARIAL_RESULT.caseCount:0
     },
     attributionRate:rate(attributedAll,totalTokens),
     unresolvedTokenRate:rate(unresolvedTokens,totalTokens),
@@ -184,6 +187,17 @@
     realisticCorpusByDialect:window.PROCFLOW_REALISTIC_CORPUS_RESULT
       ? window.PROCFLOW_REALISTIC_CORPUS_RESULT.dialects
       : {},
+    /* v2.0.0 adversarial matrix: unlike attribution and edge-kind coverage,
+       this asserts specific required and forbidden semantic facts. It is
+       stronger qualification evidence, not a universal SQL-correctness claim. */
+    dialectAdversarialSemanticAssertionRate:window.PROCFLOW_ADVERSARIAL_RESULT
+      ? window.PROCFLOW_ADVERSARIAL_RESULT.rate:0,
+    adversarialSemanticAssertions:window.PROCFLOW_ADVERSARIAL_RESULT
+      ? {cases:window.PROCFLOW_ADVERSARIAL_RESULT.caseCount,
+         total:window.PROCFLOW_ADVERSARIAL_RESULT.total,
+         required:window.PROCFLOW_ADVERSARIAL_RESULT.required,
+         forbidden:window.PROCFLOW_ADVERSARIAL_RESULT.forbidden,
+         byDialect:window.PROCFLOW_ADVERSARIAL_RESULT.byDialect}:null,
     aggregate:{
       totalTokens:totalTokens,
       accountedTokens:attributedAll,

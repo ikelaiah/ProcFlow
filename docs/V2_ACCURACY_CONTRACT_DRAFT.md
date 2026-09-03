@@ -1,7 +1,8 @@
-# ProcFlow v2 accuracy contract — draft
+# ProcFlow v2 accuracy contract — superseded draft
 
-> Draft only. This is a proposed compatibility and correctness contract; it
-> does not promise a v2 release or broaden the current v1.14.1 feature set.
+> Superseded by [V2_ACCURACY_CONTRACT.md](V2_ACCURACY_CONTRACT.md) in v2.0.0.
+> Retained to show the pre-qualification proposal and the evidence that was
+> required before promotion.
 
 ## Purpose and scope
 
@@ -64,13 +65,14 @@ data into an asserted edge without a documented correctness basis, is breaking.
 
 ## Workspace format and migrations
 
-Workspace files carry an explicit format version. A newer ProcFlow version
-must either migrate an older supported version deterministically, preserving
-source text and analysis settings, or reject it with a clear, non-destructive
-diagnostic. It must never reinterpret saved source text or silently discard
-unknown fields. Future fields are retained when feasible; otherwise export
-warns before information loss. Migration behaviour, supported source versions,
-and intentional lossy migrations are documented and regression-tested.
+This is a v2 target, not a current guarantee. v1.14.1 uses workspace schema
+version 2 and has regression coverage for migration from older local snapshots
+and corrupt-input recovery. Its generic migration routine currently normalises
+any parsed version to schema 2 and does not preserve unknown fields. Before
+this section can become a final v2 contract, future/unsupported schema versions
+must be rejected non-destructively or migrated deterministically without silent
+loss or reinterpretation of user source, with the supported paths documented
+and regression-tested.
 
 ## Export fidelity
 
@@ -103,13 +105,24 @@ before/after rationale, and preserves uncertainty rather than fabricating a
 replacement. New dialect support, execution, remote services, or telemetry are
 outside this contract unless separately specified and accepted.
 
-## Suggested v2 release evidence
+## Required v2 release evidence
 
-- All historic regression, fuzz, browser, security, packaging, and export
-  suites pass.
-- Each supported dialect has realistic combination fixtures covering static,
-  ambiguous, and dynamic forms.
-- The adversarial semantic-assertion rate is published with its fixture matrix
-  and has no unexplained regression.
-- Every intentional golden correction links to a minimal reproduction and an
-  accuracy rationale.
+- A versioned, deterministic adversarial semantic matrix exercises T-SQL,
+  PL/pgSQL, DB2 SQL PL, and SQLite. It asserts both required and forbidden
+  semantic facts, including object nodes; `call`, `dependency`, `data`,
+  `control`, and `exception` edges where applicable; opaque regions;
+  diagnostics; source provenance; and safe column bindings.
+- The matrix covers the v1.14.1 defect classes (PL/pgSQL `LATERAL`, DB2
+  `PREPARE`/`EXECUTE`, and DB2 `SESSION.` temporary tables) plus dynamic T-SQL,
+  ambiguity, unsafe reaching definitions, catalogue ambiguity, and realistic
+  query/table-expression combinations.
+- The fixture-only metric pipeline publishes the per-dialect counts and a
+  `dialectAdversarialSemanticAssertionRate` of `1.0` in a new
+  `docs/metrics-v2.0.0.json` snapshot. It must make its total, required, and
+  forbidden assertion denominators explicit.
+- All historic regression, fuzz, browser, security, packaging, export, and
+  workspace suites pass, including native Firefox in CI. Every intentional
+  golden correction links to a minimal reproduction and an accuracy rationale.
+- The workspace compatibility target above is implemented and tested. Only
+  then may this draft become `docs/V2_ACCURACY_CONTRACT.md`, the package version
+  become `2.0.0`, and release-facing documentation point to v2.

@@ -113,10 +113,22 @@
           buildWorkspaceSnapshot({files:files,options:optionsRecord,activeObjectId:null})));
         return cur.snapshot!==null&&cur.migrated===false;
       })());
+
+    var futureRaw=JSON.stringify({version:WORKSPACE_SCHEMA_VERSION+1,
+      savedAt:'2030-01-01T00:00:00.000Z',
+      files:[{name:'future.sql',text:'SELECT secret_column FROM future_table;'}],
+      options:{dialect:'tsql',scope:'dependencies',view:'query'},
+      futureOnly:{mustNotBeDiscarded:true}});
+    var future=parseWorkspace(futureRaw);
+    record('v2 future workspace versions are rejected without coercion',
+      future.snapshot===null&&future.migrated===false&&
+        future.error==='future_workspace_version',future);
   }catch(err){
     record('v1.8.0 older-version snapshots migrate forward with defaults',
       false,String(err&&err.stack||err));
     record('v1.8.0 current-version snapshots are not migrated',
+      false,String(err&&err.stack||err));
+    record('v2 future workspace versions are rejected without coercion',
       false,String(err&&err.stack||err));
   }
 
@@ -177,13 +189,39 @@
           !!read&&read.files.length===1&&read.files[0].name==='report.sql'&&
           after===false,
         {wrote:wrote,before:before,stored:stored,
-          read:read&&read.files&&read.files[0]&&read.files[0].name,after:after});
+         read:read&&read.files&&read.files[0]&&read.files[0].name,after:after});
+
+      var futureStored=JSON.stringify({version:WORKSPACE_SCHEMA_VERSION+1,
+        files:[{name:'future.sql',text:'SELECT future_value;'}],
+        options:{dialect:'tsql'},futureOnly:{mustNotBeDiscarded:true}});
+      window.localStorage.setItem(WORKSPACE_STORAGE_KEY,futureStored);
+      var rejectedFuture=readWorkspace();
+      var futureStillStored=window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
+      record('v2 future saved workspaces remain untouched after rejection',
+        rejectedFuture===null&&workspaceLastError()==='future_workspace_version'&&
+          futureStillStored===futureStored,
+        {error:workspaceLastError(),preserved:futureStillStored===futureStored});
+      clearWorkspace();
+
+      var corruptStored='{not a workspace';
+      window.localStorage.setItem(WORKSPACE_STORAGE_KEY,corruptStored);
+      var rejectedCorrupt=readWorkspace();
+      var corruptStillStored=window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
+      record('v2 corrupt saved workspaces remain untouched after rejection',
+        rejectedCorrupt===null&&workspaceLastError()==='corrupt_json'&&
+          corruptStillStored===corruptStored,
+        {error:workspaceLastError(),preserved:corruptStillStored===corruptStored});
+      clearWorkspace();
     }else{
       record('v1.8.0 opt-in storage round-trip and explicit clear',
         true,'localStorage unavailable in this environment; skipped');
     }
   }catch(err){
     record('v1.8.0 opt-in storage round-trip and explicit clear',
+      false,String(err&&err.stack||err));
+    record('v2 future saved workspaces remain untouched after rejection',
+      false,String(err&&err.stack||err));
+    record('v2 corrupt saved workspaces remain untouched after rejection',
       false,String(err&&err.stack||err));
   }
 

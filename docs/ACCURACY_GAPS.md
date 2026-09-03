@@ -118,8 +118,8 @@ DB2 call, or an omitted DB2 temporary-table data edge.
 
 The published v1.14.1 snapshot remains internally current: attribution,
 semantic-edge coverage, provenance, diagnostic-span coverage, export parity,
-and traceability are all `1`; unresolved-token rate is `0.04432`; opaque
-dynamic rate is `0.005214`; and the corpus totals 2,685 tokens across 274
+and traceability are all `1`; unresolved-token rate is `0.043447`; opaque
+dynamic rate is `0.005111`; and the corpus totals 2,739 tokens across 278
 statement regions. These measures are valuable invariants, but they are not a
 semantic oracle. In particular, they did not catch a valid source omitted by a
 recognised query construct or an incorrect interpretation of a recognised

@@ -15,10 +15,10 @@ function browserCandidates() {
 
   if (process.platform === "win32") {
     return [
-      join(process.env["PROGRAMFILES(X86)"] || "", "Microsoft", "Edge", "Application", "msedge.exe"),
-      join(process.env.PROGRAMFILES || "", "Microsoft", "Edge", "Application", "msedge.exe"),
       join(process.env.PROGRAMFILES || "", "Google", "Chrome", "Application", "chrome.exe"),
       join(process.env["PROGRAMFILES(X86)"] || "", "Google", "Chrome", "Application", "chrome.exe"),
+      join(process.env["PROGRAMFILES(X86)"] || "", "Microsoft", "Edge", "Application", "msedge.exe"),
+      join(process.env.PROGRAMFILES || "", "Microsoft", "Edge", "Application", "msedge.exe"),
       join(process.env.LOCALAPPDATA || "", "Google", "Chrome", "Application", "chrome.exe")
     ].filter(Boolean);
   }

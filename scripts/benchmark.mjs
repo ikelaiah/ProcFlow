@@ -1,4 +1,4 @@
-/* Repeatable, non-gating v1.14.1 benchmark. It measures the built runtime in a
+/* Repeatable, non-gating v2.0.0 benchmark. It measures the built runtime in a
    fresh VM without network access. Numbers are indicative; structural limits
    belong to tests/scalability.ts so ordinary correctness runs are not timing
    sensitive. */
@@ -111,7 +111,7 @@ const reportExport = elapsed(() => context.toDrawio(reportGraph,
   { title: "benchmark-report-25-datasets" }));
 
 const output = {
-  version: "1.14.1",
+  version: "2.0.0",
   note: "Indicative local timings; no thresholds or telemetry.",
   sql: [measureSql(100_000), measureSql(500_000)],
   estate100: measureEstate(),
