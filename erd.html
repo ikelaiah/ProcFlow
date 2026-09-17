@@ -67,6 +67,9 @@
     </div>
   </section>
 
+  <div class="splitter" id="splitter" role="separator" aria-orientation="vertical"
+       aria-label="Resize DDL and diagram panels" tabindex="0"></div>
+
   <section class="pane">
     <div class="pane-head output-head">
       <div class="tabs" role="tablist">
@@ -80,6 +83,7 @@
           <span class="erd-find-count" id="erd-find-count" aria-live="polite"></span>
         </label>
         <label class="opt"><input type="checkbox" id="erd-compact"> Compact boxes</label>
+        <button class="btn" id="btn-erd-reset-layout" title="Restore the grid layout (double-click a table to reset just that one)">Reset layout</button>
         <button class="btn" id="btn-erd-copy">Copy Mermaid</button>
       </div>
     </div>
@@ -105,6 +109,7 @@
 <script src="dist/src/schema.js"></script>
 <script src="dist/src/erd.js"></script>
 <script src="dist/src/ui/large-input.js"></script>
+<script src="dist/src/ui/splitter.js"></script>
 <script src="dist/src/ui/erd-page.js"></script>
 </body>
 </html>

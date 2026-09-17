@@ -39,7 +39,8 @@ try {
   const required = ["index.html", "erd.html", "styles.css", "README.txt",
     "dist/src/app.js", "dist/src/schema.js", "dist/src/erd.js",
     "dist/src/analysis/confidence.js", "dist/src/ui/large-input.js",
-    "dist/src/ui/erd-page.js", "vendor/mermaid/mermaid.min.js"];
+    "dist/src/ui/splitter.js", "dist/src/ui/erd-page.js",
+    "vendor/mermaid/mermaid.min.js"];
   const missing = required.filter((name) => !names.includes(name));
   if (missing.length) throw new Error(`package missing: ${missing.join(", ")}`);
   if (names.some((name) => /^(tests|src|node_modules|package(-lock)?\.json)\//.test(name)))

@@ -21,6 +21,10 @@
   var findMatches: string[]=[], findIndex=0;
   var panning=false, panStartX=0, panStartY=0,
       panStartScrollLeft=0, panStartScrollTop=0, didPan=false;
+  var dragMode: 'pan' | 'card' | null=null, dragCardId: string | null=null,
+      dragBaseX=0, dragBaseY=0, dragLastDx=0, dragLastDy=0;
+  var cardOffsets: Record<string, {x: number; y: number}>={};
+  var overlayRaf=0;
 
   function drawGutter(): void {
     if(!gutter||!sql) return;
@@ -153,6 +157,15 @@
       if(event.key==='Enter'||event.key===' '){
         event.preventDefault();
         selectEntity(selectedId===entity.id?null:entity.id);
+      }
+    });
+    card.addEventListener('dblclick',function(event: MouseEvent){
+      event.preventDefault();
+      if(cardOffsets[entity.id]){
+        delete cardOffsets[entity.id];
+        card.style.transform='';
+        card.classList.remove('moved');
+        scheduleOverlay();
       }
     });
     return card;
@@ -308,11 +321,23 @@
       if(compactInput) compactInput.checked=true;
     }
     cardsHost.classList.toggle('compact',compactMode);
+    if(Object.keys(cardOffsets).length){
+      var keptOffsets: Record<string, {x: number; y: number}>={};
+      result.entities.forEach(function(entity){
+        if(cardOffsets[entity.id]) keptOffsets[entity.id]=cardOffsets[entity.id];
+      });
+      cardOffsets=keptOffsets;
+    }
     cardEls={};
     cardsHost.textContent='';
     var frag=document.createDocumentFragment();
     result.entities.forEach(function(entity){
       var card=buildCard(entity);
+      var offset=cardOffsets[entity.id];
+      if(offset&&(offset.x||offset.y)){
+        card.style.transform='translate('+offset.x+'px,'+offset.y+'px)';
+        card.classList.add('moved');
+      }
       cardEls[entity.id]=card;
       frag.appendChild(card);
     });
@@ -351,6 +376,25 @@
     var el=document.createElementNS('http://www.w3.org/2000/svg',name);
     if(attrs) Object.keys(attrs).forEach(function(k){ el.setAttribute(k,String(attrs[k])); });
     return el;
+  }
+
+  function scheduleOverlay(): void {
+    if(overlayRaf) return;
+    overlayRaf=requestAnimationFrame(function(){
+      overlayRaf=0;
+      drawOverlay();
+    });
+  }
+
+  /* Manual placement: offsets survive re-renders (keyed by entity id) and are
+     cleared per card by double-click or all at once by Reset layout. */
+  function resetLayout(): void {
+    cardOffsets={};
+    Object.keys(cardEls).forEach(function(id){
+      cardEls[id].style.transform='';
+      cardEls[id].classList.remove('moved');
+    });
+    scheduleOverlay();
   }
 
   function drawOverlay(): void {
@@ -560,6 +604,8 @@
     renderInspector();
     requestAnimationFrame(drawOverlay);
   });
+  var resetLayoutBtn=$('btn-erd-reset-layout');
+  if(resetLayoutBtn) resetLayoutBtn.addEventListener('click',resetLayout);
 
   var fileInput=$('erd-file-input');
   var importBtn=$('btn-erd-import');
@@ -585,33 +631,61 @@
     new ResizeObserver(function(){ drawOverlay(); }).observe(cardsHost);
   }
 
-  /* Drag-to-pan: the canvas scrolls with the pointer so a large estate can be
-     inspected freely. Listeners live on `document` (not pointer capture):
-     capture retargets the follow-up click to the canvas, which would prevent
-     entity cards from ever receiving a click. A real drag suppresses the click
-     that follows, so panning never changes the selection. */
+  /* Drag on empty canvas pans; drag on a card moves that card so crowded
+     relationships can be separated. Click still selects: a drag shorter than
+     the threshold never suppresses the click, and a real drag always does. */
   if(canvas){
     canvas.addEventListener('pointerdown',function(event: PointerEvent){
       if(event.button!==0) return;
+      var target=event.target as HTMLElement;
+      var cardEl=target&&target.closest?target.closest('.erd-card') as HTMLElement:null;
+      dragMode=cardEl?'card':'pan';
+      dragCardId=cardEl?cardEl.getAttribute('data-entity-id'):null;
       panning=true; didPan=false;
+      dragLastDx=0; dragLastDy=0;
       panStartX=event.clientX; panStartY=event.clientY;
       panStartScrollLeft=canvas.scrollLeft; panStartScrollTop=canvas.scrollTop;
-      canvas.classList.add('dragging');
+      if(dragMode==='card'&&dragCardId){
+        var offset=cardOffsets[dragCardId]||{x:0,y:0};
+        dragBaseX=offset.x; dragBaseY=offset.y;
+        if(cardEl) cardEl.classList.add('moving');
+      } else {
+        canvas.classList.add('dragging');
+      }
     });
     document.addEventListener('pointermove',function(event: PointerEvent){
       if(!panning) return;
       var dx=event.clientX-panStartX, dy=event.clientY-panStartY;
+      dragLastDx=dx; dragLastDy=dy;
+      if(dragMode==='card'){
+        if(Math.abs(dx)>4||Math.abs(dy)>4) didPan=true;
+        if(didPan&&dragCardId&&cardEls[dragCardId]){
+          cardEls[dragCardId].style.transform=
+            'translate('+(dragBaseX+dx)+'px,'+(dragBaseY+dy)+'px)';
+          scheduleOverlay();
+        }
+        return;
+      }
       if(Math.abs(dx)>6||Math.abs(dy)>6) didPan=true;
       canvas.scrollLeft=panStartScrollLeft-dx;
       canvas.scrollTop=panStartScrollTop-dy;
     });
-    var endPan=function(): void {
+    var endDrag=function(): void {
       if(!panning) return;
-      panning=false;
+      if(dragMode==='card'&&dragCardId&&didPan){
+        cardOffsets[dragCardId]={x:dragBaseX+dragLastDx,y:dragBaseY+dragLastDy};
+        if(cardEls[dragCardId]){
+          cardEls[dragCardId].classList.add('moved');
+          cardEls[dragCardId].classList.remove('moving');
+        }
+      } else if(dragCardId&&cardEls[dragCardId]){
+        cardEls[dragCardId].classList.remove('moving');
+      }
+      panning=false; dragMode=null; dragCardId=null;
       canvas.classList.remove('dragging');
     };
-    document.addEventListener('pointerup',endPan);
-    document.addEventListener('pointercancel',endPan);
+    document.addEventListener('pointerup',endDrag);
+    document.addEventListener('pointercancel',endDrag);
     canvas.addEventListener('click',function(event: MouseEvent){
       if(didPan){ didPan=false; event.stopPropagation(); event.preventDefault(); }
     },true);

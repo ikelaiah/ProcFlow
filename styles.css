@@ -85,8 +85,14 @@ button,select,textarea,input{font-family:inherit;font-size:inherit;color:inherit
   outline:2px solid var(--marigold);outline-offset:2px}
 
 /* ---------- layout ---------- */
-.wrap{display:grid;grid-template-columns:minmax(340px,40%) 1fr;gap:1px;
-  background:var(--rule);flex:1;min-height:0}
+.wrap{display:grid;grid-template-columns:var(--pane-left,minmax(340px,40%)) 7px 1fr;
+  gap:0;background:var(--rule);flex:1;min-height:0}
+.splitter{position:relative;background:var(--bg);cursor:col-resize;touch-action:none}
+.splitter::before{content:"";position:absolute;top:0;bottom:0;left:calc(50% - .5px);
+  width:1px;background:var(--rule)}
+.splitter:hover::before,.splitter.active::before{background:var(--marigold);width:2px;
+  left:calc(50% - 1px)}
+.splitter:focus-visible{outline:2px solid var(--marigold);outline-offset:-2px}
 .pane{background:var(--bg);display:flex;flex-direction:column;min-width:0;
   min-height:0;overflow:hidden}
 .pane-head{display:flex;align-items:center;gap:10px;padding:11px 16px;
@@ -264,6 +270,7 @@ footer{flex:0 0 auto;padding:6px 16px;color:var(--ink-faint);font-size:10.5px;
   .tagline{display:none}
   .top-actions{margin-left:auto}
   .wrap{display:grid;grid-template-columns:1fr;flex:none;min-height:auto}
+  .splitter{display:none}
   .pane{overflow:visible;min-height:0}
   .pane:first-child .editor{min-height:290px}
   .pane:first-child{min-height:430px}
@@ -320,7 +327,10 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
   gap:24px;padding:20px;z-index:1}
 .erd-overlay{position:absolute;top:0;left:0;pointer-events:none;z-index:0}
 .erd-card{background:var(--panel);border:1px solid var(--rule);border-radius:5px;
-  overflow:hidden;cursor:pointer;transition:border-color .15s;align-self:start}
+  overflow:hidden;cursor:grab;transition:border-color .15s;align-self:start}
+.erd-card.moving{cursor:grabbing;z-index:30;box-shadow:0 14px 30px rgba(0,0,0,.5);
+  user-select:none}
+.erd-card.moved{z-index:2;box-shadow:0 3px 10px rgba(0,0,0,.35)}
 .erd-card:hover{border-color:var(--ink-faint)}
 .erd-card:focus-visible{outline:2px solid var(--marigold);outline-offset:2px}
 .erd-card.focus{border-color:var(--marigold);box-shadow:0 0 0 2px rgba(232,163,61,.55)}
