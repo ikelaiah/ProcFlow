@@ -306,7 +306,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 }
 #erd-sql::placeholder{color:var(--ink-faint)}
 #erd-canvas{
-  flex:1;overflow:auto;position:relative;cursor:grab;
+  flex:1;overflow:auto;position:relative;cursor:grab;touch-action:none;
   background-color:var(--canvas);
   background-image:radial-gradient(circle at 1px 1px,#22323e 1px,transparent 0);
   background-size:22px 22px;
@@ -323,8 +323,8 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
   overflow:hidden;cursor:pointer;transition:border-color .15s;align-self:start}
 .erd-card:hover{border-color:var(--ink-faint)}
 .erd-card:focus-visible{outline:2px solid var(--marigold);outline-offset:2px}
-.erd-card.focus{border-color:var(--marigold);box-shadow:0 0 0 1px rgba(232,163,61,.45)}
-.erd-card.related{border-color:var(--steel);box-shadow:0 0 0 1px rgba(126,166,224,.35)}
+.erd-card.focus{border-color:var(--marigold);box-shadow:0 0 0 2px rgba(232,163,61,.55)}
+.erd-card.related{border-color:var(--steel);box-shadow:0 0 0 2px rgba(126,166,224,.4)}
 .erd-card.dim{opacity:.32}
 .erd-card.match{border-color:var(--jade);box-shadow:0 0 0 1px rgba(84,195,155,.4)}
 .erd-cards.compact{grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:12px;padding:14px}

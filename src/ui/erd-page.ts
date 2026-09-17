@@ -586,8 +586,10 @@
   }
 
   /* Drag-to-pan: the canvas scrolls with the pointer so a large estate can be
-     inspected freely. A drag suppresses the click that follows, so panning
-     never changes the selection. */
+     inspected freely. Listeners live on `document` (not pointer capture):
+     capture retargets the follow-up click to the canvas, which would prevent
+     entity cards from ever receiving a click. A real drag suppresses the click
+     that follows, so panning never changes the selection. */
   if(canvas){
     canvas.addEventListener('pointerdown',function(event: PointerEvent){
       if(event.button!==0) return;
@@ -595,27 +597,21 @@
       panStartX=event.clientX; panStartY=event.clientY;
       panStartScrollLeft=canvas.scrollLeft; panStartScrollTop=canvas.scrollTop;
       canvas.classList.add('dragging');
-      if(canvas.setPointerCapture){
-        try { canvas.setPointerCapture(event.pointerId); } catch(err){ /* synthetic pointer */ }
-      }
     });
-    canvas.addEventListener('pointermove',function(event: PointerEvent){
+    document.addEventListener('pointermove',function(event: PointerEvent){
       if(!panning) return;
       var dx=event.clientX-panStartX, dy=event.clientY-panStartY;
-      if(Math.abs(dx)>4||Math.abs(dy)>4) didPan=true;
+      if(Math.abs(dx)>6||Math.abs(dy)>6) didPan=true;
       canvas.scrollLeft=panStartScrollLeft-dx;
       canvas.scrollTop=panStartScrollTop-dy;
     });
-    var endPan=function(event: PointerEvent): void {
+    var endPan=function(): void {
       if(!panning) return;
       panning=false;
       canvas.classList.remove('dragging');
-      if(canvas.releasePointerCapture){
-        try { canvas.releasePointerCapture(event.pointerId); } catch(err){ /* already released */ }
-      }
     };
-    canvas.addEventListener('pointerup',endPan);
-    canvas.addEventListener('pointercancel',endPan);
+    document.addEventListener('pointerup',endPan);
+    document.addEventListener('pointercancel',endPan);
     canvas.addEventListener('click',function(event: MouseEvent){
       if(didPan){ didPan=false; event.stopPropagation(); event.preventDefault(); }
     },true);
