@@ -306,11 +306,13 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 }
 #erd-sql::placeholder{color:var(--ink-faint)}
 #erd-canvas{
-  flex:1;overflow:auto;position:relative;
+  flex:1;overflow:auto;position:relative;cursor:grab;
   background-color:var(--canvas);
   background-image:radial-gradient(circle at 1px 1px,#22323e 1px,transparent 0);
   background-size:22px 22px;
 }
+#erd-canvas.dragging{cursor:grabbing;user-select:none}
+#erd-canvas.dragging .erd-card{cursor:grabbing}
 .erd-empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--ink-faint);
   padding:40px;pointer-events:none}
 .erd-empty p{font-size:12.5px;max-width:360px;text-align:center}
@@ -320,7 +322,10 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .erd-card{background:var(--panel);border:1px solid var(--rule);border-radius:5px;
   overflow:hidden;cursor:pointer;transition:border-color .15s;align-self:start}
 .erd-card:hover{border-color:var(--ink-faint)}
-.erd-card.focus{border-color:var(--marigold)}
+.erd-card:focus-visible{outline:2px solid var(--marigold);outline-offset:2px}
+.erd-card.focus{border-color:var(--marigold);box-shadow:0 0 0 1px rgba(232,163,61,.45)}
+.erd-card.related{border-color:var(--steel);box-shadow:0 0 0 1px rgba(126,166,224,.35)}
+.erd-card.dim{opacity:.32}
 .erd-card.unresolved{border-style:dashed;border-color:#6b3a38;background:#1c1a1c}
 .erd-card.view{border-color:#2f4a63}
 .erd-card header{display:flex;align-items:center;gap:8px;padding:8px 10px;
@@ -349,6 +354,38 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .erd-badge-id{color:#c99ae0;border-color:#4d3a5c}
 .erd-badge-gen{color:#e0b76a;border-color:#5c4a2a}
 .erd-no-cols{padding:6px 10px;color:var(--ink-faint);font-size:10.5px;font-style:italic}
+/* v2.1.0 — selection inspector: declared FKs touching the selected entity */
+.erd-inspector{
+  position:absolute;right:14px;bottom:14px;z-index:4;
+  width:min(370px,calc(100% - 28px));max-height:min(48vh,430px);overflow:auto;
+  padding:10px 12px;border:1px solid var(--rule);border-radius:5px;
+  background:rgba(24,35,44,.97);box-shadow:0 14px 34px rgba(0,0,0,.42)
+}
+.erd-inspector[hidden]{display:none}
+.erd-inspector header{display:flex;align-items:baseline;gap:8px;margin-bottom:6px}
+.erd-inspector h4{margin:0;font-family:var(--mono);font-size:12.5px;overflow-wrap:anywhere}
+.erd-inspector-close{
+  margin-left:auto;border:0;background:transparent;color:var(--ink-dim);cursor:pointer;
+  padding:2px 4px;font-family:var(--cond);font-size:10px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.08em
+}
+.erd-inspector-close:hover{color:var(--ink)}
+.erd-inspector-close:focus-visible{outline:2px solid var(--marigold);outline-offset:1px}
+.erd-inspector-group{margin:8px 0 4px;font-family:var(--cond);font-size:9.5px;
+  text-transform:uppercase;letter-spacing:.12em;color:var(--ink-faint)}
+.erd-rel-row{
+  display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 8px;width:100%;
+  padding:5px 6px;border:0;border-radius:3px;background:transparent;color:var(--ink);
+  text-align:left;cursor:pointer;font-family:var(--mono);font-size:11px
+}
+.erd-rel-row:hover{background:#20333f}
+.erd-rel-row:focus-visible{outline:2px solid var(--marigold);outline-offset:-1px}
+.erd-rel-arrow{grid-row:1 / span 3;align-self:start;color:var(--steel)}
+.erd-rel-name{overflow-wrap:anywhere}
+.erd-rel-detail{grid-column:2;color:var(--ink-faint);font-size:10px;overflow-wrap:anywhere}
+.erd-rel-meta{grid-column:2;color:var(--ink-dim);font-size:9.5px}
+.erd-inspector-empty{margin:6px 0 0;color:var(--ink-faint);font-size:11px}
 @media (max-width:900px){
   .erd-cards{grid-template-columns:1fr;gap:18px;padding:14px}
+  .erd-inspector{right:8px;bottom:8px;width:calc(100% - 16px)}
 }

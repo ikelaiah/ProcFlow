@@ -7,11 +7,14 @@
   var $=function(id: string): any { return document.getElementById(id); };
   var sql=$('erd-sql'), gutter=$('erd-gutter'), msg=$('erd-msg'),
       cardsHost=$('erd-cards'), overlay=$('erd-overlay'), canvas=$('erd-canvas'),
-      empty=$('erd-empty'), mermaidOut=$('erd-mermaid-out');
+      empty=$('erd-empty'), mermaidOut=$('erd-mermaid-out'),
+      inspector=$('erd-inspector');
   var result: SchemaResult | null=null;
   var cardEls: Record<string, HTMLElement>={};
   var selectedId: string | null=null;
   var renderSeq=0;
+  var panning=false, panStartX=0, panStartY=0,
+      panStartScrollLeft=0, panStartScrollTop=0, didPan=false;
 
   function drawGutter(): void {
     if(!gutter||!sql) return;
@@ -122,14 +125,121 @@
       list.appendChild(none);
     }
     card.appendChild(list);
+    card.tabIndex=0;
     card.addEventListener('click',function(){
-      selectedId=selectedId===entity.id?null:entity.id;
-      Object.keys(cardEls).forEach(function(id){
-        cardEls[id].classList.toggle('focus',id===selectedId);
-      });
-      drawOverlay();
+      selectEntity(selectedId===entity.id?null:entity.id);
+    });
+    card.addEventListener('keydown',function(event: KeyboardEvent){
+      if(event.key==='Enter'||event.key===' '){
+        event.preventDefault();
+        selectEntity(selectedId===entity.id?null:entity.id);
+      }
     });
     return card;
+  }
+
+  function relationshipTouches(entityId: string, selected: string): boolean {
+    if(!result) return false;
+    return result.relationships.some(function(rel){
+      return (rel.fromId===entityId&&rel.toId===selected)||
+        (rel.toId===entityId&&rel.fromId===selected);
+    });
+  }
+
+  function selectEntity(id: string | null): void {
+    selectedId=id;
+    Object.keys(cardEls).forEach(function(entityId){
+      var connected=!selectedId||relationshipTouches(entityId,selectedId);
+      cardEls[entityId].classList.toggle('focus',entityId===selectedId);
+      cardEls[entityId].classList.toggle('related',
+        !!selectedId&&connected&&entityId!==selectedId);
+      cardEls[entityId].classList.toggle('dim',!!selectedId&&!connected);
+    });
+    renderInspector();
+    drawOverlay();
+  }
+
+  /* Selection inspector: every declared FK touching the selected entity, with
+     direction, column mapping, cardinality, and constraint name. Never inferred. */
+  function renderInspector(): void {
+    if(!inspector||!result) return;
+    inspector.textContent='';
+    var selected=selectedId?result.entities.filter(function(entity){
+      return entity.id===selectedId;
+    })[0]:null;
+    if(!selected){
+      inspector.hidden=true;
+      return;
+    }
+    inspector.hidden=false;
+    var head=document.createElement('header');
+    var title=document.createElement('h4');
+    title.textContent=selected.name;
+    var clear=document.createElement('button');
+    clear.type='button';
+    clear.className='erd-inspector-close';
+    clear.textContent='Clear';
+    clear.addEventListener('click',function(){ selectEntity(null); });
+    head.appendChild(title);
+    head.appendChild(clear);
+    inspector.appendChild(head);
+    function group(label: string, rows: SchemaRelationship[], outgoing: boolean): void {
+      if(!rows.length) return;
+      var heading=document.createElement('p');
+      heading.className='erd-inspector-group';
+      heading.textContent=label;
+      inspector.appendChild(heading);
+      rows.forEach(function(rel){
+        var otherId=outgoing?rel.fromId:rel.toId;
+        var other=result.entities.filter(function(entity){
+          return entity.id===otherId;
+        })[0];
+        var row=document.createElement('button');
+        row.type='button';
+        row.className='erd-rel-row';
+        var arrow=document.createElement('span');
+        arrow.className='erd-rel-arrow';
+        arrow.textContent=outgoing?'\u2192':'\u2190';
+        var name=document.createElement('span');
+        name.className='erd-rel-name';
+        name.textContent=other?other.name:otherId;
+        var detail=document.createElement('span');
+        detail.className='erd-rel-detail';
+        detail.textContent=rel.toColumns.join(',')+' \u2192 '+
+          (rel.fromColumns.join(',')||'PK');
+        var meta=document.createElement('span');
+        meta.className='erd-rel-meta';
+        meta.textContent=(rel.cardinality==='one-to-one'?'1:1':'1:N')+
+          (rel.optional?' optional':'')+(rel.name?' \u00b7 '+rel.name:'');
+        row.appendChild(arrow);
+        row.appendChild(name);
+        row.appendChild(detail);
+        row.appendChild(meta);
+        row.title='Select '+name.textContent;
+        row.addEventListener('click',function(){
+          selectEntity(otherId);
+          var card=cardEls[otherId];
+          if(card&&card.scrollIntoView){
+            card.scrollIntoView({block:'nearest',inline:'nearest',behavior:'smooth'});
+          }
+        });
+        inspector.appendChild(row);
+      });
+    }
+    group('References (FK out)',result.relationships.filter(function(rel){
+      return rel.toId===selected.id;
+    }),true);
+    group('Referenced by (FK in)',result.relationships.filter(function(rel){
+      return rel.fromId===selected.id&&rel.toId!==selected.id;
+    }),false);
+    if(!result.relationships.some(function(rel){
+      return rel.fromId===selected.id||rel.toId===selected.id;
+    })){
+      var none=document.createElement('p');
+      none.className='erd-inspector-empty';
+      none.textContent='No declared foreign keys.';
+      inspector.appendChild(none);
+    }
   }
 
   function renderCards(): void {
@@ -186,35 +296,51 @@
     result.relationships.forEach(function(rel){
       var from=entityBox(rel.fromId), to=entityBox(rel.toId);
       if(!from||!to) return;
-      var focused=!selectedId||rel.fromId===selectedId||rel.toId===selectedId;
+      var active=!!selectedId;
+      var connected=!active||rel.fromId===selectedId||rel.toId===selectedId;
       var dash=rel.resolution==='exact'?'':(rel.resolution==='heuristic'?'7 4':'2 4');
       var color=rel.resolution==='opaque'?'#e4645e':
         (rel.resolution==='heuristic'?'#e8a33d':'#7ea6e0');
-      var d: string, labelAt: {x: number; y: number}[];
+      var d: string, labelAt: {x: number; y: number}[], midAt: {x: number; y: number};
       if(rel.fromId===rel.toId){
         var loopX=from.right+10, loopY=from.cy;
         d='M '+from.right+' '+(from.top+14)+' C '+(loopX+34)+' '+(from.top-14)+', '+
           (loopX+34)+' '+(from.bottom+14)+', '+from.right+' '+(from.bottom-14);
         labelAt=[{x:loopX+30,y:from.top+6},{x:loopX+30,y:from.bottom-4}];
+        midAt={x:loopX+34,y:loopY};
       } else {
         var p1=edgePoint(from,to.cx,to.cy), p2=edgePoint(to,from.cx,from.cy);
         var midX=(p1.x+p2.x)/2;
         d='M '+p1.x+' '+p1.y+' C '+midX+' '+p1.y+', '+midX+' '+p2.y+', '+p2.x+' '+p2.y;
         labelAt=[{x:p1.x+(p2.x-p1.x)*0.16,y:p1.y+(p2.y-p1.y)*0.16},
                  {x:p1.x+(p2.x-p1.x)*0.84,y:p1.y+(p2.y-p1.y)*0.84}];
+        midAt={x:midX,y:(p1.y+p2.y)/2};
       }
-      var path=svgEl('path',{d:d,fill:'none',stroke:color,'stroke-width':focused?2:1.4,
-        'stroke-dasharray':dash,opacity:focused?0.95:0.18,'stroke-linecap':'round'});
+      var path=svgEl('path',{d:d,fill:'none',stroke:color,
+        'stroke-width':active&&connected?2.6:(connected?2:1.4),
+        'stroke-dasharray':dash,opacity:active?(connected?0.95:0.07):0.95,
+        'stroke-linecap':'round'});
       path.setAttribute('data-relationship',rel.id);
       overlay.appendChild(path);
       var leftLabel=rel.optional?'0..1':'1', rightLabel=rel.unique?'1':'N';
       [{text:leftLabel,at:labelAt[0]},{text:rightLabel,at:labelAt[1]}].forEach(function(item){
         var text=svgEl('text',{x:item.at.x,y:item.at.y,fill:color,'font-size':10,
-          'font-family':'ui-monospace,Consolas,monospace',opacity:focused?1:0.25,
+          'font-family':'ui-monospace,Consolas,monospace',
+          opacity:active?(connected?1:0.1):1,
           'text-anchor':'middle','dominant-baseline':'middle'});
         text.textContent=item.text;
         overlay.appendChild(text);
       });
+      if(active&&connected){
+        var label=rel.name||(rel.toColumns.join(',')+' \u2192 '+
+          (rel.fromColumns.join(',')||'PK'));
+        var mid=svgEl('text',{x:midAt.x,y:midAt.y,fill:color,'font-size':10,
+          'font-family':'ui-monospace,Consolas,monospace',
+          stroke:'#101b23','stroke-width':3,'paint-order':'stroke',
+          'text-anchor':'middle','dominant-baseline':'middle'});
+        mid.textContent=label;
+        overlay.appendChild(mid);
+      }
     });
   }
 
@@ -230,6 +356,7 @@
     setStat('erd-diagnostics',result.diagnostics.length);
     selectedId=null;
     renderCards();
+    renderInspector();
     showDiagnostics();
     if(mermaidOut) mermaidOut.textContent=toMermaidER(result);
     var seq=++renderSeq;
@@ -336,6 +463,45 @@
   if(typeof ResizeObserver!=='undefined'&&cardsHost){
     new ResizeObserver(function(){ drawOverlay(); }).observe(cardsHost);
   }
+
+  /* Drag-to-pan: the canvas scrolls with the pointer so a large estate can be
+     inspected freely. A drag suppresses the click that follows, so panning
+     never changes the selection. */
+  if(canvas){
+    canvas.addEventListener('pointerdown',function(event: PointerEvent){
+      if(event.button!==0) return;
+      panning=true; didPan=false;
+      panStartX=event.clientX; panStartY=event.clientY;
+      panStartScrollLeft=canvas.scrollLeft; panStartScrollTop=canvas.scrollTop;
+      canvas.classList.add('dragging');
+      if(canvas.setPointerCapture){
+        try { canvas.setPointerCapture(event.pointerId); } catch(err){ /* synthetic pointer */ }
+      }
+    });
+    canvas.addEventListener('pointermove',function(event: PointerEvent){
+      if(!panning) return;
+      var dx=event.clientX-panStartX, dy=event.clientY-panStartY;
+      if(Math.abs(dx)>4||Math.abs(dy)>4) didPan=true;
+      canvas.scrollLeft=panStartScrollLeft-dx;
+      canvas.scrollTop=panStartScrollTop-dy;
+    });
+    var endPan=function(event: PointerEvent): void {
+      if(!panning) return;
+      panning=false;
+      canvas.classList.remove('dragging');
+      if(canvas.releasePointerCapture){
+        try { canvas.releasePointerCapture(event.pointerId); } catch(err){ /* already released */ }
+      }
+    };
+    canvas.addEventListener('pointerup',endPan);
+    canvas.addEventListener('pointercancel',endPan);
+    canvas.addEventListener('click',function(event: MouseEvent){
+      if(didPan){ didPan=false; event.stopPropagation(); event.preventDefault(); }
+    },true);
+  }
+  document.addEventListener('keydown',function(event: KeyboardEvent){
+    if(event.key==='Escape'&&selectedId) selectEntity(null);
+  });
 
   drawGutter();
   render();
