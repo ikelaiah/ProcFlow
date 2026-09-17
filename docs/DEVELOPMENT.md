@@ -22,6 +22,7 @@ and open these pages:
 
 - `tests/index.html` — golden, parity, layout, workspace, catalogue, report,
   scale, and realistic-corpus checks.
+- `erd.html` — the schema DDL / entity relationship diagram page.
 - `tests/fuzz.html` — 400 deterministic mutation cases.
 - `tests/ui.html` — browser interaction and large-input responsiveness.
 - `tests/security.html` — hostile-input and strict-rendering checks.

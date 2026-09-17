@@ -296,3 +296,59 @@ footer{flex:0 0 auto;padding:6px 16px;color:var(--ink-faint);font-size:10.5px;
   .output-head .opt select{min-width:0;max-width:120px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ---------- v2.1.0 ERD page ---------- */
+a.btn{text-decoration:none;display:inline-flex;align-items:center}
+#erd-sql{
+  flex:1;border:0;background:var(--editor);padding:14px 16px;resize:none;
+  font-family:var(--mono);font-size:12.5px;line-height:1.6;tab-size:2;
+  white-space:pre;overflow:auto;outline-offset:-2px;
+}
+#erd-sql::placeholder{color:var(--ink-faint)}
+#erd-canvas{
+  flex:1;overflow:auto;position:relative;
+  background-color:var(--canvas);
+  background-image:radial-gradient(circle at 1px 1px,#22323e 1px,transparent 0);
+  background-size:22px 22px;
+}
+.erd-empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--ink-faint);
+  padding:40px;pointer-events:none}
+.erd-empty p{font-size:12.5px;max-width:360px;text-align:center}
+.erd-cards{position:relative;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
+  gap:24px;padding:20px;z-index:1}
+.erd-overlay{position:absolute;top:0;left:0;pointer-events:none;z-index:0}
+.erd-card{background:var(--panel);border:1px solid var(--rule);border-radius:5px;
+  overflow:hidden;cursor:pointer;transition:border-color .15s;align-self:start}
+.erd-card:hover{border-color:var(--ink-faint)}
+.erd-card.focus{border-color:var(--marigold)}
+.erd-card.unresolved{border-style:dashed;border-color:#6b3a38;background:#1c1a1c}
+.erd-card.view{border-color:#2f4a63}
+.erd-card header{display:flex;align-items:center;gap:8px;padding:8px 10px;
+  border-bottom:1px solid var(--rule);background:var(--toolbar)}
+.erd-card h3{margin:0;font-size:13px;font-family:var(--mono);font-weight:600;
+  overflow-wrap:anywhere;min-width:0}
+.erd-kind{font-family:var(--cond);font-size:9px;text-transform:uppercase;letter-spacing:.1em;
+  color:var(--jade);border:1px solid #2c5d4b;border-radius:999px;padding:1px 6px;flex:0 0 auto}
+.erd-card.view .erd-kind{color:var(--steel);border-color:#33506f}
+.erd-card.unresolved .erd-kind{color:var(--coral);border-color:#6b3a38}
+.erd-relcount{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--ink-dim);
+  border:1px solid var(--rule);border-radius:999px;padding:1px 6px}
+.erd-cols{list-style:none;margin:0;padding:4px 0}
+.erd-cols li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;
+  align-items:baseline;padding:3px 10px;font-family:var(--mono);font-size:11px}
+.erd-cols li:nth-child(odd){background:#16222b}
+.erd-col-name{color:var(--ink);overflow-wrap:anywhere}
+.erd-col-type{color:var(--ink-faint);font-size:10px;white-space:nowrap;max-width:120px;
+  overflow:hidden;text-overflow:ellipsis}
+.erd-badges{display:flex;gap:3px}
+.erd-badge{font-size:8.5px;letter-spacing:.04em;padding:0 3px;border-radius:2px;
+  border:1px solid var(--rule);color:var(--ink-dim);font-weight:600}
+.erd-badge-pk{color:var(--marigold);border-color:#6d5324}
+.erd-badge-fk{color:var(--steel);border-color:#33506f}
+.erd-badge-uk{color:var(--jade);border-color:#2c5d4b}
+.erd-badge-id{color:#c99ae0;border-color:#4d3a5c}
+.erd-badge-gen{color:#e0b76a;border-color:#5c4a2a}
+.erd-no-cols{padding:6px 10px;color:var(--ink-faint);font-size:10.5px;font-style:italic}
+@media (max-width:900px){
+  .erd-cards{grid-template-columns:1fr;gap:18px;padding:14px}
+}

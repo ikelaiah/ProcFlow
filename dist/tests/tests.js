@@ -894,6 +894,19 @@
     catch (err) {
         record('v2 adversarial semantic qualification matrix', false, String(err && err.stack || err));
     }
+    /* v2.1.0: ERD / schema foundation — DDL parsing across the four dialects,
+       declared keys and foreign keys only, composite-key grouping, conservative
+       unresolved references, source spans, and the Mermaid erDiagram export run
+       ahead in tests/schema.ts; gate the whole golden page on them. */
+    try {
+        record('v2.1.0 ERD schema parse and Mermaid erDiagram fixtures', window.PROCFLOW_SCHEMA_PASS === true &&
+            !!window.PROCFLOW_SCHEMA_RESULT &&
+            window.PROCFLOW_SCHEMA_RESULT.passed === window.PROCFLOW_SCHEMA_RESULT.total &&
+            window.PROCFLOW_SCHEMA_RESULT.mermaidPassed === window.PROCFLOW_SCHEMA_RESULT.mermaidTotal, window.PROCFLOW_SCHEMA_DETAIL || window.PROCFLOW_SCHEMA_RESULT);
+    }
+    catch (err) {
+        record('v2.1.0 ERD schema parse and Mermaid erDiagram fixtures', false, String(err && err.stack || err));
+    }
     var passed = results.filter(function (r) { return r.pass; }).length;
     document.body.className = passed === results.length ? 'pass' : 'fail';
     document.getElementById('summary').textContent = passed + '/' + results.length + ' tests passed';

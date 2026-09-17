@@ -901,6 +901,88 @@ interface RangeFixture {
 
 interface Db2GraphFixture extends GraphFixture {}
 
+/* v2.1.0 — ERD / schema foundation. DDL is parsed into a conservative schema
+   model: declared constraints only, raw type text preserved per dialect, and
+   every entity, column, and key carrying a source span. Relationship edges
+   assert declared foreign keys; nothing is inferred from query text. */
+type SchemaObjectKind = 'table' | 'view';
+type SchemaKeyKind = 'pk' | 'unique' | 'fk';
+type SchemaLinkResolution = 'exact' | 'heuristic' | 'opaque';
+type SchemaCardinality = 'one-to-one' | 'one-to-many';
+
+interface SchemaColumn {
+  name: string;
+  type: string;
+  nullable: boolean;
+  primaryKey: boolean;
+  unique: boolean;
+  identity: boolean;
+  generated: boolean;
+  computed: boolean;
+  ordinal: number;
+  span: SourceSpan;
+}
+
+interface SchemaReference {
+  name: string;
+  norm: string;
+  columns: string[];
+  entityId?: string;
+  resolution: SchemaLinkResolution;
+}
+
+interface SchemaKey {
+  kind: SchemaKeyKind;
+  columns: string[];
+  name?: string;
+  referenced?: SchemaReference;
+  onDelete?: string;
+  onUpdate?: string;
+  deferrable?: boolean;
+  span: SourceSpan;
+}
+
+interface SchemaEntity {
+  id: string;
+  name: string;
+  schema: string | null;
+  kind: SchemaObjectKind;
+  columns: SchemaColumn[];
+  keys: SchemaKey[];
+  unresolved: boolean;
+  span: SourceSpan;
+}
+
+interface SchemaRelationship {
+  id: string;
+  fromId: string;
+  toId: string;
+  fromColumns: string[];
+  toColumns: string[];
+  cardinality: SchemaCardinality;
+  optional: boolean;
+  unique: boolean;
+  name?: string;
+  resolution: SchemaLinkResolution;
+  span: SourceSpan;
+}
+
+interface SchemaStats {
+  tables: number;
+  views: number;
+  columns: number;
+  relationships: number;
+  unresolved: number;
+}
+
+interface SchemaResult {
+  text: string;
+  entities: SchemaEntity[];
+  relationships: SchemaRelationship[];
+  diagnostics: Diagnostic[];
+  stats: SchemaStats;
+}
+
 interface Window {
   mermaid: {
     initialize(options: Record<string, unknown>): void;
@@ -1004,6 +1086,17 @@ interface Window {
     expected: string;
     actual: unknown;
   }>;
+  /* v2.1.0 schema/ERD suite results (DDL parse, declared constraints,
+     relationship derivation, Mermaid erDiagram export), published for the
+     golden tests. */
+  PROCFLOW_SCHEMA_PASS?: boolean;
+  PROCFLOW_SCHEMA_RESULT?: {
+    passed: number;
+    total: number;
+    mermaidPassed: number;
+    mermaidTotal: number;
+  };
+  PROCFLOW_SCHEMA_DETAIL?: Array<{name: string; pass: boolean; detail?: unknown}>;
   /* v1.14.0 hostile-input security suite. */
   PROCFLOW_SECURITY_PASS?: boolean;
   PROCFLOW_SECURITY_RESULT?: {passed: number; total: number};
