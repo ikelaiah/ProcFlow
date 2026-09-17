@@ -332,24 +332,21 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
   padding:40px;pointer-events:none}
 .erd-empty p{font-size:12.5px;max-width:360px;text-align:center}
 .erd-space{position:relative;min-width:100%;min-height:100%}
-.erd-cards{position:absolute;top:0;left:0;display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
-  gap:24px;padding:20px;z-index:1;
+.erd-cards{position:absolute;top:0;left:0;z-index:1;
   transform-origin:0 0;transform:scale(var(--erd-zoom,1))}
 .erd-overlay{position:absolute;top:0;left:0;pointer-events:none;z-index:0}
 .zoomed-out #erd-overlay text{display:none}
-.erd-card{background:var(--panel);border:1px solid var(--rule);border-radius:5px;
-  overflow:hidden;cursor:grab;transition:border-color .15s;align-self:start}
+.erd-card{position:absolute;width:260px;background:var(--panel);border:1px solid var(--rule);
+  border-radius:5px;overflow:hidden;cursor:grab;transition:border-color .15s;align-self:start}
 .erd-card.moving{cursor:grabbing;z-index:30;box-shadow:0 14px 30px rgba(0,0,0,.5);
   user-select:none}
-.erd-card.moved{z-index:2;box-shadow:0 3px 10px rgba(0,0,0,.35)}
 .erd-card:hover{border-color:var(--ink-faint)}
 .erd-card:focus-visible{outline:2px solid var(--marigold);outline-offset:2px}
 .erd-card.focus{border-color:var(--marigold);box-shadow:0 0 0 2px rgba(232,163,61,.55)}
 .erd-card.related{border-color:var(--steel);box-shadow:0 0 0 2px rgba(126,166,224,.4)}
 .erd-card.dim{opacity:.32}
 .erd-card.match{border-color:var(--jade);box-shadow:0 0 0 1px rgba(84,195,155,.4)}
-.erd-cards.compact{grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:12px;padding:14px}
+.erd-cards.compact .erd-card{width:200px}
 .erd-card.compact header{padding:6px 8px}
 .erd-card.compact h3{font-size:12px}
 .erd-summary{margin:0;padding:6px 10px 8px;color:var(--ink-dim);
@@ -423,6 +420,5 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .erd-zoom-val{font-family:var(--mono);font-size:10px;color:var(--ink-faint);
   min-width:42px;text-align:center}
 @media (max-width:900px){
-  .erd-cards{grid-template-columns:1fr;gap:18px;padding:14px}
   .erd-inspector{right:8px;bottom:8px;width:calc(100% - 16px)}
 }

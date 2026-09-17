@@ -3,6 +3,21 @@
 All notable released ProcFlow changes are recorded here. Detailed verification
 evidence belongs in the canonical release note under `docs/releases/`.
 
+## v2.2.0 — Arrange and save the ERD
+
+- Added deterministic Auto arrange: layered parent→child flow with bounded
+  barycenter crossing reduction, cycle-safe ordering, and view placement
+  downstream of the tables referenced in the view body (`FROM`/`JOIN`, used as
+  a declared layout hint only).
+- Added band wrapping so wide and tall estates (800-table chains, 799-leaf
+  fans) become a readable grid instead of one extremely long line or column.
+- Added layout saving: opt-in **Save/Restore/Forget** in this browser plus
+  versioned **Export/Import** layout files keyed by a schema fingerprint, with
+  unmatched entities appended rather than overlapped.
+- Reworked the ERD canvas to absolute positions, so dragging is persistent
+  across re-renders, re-parsing, and Compact mode; **Reset** returns to
+  declaration order.
+
 ## v2.1.0 — Entity relationship diagrams
 
 - Added the ERD page (`erd.html`): DDL parsing for declared tables, views,

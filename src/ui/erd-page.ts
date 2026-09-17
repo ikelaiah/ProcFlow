@@ -24,7 +24,10 @@
       panStartScrollLeft=0, panStartScrollTop=0, didPan=false;
   var dragMode: 'pan' | 'card' | null=null, dragCardId: string | null=null,
       dragBaseX=0, dragBaseY=0, dragLastDx=0, dragLastDy=0;
-  var cardOffsets: Record<string, {x: number; y: number}>={};
+  var cardPositions: Record<string, ErdLayoutPosition>={};
+  var cardSizes: Record<string, ErdLayoutSize>={};
+  var layoutKind: 'default' | 'auto' | 'manual'='default';
+  var stageWidth=0, stageHeight=0;
   var overlayRaf=0;
 
   function drawGutter(): void {
@@ -158,15 +161,6 @@
       if(event.key==='Enter'||event.key===' '){
         event.preventDefault();
         selectEntity(selectedId===entity.id?null:entity.id);
-      }
-    });
-    card.addEventListener('dblclick',function(event: MouseEvent){
-      event.preventDefault();
-      if(cardOffsets[entity.id]){
-        delete cardOffsets[entity.id];
-        card.style.transform='';
-        card.classList.remove('moved');
-        scheduleOverlay();
       }
     });
     return card;
@@ -322,29 +316,82 @@
       if(compactInput) compactInput.checked=true;
     }
     cardsHost.classList.toggle('compact',compactMode);
-    if(Object.keys(cardOffsets).length){
-      var keptOffsets: Record<string, {x: number; y: number}>={};
+    if(Object.keys(cardPositions).length){
+      var kept: Record<string, ErdLayoutPosition>={};
       result.entities.forEach(function(entity){
-        if(cardOffsets[entity.id]) keptOffsets[entity.id]=cardOffsets[entity.id];
+        if(cardPositions[entity.id]) kept[entity.id]=cardPositions[entity.id];
       });
-      cardOffsets=keptOffsets;
+      cardPositions=kept;
     }
     cardEls={};
+    cardSizes={};
     cardsHost.textContent='';
     var frag=document.createDocumentFragment();
     result.entities.forEach(function(entity){
       var card=buildCard(entity);
-      var offset=cardOffsets[entity.id];
-      if(offset&&(offset.x||offset.y)){
-        card.style.transform='translate('+offset.x+'px,'+offset.y+'px)';
-        card.classList.add('moved');
-      }
       cardEls[entity.id]=card;
       frag.appendChild(card);
     });
     cardsHost.appendChild(frag);
     if(empty) empty.hidden=result.entities.length>0;
+    result.entities.forEach(function(entity){
+      var card=cardEls[entity.id];
+      cardSizes[entity.id]={w:card.offsetWidth||260,h:card.offsetHeight||140};
+    });
+    if(!Object.keys(cardPositions).length&&result.entities.length){
+      applyLayout(erdDefaultLayout(result,cardSizes),'default');
+    } else {
+      placeMissingEntities();
+      applyPositions();
+    }
+  }
+
+  function applyPositions(): void {
+    if(!result) return;
+    result.entities.forEach(function(entity){
+      var card=cardEls[entity.id], position=cardPositions[entity.id];
+      if(!card||!position) return;
+      card.style.left=Math.round(position.x)+'px';
+      card.style.top=Math.round(position.y)+'px';
+    });
+    updateStageBounds();
+  }
+
+  function updateStageBounds(): void {
+    if(!cardsHost||!result) return;
+    var maxX=0, maxY=0;
+    result.entities.forEach(function(entity){
+      var position=cardPositions[entity.id];
+      if(!position) return;
+      var size=cardSizes[entity.id]||{w:260,h:140};
+      maxX=Math.max(maxX,position.x+size.w);
+      maxY=Math.max(maxY,position.y+size.h);
+    });
+    stageWidth=maxX+40;
+    stageHeight=maxY+40;
+    cardsHost.style.width=stageWidth+'px';
+    cardsHost.style.height=stageHeight+'px';
     applyZoomLayout();
+  }
+
+  /* New or unmatched entities are appended below the current stage instead of
+     being stacked on top of existing cards. */
+  function placeMissingEntities(): void {
+    if(!result) return;
+    var bottom=0;
+    result.entities.forEach(function(entity){
+      var position=cardPositions[entity.id];
+      if(!position) return;
+      var size=cardSizes[entity.id]||{w:260,h:140};
+      bottom=Math.max(bottom,position.y+size.h);
+    });
+    var y=bottom?bottom+56:0;
+    result.entities.forEach(function(entity){
+      if(cardPositions[entity.id]) return;
+      var size=cardSizes[entity.id]||{w:260,h:140};
+      cardPositions[entity.id]={x:0,y:y};
+      y+=size.h+56;
+    });
   }
 
   interface ErdBox {
@@ -390,15 +437,97 @@
     });
   }
 
-  /* Manual placement: offsets survive re-renders (keyed by entity id) and are
-     cleared per card by double-click or all at once by Reset layout. */
-  function resetLayout(): void {
-    cardOffsets={};
-    Object.keys(cardEls).forEach(function(id){
-      cardEls[id].style.transform='';
-      cardEls[id].classList.remove('moved');
-    });
+  function applyLayout(layout: ErdLayoutResult, kind: 'default' | 'auto' | 'manual'): void {
+    cardPositions=layout.positions;
+    layoutKind=kind;
+    applyPositions();
     scheduleOverlay();
+  }
+
+  function defaultLayout(): void {
+    if(!result) return;
+    applyLayout(erdDefaultLayout(result,cardSizes),'default');
+    layoutStatus('Default declaration-order layout.');
+  }
+
+  function autoArrange(): void {
+    if(!result) return;
+    applyLayout(erdAutoLayout(result,cardSizes),'auto');
+    layoutStatus('Auto-arranged '+result.entities.length+' entities (declared keys only).');
+  }
+
+  function layoutStatus(text: string): void {
+    var el=$('erd-layout-status');
+    if(el) el.textContent=text;
+  }
+
+  /* Saved layouts are opt-in, versioned, and fingerprint-checked; unmatched
+     entities are appended rather than dropped or overlapped. */
+  function saveLayoutToBrowser(): void {
+    if(!result) return;
+    var ok=writeErdLayout(erdLayoutToJSON(result,cardPositions));
+    layoutStatus(ok?'Layout saved to this browser.':'Could not save the layout in this browser.');
+  }
+
+  function restoreLayoutFromBrowser(): void {
+    var raw=readErdLayout();
+    if(!raw){ layoutStatus('No layout saved in this browser.'); return; }
+    var parsed=erdLayoutFromJSON(raw);
+    if(!parsed.file){
+      layoutStatus(parsed.diagnostics[0]?parsed.diagnostics[0].message:'Saved layout is unreadable.');
+      return;
+    }
+    applyLayoutFile(parsed.file,'Restored');
+  }
+
+  function applyLayoutFile(file: ErdLayoutFile, source: string): void {
+    if(!result) return;
+    var current=erdLayoutFingerprint(result);
+    var applied: Record<string, ErdLayoutPosition>={};
+    var matched=0;
+    result.entities.forEach(function(entity){
+      var position=file.positions[entity.id];
+      if(position){ applied[entity.id]=position; matched++; }
+    });
+    if(!matched){
+      layoutStatus(source+': no entity ids matched the current schema.');
+      return;
+    }
+    cardPositions=applied;
+    layoutKind='manual';
+    placeMissingEntities();
+    applyPositions();
+    scheduleOverlay();
+    var note=(file.fingerprint&&file.fingerprint!==current)
+      ? ' (schema changed since save; unmatched entities were appended)'
+      : '';
+    layoutStatus(source+': '+matched+' positions applied'+note+'.');
+  }
+
+  function exportLayoutFile(): void {
+    if(!result) return;
+    var text=erdLayoutToJSON(result,cardPositions);
+    var blob=new Blob([text],{type:'application/json'});
+    var url=URL.createObjectURL(blob);
+    var anchor=document.createElement('a');
+    anchor.href=url;
+    anchor.download='procflow-erd-layout-'+erdLayoutFingerprint(result)+'.json';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    setTimeout(function(){ URL.revokeObjectURL(url); },1000);
+    layoutStatus('Layout exported.');
+  }
+
+  function importLayoutFile(file: File): void {
+    file.text().then(function(text){
+      var parsed=erdLayoutFromJSON(text);
+      if(!parsed.file){
+        layoutStatus(parsed.diagnostics[0]?parsed.diagnostics[0].message:'Layout file is unreadable.');
+        return;
+      }
+      applyLayoutFile(parsed.file,'Imported');
+    });
   }
 
   var ERD_MIN_ZOOM=0.02, ERD_MAX_ZOOM=2;
@@ -409,13 +538,12 @@
     return isNaN(value)?1:value;
   }
 
-  /* The card stage is laid out once at 100% and scaled with a transform, so
-     the grid never reflows while zooming (reflowing made repeated Fit clicks
-     shrink forever). A spacer carries the scaled scroll area. */
+  /* Card positions are absolute canvas pixels at 100%; zoom scales the whole
+     stage with a transform, so it never reflows while zooming. A spacer
+     carries the scaled scroll area. */
   function applyZoomLayout(): void {
     if(!canvas||!cardsHost||!space) return;
     var zoom=currentZoom();
-    cardsHost.style.width=canvas.clientWidth+'px';
     var width=Math.ceil(cardsHost.offsetWidth*zoom)+40;
     var height=Math.ceil(cardsHost.offsetHeight*zoom)+40;
     space.style.width=Math.max(width,canvas.clientWidth)+'px';
@@ -695,12 +823,38 @@
     compactTouched=true;
     compactMode=!!compactInput.checked;
     renderCards();
+    if(layoutKind==='auto'&&result) applyLayout(erdAutoLayout(result,cardSizes),'auto');
+    else if(layoutKind==='default'&&result) applyLayout(erdDefaultLayout(result,cardSizes),'default');
+    else layoutStatus('Box sizes changed; use Auto arrange to re-pack.');
     applyFind(false);
     renderInspector();
     requestAnimationFrame(drawOverlay);
   });
+  var autoArrangeBtn=$('btn-erd-auto-arrange');
+  if(autoArrangeBtn) autoArrangeBtn.addEventListener('click',autoArrange);
   var resetLayoutBtn=$('btn-erd-reset-layout');
-  if(resetLayoutBtn) resetLayoutBtn.addEventListener('click',resetLayout);
+  if(resetLayoutBtn) resetLayoutBtn.addEventListener('click',defaultLayout);
+  var saveLayoutBtn=$('btn-erd-save-layout');
+  if(saveLayoutBtn) saveLayoutBtn.addEventListener('click',saveLayoutToBrowser);
+  var restoreLayoutBtn=$('btn-erd-restore-layout');
+  if(restoreLayoutBtn) restoreLayoutBtn.addEventListener('click',restoreLayoutFromBrowser);
+  var forgetLayoutBtn=$('btn-erd-forget-layout');
+  if(forgetLayoutBtn) forgetLayoutBtn.addEventListener('click',function(){
+    clearErdLayout();
+    layoutStatus('Saved layout forgotten.');
+  });
+  var exportLayoutBtn=$('btn-erd-export-layout');
+  if(exportLayoutBtn) exportLayoutBtn.addEventListener('click',exportLayoutFile);
+  var importLayoutBtn=$('btn-erd-import-layout');
+  var layoutFileInput=$('erd-layout-file-input');
+  if(importLayoutBtn&&layoutFileInput) importLayoutBtn.addEventListener('click',function(){
+    layoutFileInput.click();
+  });
+  if(layoutFileInput) layoutFileInput.addEventListener('change',function(){
+    var files=Array.prototype.slice.call(layoutFileInput.files||[]);
+    if(files.length) importLayoutFile(files[0]);
+    layoutFileInput.value='';
+  });
   var zoomOut=$('erd-z-out');
   if(zoomOut) zoomOut.addEventListener('click',function(){ zoomBy(1/1.15); });
   var zoomIn=$('erd-z-in');
@@ -750,8 +904,8 @@
       panStartX=event.clientX; panStartY=event.clientY;
       panStartScrollLeft=canvas.scrollLeft; panStartScrollTop=canvas.scrollTop;
       if(dragMode==='card'&&dragCardId){
-        var offset=cardOffsets[dragCardId]||{x:0,y:0};
-        dragBaseX=offset.x; dragBaseY=offset.y;
+        var position=cardPositions[dragCardId]||{x:0,y:0};
+        dragBaseX=position.x; dragBaseY=position.y;
         if(cardEl) cardEl.classList.add('moving');
       } else {
         canvas.classList.add('dragging');
@@ -765,8 +919,8 @@
         if(Math.abs(dx)>4||Math.abs(dy)>4) didPan=true;
         if(didPan&&dragCardId&&cardEls[dragCardId]){
           var zoom=currentZoom();
-          cardEls[dragCardId].style.transform=
-            'translate('+(dragBaseX+dx/zoom)+'px,'+(dragBaseY+dy/zoom)+'px)';
+          cardPositions[dragCardId]={x:dragBaseX+dx/zoom,y:dragBaseY+dy/zoom};
+          applyPositions();
           scheduleOverlay();
         }
         return;
@@ -778,13 +932,8 @@
     var endDrag=function(): void {
       if(!panning) return;
       if(dragMode==='card'&&dragCardId&&didPan){
-        var endZoom=currentZoom();
-        cardOffsets[dragCardId]={x:dragBaseX+dragLastDx/endZoom,
-                                 y:dragBaseY+dragLastDy/endZoom};
-        if(cardEls[dragCardId]){
-          cardEls[dragCardId].classList.add('moved');
-          cardEls[dragCardId].classList.remove('moving');
-        }
+        layoutKind='manual';
+        if(cardEls[dragCardId]) cardEls[dragCardId].classList.remove('moving');
       } else if(dragCardId&&cardEls[dragCardId]){
         cardEls[dragCardId].classList.remove('moving');
       }

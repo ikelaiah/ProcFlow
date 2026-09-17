@@ -587,6 +587,43 @@ function schemaParseCreateTable(ctx, toks) {
     schemaAddEntity(ctx, entity);
     return true;
 }
+/* Normalized FROM/JOIN object names inside a view body. Declared evidence
+   only, used as a layout hint (views sit downstream of their sources); these
+   never create relationship edges. Comma-separated sources are included. */
+function schemaViewSources(toks, start) {
+    var out = [], seen = {}, i = start;
+    function add(id) {
+        if (!id)
+            return;
+        var norm = schemaNormName(id.parts);
+        if (norm && !seen[norm]) {
+            seen[norm] = 1;
+            out.push(norm);
+        }
+    }
+    while (i < toks.length) {
+        var t = toks[i];
+        if (t.type === 'word' && (t.u === 'FROM' || t.u === 'JOIN')) {
+            var id = schemaIdent(toks, i + 1);
+            if (id) {
+                add(id);
+                i = id.next;
+                if (t.u === 'FROM') {
+                    while (toks[i] && toks[i].v === ',' && toks[i + 1] && toks[i + 1].type === 'word') {
+                        var more = schemaIdent(toks, i + 1);
+                        if (!more)
+                            break;
+                        add(more);
+                        i = more.next;
+                    }
+                }
+                continue;
+            }
+        }
+        i++;
+    }
+    return out;
+}
 function schemaParseCreateView(ctx, toks) {
     var i = 1;
     while (i < toks.length && toks[i].type === 'word' &&
@@ -630,6 +667,9 @@ function schemaParseCreateView(ctx, toks) {
         if (!entity.columns.length) {
             schemaIssue(ctx, 'info', 'schema_columns_unknown', 'Columns of view "' + entity.name + '" are not declared in this DDL; the view is shown without attributes.', schemaSpan(id.start, id.end));
         }
+        var sources = schemaViewSources(toks, j + 1);
+        if (sources.length)
+            entity.sources = sources;
     }
     schemaAddEntity(ctx, entity);
     return true;

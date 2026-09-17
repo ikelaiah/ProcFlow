@@ -128,6 +128,319 @@ function toMermaidER(result) {
     });
     return lines.join('\n');
 }
+/* ===== v2.2.0 deterministic ERD layout =====
+   Pure geometry over the schema IR: no DOM, no randomness. Card sizes come
+   from the page so positions never overlap; the default layout preserves
+   declaration order, and Auto-arrange uses a layered parent→child flow with
+   bounded barycenter crossing reduction. Cycles and self-references are
+   broken deterministically (first unassigned node by declaration order). */
+function erdLayoutFingerprint(result) {
+    var text = result.entities.map(function (entity) {
+        return entity.id + '|' + entity.kind;
+    }).sort().join(';');
+    var hash = 2166136261;
+    for (var i = 0; i < text.length; i++) {
+        hash ^= text.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+    }
+    return ('0000000' + ((hash >>> 0).toString(16))).slice(-8);
+}
+function erdResolvedSourceId(result, norm) {
+    for (var i = 0; i < result.entities.length; i++) {
+        if (result.entities[i].id === norm)
+            return norm;
+    }
+    var last = norm.split('.').pop(), match = null;
+    for (var j = 0; j < result.entities.length; j++) {
+        var parts = result.entities[j].id.split('.');
+        if (parts[parts.length - 1] === last) {
+            if (match)
+                return null; /* ambiguous: no layout claim */
+            match = result.entities[j].id;
+        }
+    }
+    return match;
+}
+function erdSizeOf(sizes, id) {
+    var size = sizes[id];
+    return size && size.w > 0 && size.h > 0 ? size : { w: 260, h: 140 };
+}
+/* Declaration-order packing into fixed columns (initial and Reset layout). */
+function erdDefaultLayout(result, sizes, columns) {
+    var entities = result.entities;
+    var count = entities.length;
+    var cols = Math.max(1, Math.min(columns || Math.ceil(Math.sqrt(count || 1)), 8));
+    var gapX = 64, gapY = 56, width = 0;
+    for (var s = 0; s < count; s++)
+        width = Math.max(width, erdSizeOf(sizes, entities[s].id).w);
+    var colHeights = [];
+    for (var c = 0; c < cols; c++)
+        colHeights.push(0);
+    var positions = {};
+    var layoutColumns = [];
+    for (var k = 0; k < cols; k++)
+        layoutColumns.push([]);
+    entities.forEach(function (entity, index) {
+        var col = index % cols;
+        var size = erdSizeOf(sizes, entity.id);
+        positions[entity.id] = { x: col * (width + gapX), y: colHeights[col] };
+        layoutColumns[col].push(entity.id);
+        colHeights[col] += size.h + gapY;
+    });
+    var height = 0;
+    colHeights.forEach(function (h) { height = Math.max(height, h); });
+    return { positions: positions, columns: layoutColumns,
+        width: cols * (width + gapX) - (count ? gapX : 0),
+        height: Math.max(height - gapY, 0) };
+}
+/* Layered parent→child flow with bounded crossing reduction. */
+function erdAutoLayout(result, sizes) {
+    var entities = result.entities, count = entities.length;
+    if (!count)
+        return { positions: {}, columns: [], width: 0, height: 0 };
+    var indexOf = {};
+    entities.forEach(function (entity, index) { indexOf[entity.id] = index; });
+    var parents = [], children = [], seen = {};
+    for (var a = 0; a < count; a++) {
+        parents.push([]);
+        children.push([]);
+    }
+    function edge(parentId, childId) {
+        var p = indexOf[parentId], c = indexOf[childId];
+        if (p === undefined || c === undefined || p === c)
+            return;
+        var key = Math.min(p, c) + '>' + Math.max(p, c);
+        if (seen[key])
+            return;
+        seen[key] = 1;
+        parents[c].push(p);
+        children[p].push(c);
+    }
+    result.relationships.forEach(function (rel) { edge(rel.fromId, rel.toId); });
+    entities.forEach(function (entity) {
+        if (entity.kind !== 'view')
+            return;
+        (entity.sources || []).forEach(function (source) {
+            var id = erdResolvedSourceId(result, source);
+            if (id)
+                edge(id, entity.id);
+        });
+    });
+    var layer = [], assigned = [];
+    for (var z = 0; z < count; z++) {
+        layer.push(0);
+        assigned.push(false);
+    }
+    var done = 0, guard = 0;
+    while (done < count && guard++ < count * 2 + 4) {
+        var progressed = false;
+        for (var i = 0; i < count; i++) {
+            if (assigned[i])
+                continue;
+            var ready = true;
+            for (var q = 0; q < parents[i].length; q++) {
+                if (!assigned[parents[i][q]]) {
+                    ready = false;
+                    break;
+                }
+            }
+            if (ready) {
+                var depth = 0;
+                parents[i].forEach(function (p) { depth = Math.max(depth, layer[p] + 1); });
+                layer[i] = depth;
+                assigned[i] = true;
+                done++;
+                progressed = true;
+            }
+        }
+        if (!progressed) {
+            /* Cycle or self-lock: break deterministically at the earliest entity. */
+            for (var b = 0; b < count; b++) {
+                if (assigned[b])
+                    continue;
+                var base = 0;
+                parents[b].forEach(function (p) { if (assigned[p])
+                    base = Math.max(base, layer[p] + 1); });
+                layer[b] = Math.max(1, base);
+                assigned[b] = true;
+                done++;
+                break;
+            }
+        }
+    }
+    var maxLayer = 0;
+    layer.forEach(function (value) { maxLayer = Math.max(maxLayer, value); });
+    /* Views with no declared sources sit in their own downstream band. */
+    entities.forEach(function (entity, index) {
+        if (entity.kind === 'view' && !parents[index].length)
+            layer[index] = maxLayer + 1;
+    });
+    var distinct = [];
+    layer.forEach(function (value) { if (distinct.indexOf(value) < 0)
+        distinct.push(value); });
+    distinct.sort(function (x, y) { return x - y; });
+    var layerToColumn = {};
+    distinct.forEach(function (value, index) { layerToColumn[String(value)] = index; });
+    var columnCount = distinct.length;
+    var order = [];
+    for (var col = 0; col < columnCount; col++)
+        order.push([]);
+    entities.forEach(function (entity, index) {
+        order[layerToColumn[String(layer[index])]].push(index);
+    });
+    var rowOf = [];
+    entities.forEach(function () { rowOf.push(0); });
+    function refreshRows() {
+        order.forEach(function (column) {
+            column.forEach(function (index, row) { rowOf[index] = row; });
+        });
+    }
+    refreshRows();
+    function barycenter(index, neighbor) {
+        var list = neighbor[index];
+        if (!list || !list.length)
+            return rowOf[index];
+        var sum = 0;
+        list.forEach(function (other) { sum += rowOf[other]; });
+        return sum / list.length;
+    }
+    for (var pass = 0; pass < 4; pass++) {
+        var forward = pass % 2 === 0;
+        if (forward) {
+            for (var c = 1; c < columnCount; c++) {
+                var colList = order[c];
+                colList.sort(function (x, y) {
+                    var diff = barycenter(x, parents) - barycenter(y, parents);
+                    return diff !== 0 ? diff : x - y;
+                });
+                refreshRows();
+            }
+        }
+        else {
+            for (var d = columnCount - 2; d >= 0; d--) {
+                var backList = order[d];
+                backList.sort(function (x, y) {
+                    var diff = barycenter(x, children) - barycenter(y, children);
+                    return diff !== 0 ? diff : x - y;
+                });
+                refreshRows();
+            }
+        }
+    }
+    /* Tall columns are chunked before banding: a 799-leaf fan becomes a readable
+       grid instead of one 128,000-pixel column. Chunks stay in the same layer,
+       so declared parent→child order is preserved. */
+    var maxRowsPerColumn = 14;
+    var chunkedOrder = [];
+    order.forEach(function (column) {
+        if (column.length <= maxRowsPerColumn) {
+            chunkedOrder.push(column);
+            return;
+        }
+        for (var start = 0; start < column.length; start += maxRowsPerColumn) {
+            chunkedOrder.push(column.slice(start, start + maxRowsPerColumn));
+        }
+    });
+    order = chunkedOrder;
+    var columnCountExpanded = order.length;
+    /* Wide estates wrap into bands (snake layout): a 800-long chain becomes a
+       readable grid instead of one 200,000-pixel line. Bands are deterministic
+       and keep parent→child order inside each band. */
+    var gapX = 72, gapY = 56, bandGapY = 140, maxColumnsPerBand = 12;
+    var positions = {}, placedColumns = [];
+    var bandStart = 0, bandY = 0;
+    while (bandStart < columnCountExpanded) {
+        var bandEnd = Math.min(columnCountExpanded, bandStart + maxColumnsPerBand);
+        var localWidth = [], localHeight = [];
+        for (var bandColumn = bandStart; bandColumn < bandEnd; bandColumn++) {
+            var widthMax = 0, heightSum = 0;
+            order[bandColumn].forEach(function (index, row) {
+                var size = erdSizeOf(sizes, entities[index].id);
+                if (size.w > widthMax)
+                    widthMax = size.w;
+                heightSum += size.h + (row ? gapY : 0);
+            });
+            localWidth.push(widthMax);
+            localHeight.push(heightSum);
+        }
+        var bandTallest = 0;
+        localHeight.forEach(function (value) { bandTallest = Math.max(bandTallest, value); });
+        var x = 0;
+        for (var column = bandStart; column < bandEnd; column++) {
+            var local = column - bandStart;
+            var y = bandY + Math.max(0, (bandTallest - localHeight[local]) / 2), ids = [];
+            order[column].forEach(function (index, row) {
+                var entity = entities[index], size = erdSizeOf(sizes, entity.id);
+                if (row)
+                    y += gapY;
+                positions[entity.id] = { x: x + (localWidth[local] - size.w) / 2, y: y };
+                ids.push(entity.id);
+                y += size.h;
+            });
+            placedColumns.push(ids);
+            x += localWidth[local] + gapX;
+        }
+        bandY += bandTallest + bandGapY;
+        bandStart = bandEnd;
+    }
+    var width = 0, height = 0;
+    Object.keys(positions).forEach(function (id) {
+        var size = erdSizeOf(sizes, id);
+        width = Math.max(width, positions[id].x + size.w);
+        height = Math.max(height, positions[id].y + size.h);
+    });
+    return { positions: positions, columns: placedColumns, width: width, height: height };
+}
+/* Layout files are explicit, versioned, and keyed by schema fingerprint so a
+   stale layout cannot silently mismatch a changed schema. */
+function erdLayoutToJSON(result, positions) {
+    var ordered = {};
+    result.entities.forEach(function (entity) {
+        var position = positions[entity.id];
+        if (position)
+            ordered[entity.id] = { x: Math.round(position.x), y: Math.round(position.y) };
+    });
+    var file = { format: 'procflow-erd-layout', version: 1,
+        fingerprint: erdLayoutFingerprint(result),
+        positions: ordered };
+    return JSON.stringify(file, null, 1);
+}
+function erdLayoutFromJSON(text) {
+    var diagnostics = [];
+    function fail(code, message) {
+        diagnostics.push({ severity: 'error', code: code, message: message, span: null,
+            scope: 'document' });
+        return { file: null, diagnostics: diagnostics };
+    }
+    var parsed;
+    try {
+        parsed = JSON.parse(text);
+    }
+    catch (err) {
+        return fail('erd_layout_parse_error', 'Layout file is not valid JSON.');
+    }
+    if (!parsed || typeof parsed !== 'object' || parsed.format !== 'procflow-erd-layout') {
+        return fail('erd_layout_format_error', 'Layout file is not a ProcFlow ERD layout.');
+    }
+    if (parsed.version !== 1) {
+        return fail('erd_layout_version_error', 'Layout file version ' + String(parsed.version) + ' is not supported.');
+    }
+    if (!parsed.positions || typeof parsed.positions !== 'object') {
+        return fail('erd_layout_format_error', 'Layout file has no positions.');
+    }
+    var positions = {};
+    Object.keys(parsed.positions).forEach(function (id) {
+        var value = parsed.positions[id];
+        if (value && typeof value.x === 'number' && typeof value.y === 'number' &&
+            isFinite(value.x) && isFinite(value.y)) {
+            positions[id] = { x: value.x, y: value.y };
+        }
+    });
+    return { file: { format: 'procflow-erd-layout', version: 1,
+            fingerprint: String(parsed.fingerprint || ''),
+            positions: positions },
+        diagnostics: diagnostics };
+}
 /* Bundled ERD samples (local-only, deterministic, and also used by the
    v2.1.0 fixtures so the demo path is covered by tests). */
 var PROCFLOW_ERD_SAMPLE_TSQL = [
