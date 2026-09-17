@@ -60,7 +60,10 @@ jobs:
       - name: Check runtime remains local-only
         shell: bash
         run: |
-          if grep -REn "https?://" index.html styles.css src dist tests; then
+          # The W3C SVG namespace is an XML identifier passed to createElementNS,
+          # not a network URL: allow exactly that string and fail on any other.
+          if grep -REn "https?://" index.html styles.css src dist tests \
+               | grep -v "http://www.w3.org/2000/svg"; then
             echo "Runtime files contain an external URL."
             exit 1
           fi

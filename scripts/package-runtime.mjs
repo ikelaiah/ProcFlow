@@ -16,19 +16,21 @@ const runtimeReadme = [
   `ProcFlow v${version}`,
   "",
   "Open index.html in a current Chrome, Edge, Firefox, or Chromium browser.",
-  "Keep index.html, styles.css, dist/, and vendor/ together after extracting.",
+  "Open erd.html for the entity relationship diagram page built from schema DDL.",
+  "Keep index.html, erd.html, styles.css, dist/, and vendor/ together after extracting.",
   "The application runs locally in the browser; it does not upload or execute SQL.",
   "Analysis is heuristic. Verify important findings against the source SQL and database.",
   ""
 ].join("\n");
 const paths = [
-  "index.html", "styles.css", "LICENSE", "vendor/mermaid/mermaid.min.js",
+  "index.html", "erd.html", "styles.css", "LICENSE", "vendor/mermaid/mermaid.min.js",
   "vendor/mermaid/LICENSE"
 ];
 const distFiles = [
   "app.js", "catalogue.js", "columnflow.js", "columns.js", "dialects.js",
-  "exporters.js", "ir.js", "lineage.js", "report.js", "tokenizer.js",
-  "workspace.js", "analysis/confidence.js", "ui/large-input.js"
+  "exporters.js", "ir.js", "lineage.js", "report.js", "schema.js",
+  "tokenizer.js", "workspace.js", "erd.js", "analysis/confidence.js",
+  "ui/large-input.js", "ui/splitter.js", "ui/erd-page.js"
 ];
 for (const file of distFiles) paths.push(`dist/src/${file}`);
 const missing = paths.filter((path) => !existsSync(join(root, path)));

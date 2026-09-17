@@ -14,8 +14,9 @@
 </p>
 
 ProcFlow turns SQL into diagrams for control flow, query structure, object
-dependencies, column lineage, and report dependencies. It runs locally in the
-browser: no backend, database connection, sign-in, or installation is required.
+dependencies, column lineage, report dependencies, and entity relationship
+diagrams from schema DDL. It runs locally in the browser: no backend, database
+connection, sign-in, or installation is required.
 
 > **Accuracy warning:** ProcFlow is a deterministic heuristic analyser, not a
 > database compiler. Treat diagrams as investigation aids and verify important
@@ -33,6 +34,9 @@ browser: no backend, database connection, sign-in, or installation is required.
   their queries, and trace report → dataset → object → column dependencies.
 - **Application teams:** inspect multi-object scripts, temporary-table flow,
   catalogue-backed object resolution, and conservative column lineage.
+- **Schema reviewers:** open `erd.html`, paste or import `CREATE TABLE` /
+  `ALTER TABLE` DDL, and see declared tables, views, keys, and foreign keys as
+  an entity relationship diagram.
 - **Reviewers:** export deterministic Mermaid, SVG, or editable draw.io
   diagrams with source provenance.
 
@@ -44,6 +48,24 @@ browser: no backend, database connection, sign-in, or installation is required.
    **Refresh**.
 4. Choose an object and scope, then inspect the source spans and diagnostics
    before relying on a relationship.
+
+For schema DDL, open `erd.html`, paste or import `CREATE TABLE` / `ALTER TABLE`
+statements (T-SQL, PostgreSQL, DB2, or SQLite), and review the declared
+entities and foreign keys. Drag the canvas to pan, drag a table card to move it
+out of the way and declutter relationship lines (double-click a card, or use
+**Reset layout**, to restore the grid), select a table to highlight its
+declared foreign keys and list each one with its column mapping and
+cardinality, and press **Clear** (or Escape) to deselect. Zoom controls under
+the canvas (or **Fit**) frame the whole estate; with a table selected, **Fit**
+frames that table and its declared neighbours and the selection ring stays
+visible at estate zoom. On both the flowchart
+and ERD pages the divider between the editor and the diagram is draggable
+(double-click it to reset). Estates with hundreds of tables stay responsive:
+auto-draw pauses above the shared large-input threshold until **Refresh**,
+boxes switch to a compact summary automatically, and **Find** highlights
+matches and jumps between them with Enter. The ERD page asserts declared
+constraints only; it never infers a relationship from query text, and
+unresolved references stay explicit.
 
 For development, see [Development](docs/DEVELOPMENT.md). For a simple served
 run, use `python -m http.server 8000` from the runtime directory and open
@@ -66,6 +88,9 @@ in the browser.
 - temporary-table producer → consumer data flow;
 - conservative column lineage with explicit ambiguity;
 - report and dataset dependency chains;
+- declared entity relationships from DDL: tables, views, columns, primary,
+  unique, and foreign keys (composite keys grouped), exported as Mermaid
+  `erDiagram`;
 - dynamic SQL as an explicit opaque step rather than an invented dependency.
 
 ## Supported dialects

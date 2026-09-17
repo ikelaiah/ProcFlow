@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>proc&gt;flow — ERD</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand-lockup">
+    <h1 class="mark">proc<span class="caret">&gt;</span>flow</h1>
+    <p class="tagline">Entity relationship diagram</p>
+  </div>
+  <nav class="mode-switch" aria-label="Page">
+    <a class="mode-link" href="index.html">Flowchart</a>
+    <a class="mode-link active" href="erd.html" aria-current="page">ERD</a>
+  </nav>
+  <details class="privacy-disclosure">
+    <summary>
+      <span class="privacy-icon" aria-hidden="true">🔒</span>
+      Local only
+    </summary>
+    <div class="privacy-popover">
+      <strong>Your DDL stays in this browser.</strong>
+      Procflow does not connect to a database, upload schema definitions, or
+      send anything to an API. Imported files remain in this tab and are
+      discarded when it closes.
+    </div>
+  </details>
+  <div class="top-actions">
+    <input id="erd-file-input" type="file" accept=".sql,.ddl,.txt,text/plain" multiple hidden>
+    <button class="btn" id="btn-erd-import">Import DDL</button>
+    <button class="btn" id="btn-erd-sample">T-SQL sample</button>
+    <button class="btn" id="btn-erd-sample-db2">DB2 sample</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="pane">
+    <div class="pane-head editor-head"><span class="pane-title">Schema DDL</span>
+      <div class="editor-actions" style="margin-left:auto">
+        <button class="btn quiet" id="btn-erd-clear">Clear</button>
+        <button class="btn primary" id="btn-erd-draw"
+                aria-keyshortcuts="Control+Enter Meta+Enter"
+                title="Refresh ERD (Ctrl or Cmd + Enter)">
+          Refresh <kbd>Ctrl ↵</kbd>
+        </button>
+      </div>
+    </div>
+    <div class="editor">
+      <div class="gutter" id="erd-gutter">1</div>
+      <textarea id="erd-sql" spellcheck="false" placeholder="Paste CREATE TABLE / ALTER TABLE DDL — T-SQL, PostgreSQL, DB2 or SQLite. Or press Load sample. Declared PRIMARY KEY, UNIQUE, and FOREIGN KEY constraints become the diagram."></textarea>
+    </div>
+    <div class="large-input-notice" id="erd-large-notice" role="status"
+         aria-live="polite" hidden></div>
+    <div class="readout" aria-live="polite">
+      <div class="status-summary">
+        <div class="analysis-health" id="erd-stats">
+          <div class="health-item"><span>Tables</span><b id="erd-tables">0</b></div>
+          <div class="health-item"><span>Views</span><b id="erd-views">0</b></div>
+          <div class="health-item"><span>Columns</span><b id="erd-columns">0</b></div>
+          <div class="health-item"><span>Relations</span><b id="erd-relationships">0</b></div>
+          <div class="health-item"><span>Unresolved</span><b id="erd-unresolved">0</b></div>
+          <div class="health-item"><span>Diagnostics</span><b id="erd-diagnostics">0</b></div>
+        </div>
+      </div>
+      <div class="msg" id="erd-msg"></div>
+    </div>
+  </section>
+
+  <div class="splitter" id="splitter" role="separator" aria-orientation="vertical"
+       aria-label="Resize DDL and diagram panels" tabindex="0"></div>
+
+  <section class="pane">
+    <div class="pane-head output-head">
+      <div class="tabs" role="tablist">
+        <button class="tab" id="tab-erd-diagram" role="tab" aria-selected="true" aria-controls="view-erd-diagram">Diagram</button>
+        <button class="tab" id="tab-erd-mermaid" role="tab" aria-selected="false" aria-controls="view-erd-mermaid">Mermaid ERD</button>
+      </div>
+      <div class="command-menus">
+        <label class="opt erd-find-label">Find
+          <input type="search" id="erd-find" placeholder="table name" spellcheck="false"
+                 aria-label="Find a table or view">
+          <span class="erd-find-count" id="erd-find-count" aria-live="polite"></span>
+        </label>
+        <label class="opt"><input type="checkbox" id="erd-compact"> Compact boxes</label>
+        <button class="btn" id="btn-erd-reset-layout" title="Restore the grid layout (double-click a table to reset just that one)">Reset layout</button>
+        <button class="btn" id="btn-erd-copy">Copy Mermaid</button>
+      </div>
+    </div>
+    <div class="view active" id="view-erd-diagram" role="tabpanel" aria-labelledby="tab-erd-diagram">
+      <div id="erd-canvas">
+        <div class="erd-empty" id="erd-empty">
+          <p>Paste DDL on the left. The entity map updates as you type.</p>
+        </div>
+        <div class="erd-space" id="erd-space"></div>
+        <div class="erd-cards" id="erd-cards"></div>
+        <svg class="erd-overlay" id="erd-overlay" aria-hidden="true"></svg>
+      </div>
+      <div class="zoom erd-zoom" role="group" aria-label="Diagram zoom">
+        <button class="btn" id="erd-z-out" title="Zoom out">−</button>
+        <button class="btn" id="erd-z-in" title="Zoom in">+</button>
+        <button class="btn" id="erd-z-fit" title="Fit the whole estate; with a table selected, fit that table and its declared neighbours">Fit</button>
+        <span class="erd-zoom-val" id="erd-zoom-val">100%</span>
+      </div>
+      <aside class="erd-inspector" id="erd-inspector" hidden aria-live="polite"></aside>
+    </div>
+    <div class="view" id="view-erd-mermaid" role="tabpanel" aria-labelledby="tab-erd-mermaid">
+      <pre id="erd-mermaid-out">erDiagram</pre>
+    </div>
+  </section>
+</main>
+
+<footer>Declared constraints only — relationships come from PRIMARY KEY / UNIQUE / FOREIGN KEY declarations in the DDL, never inferred from queries. Unresolved references stay explicit.</footer>
+
+<script src="dist/src/tokenizer.js"></script>
+<script src="dist/src/schema.js"></script>
+<script src="dist/src/erd.js"></script>
+<script src="dist/src/ui/large-input.js"></script>
+<script src="dist/src/ui/splitter.js"></script>
+<script src="dist/src/ui/erd-page.js"></script>
+</body>
+</html>
