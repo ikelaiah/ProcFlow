@@ -55,7 +55,10 @@ entities and foreign keys. Drag the canvas to pan, drag a table card to move it
 out of the way and declutter relationship lines (double-click a card, or use
 **Reset layout**, to restore the grid), select a table to highlight its
 declared foreign keys and list each one with its column mapping and
-cardinality, and press **Clear** (or Escape) to deselect. On both the flowchart
+cardinality, and press **Clear** (or Escape) to deselect. Zoom controls under
+the canvas (or **Fit**) frame the whole estate; with a table selected, **Fit**
+frames that table and its declared neighbours and the selection ring stays
+visible at estate zoom. On both the flowchart
 and ERD pages the divider between the editor and the diagram is draggable
 (double-click it to reset). Estates with hundreds of tables stay responsive:
 auto-draw pauses above the shared large-input threshold until **Refresh**,

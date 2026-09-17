@@ -13,6 +13,10 @@
     <h1 class="mark">proc<span class="caret">&gt;</span>flow</h1>
     <p class="tagline">Entity relationship diagram</p>
   </div>
+  <nav class="mode-switch" aria-label="Page">
+    <a class="mode-link" href="index.html">Flowchart</a>
+    <a class="mode-link active" href="erd.html" aria-current="page">ERD</a>
+  </nav>
   <details class="privacy-disclosure">
     <summary>
       <span class="privacy-icon" aria-hidden="true">🔒</span>
@@ -26,7 +30,6 @@
     </div>
   </details>
   <div class="top-actions">
-    <a class="btn" href="index.html">Flowchart</a>
     <input id="erd-file-input" type="file" accept=".sql,.ddl,.txt,text/plain" multiple hidden>
     <button class="btn" id="btn-erd-import">Import DDL</button>
     <button class="btn" id="btn-erd-sample">T-SQL sample</button>
@@ -94,6 +97,12 @@
         </div>
         <div class="erd-cards" id="erd-cards"></div>
         <svg class="erd-overlay" id="erd-overlay" aria-hidden="true"></svg>
+      </div>
+      <div class="zoom erd-zoom" role="group" aria-label="Diagram zoom">
+        <button class="btn" id="erd-z-out" title="Zoom out">−</button>
+        <button class="btn" id="erd-z-in" title="Zoom in">+</button>
+        <button class="btn" id="erd-z-fit" title="Fit the whole estate; with a table selected, fit that table and its declared neighbours">Fit</button>
+        <span class="erd-zoom-val" id="erd-zoom-val">100%</span>
       </div>
       <aside class="erd-inspector" id="erd-inspector" hidden aria-live="polite"></aside>
     </div>

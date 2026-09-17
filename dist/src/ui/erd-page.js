@@ -393,6 +393,62 @@
         });
         scheduleOverlay();
     }
+    function currentZoom() {
+        if (!canvas)
+            return 1;
+        var value = parseFloat(canvas.style.getPropertyValue('--erd-zoom'));
+        return isNaN(value) ? 1 : value;
+    }
+    function setZoom(value) {
+        if (!canvas)
+            return;
+        var zoom = Math.max(0.15, Math.min(2, value));
+        canvas.style.setProperty('--erd-zoom', String(zoom));
+        canvas.classList.toggle('zoomed-out', zoom < 0.5);
+        var label = $('erd-zoom-val');
+        if (label)
+            label.textContent = Math.round(zoom * 100) + '%';
+        drawOverlay();
+    }
+    function zoomBy(factor) {
+        if (!canvas)
+            return;
+        var from = currentZoom(), to = Math.max(0.15, Math.min(2, from * factor));
+        var cx = (canvas.scrollLeft + canvas.clientWidth / 2) / from;
+        var cy = (canvas.scrollTop + canvas.clientHeight / 2) / from;
+        setZoom(to);
+        canvas.scrollLeft = cx * to - canvas.clientWidth / 2;
+        canvas.scrollTop = cy * to - canvas.clientHeight / 2;
+    }
+    /* Fit the whole estate, or — with a table selected — that table and its
+       declared neighbours, so the highlighted entity is immediately readable. */
+    function fitView() {
+        if (!result || !canvas)
+            return;
+        var ids = selectedId
+            ? [selectedId].concat(adjacency[selectedId] || [])
+            : result.entities.map(function (entity) { return entity.id; });
+        var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        ids.forEach(function (id) {
+            var box = entityBox(id);
+            if (!box)
+                return;
+            minX = Math.min(minX, box.left);
+            minY = Math.min(minY, box.top);
+            maxX = Math.max(maxX, box.right);
+            maxY = Math.max(maxY, box.bottom);
+        });
+        if (minX === Infinity)
+            return;
+        var pad = 40;
+        var width = maxX - minX + pad * 2, height = maxY - minY + pad * 2;
+        var from = currentZoom();
+        var to = Math.max(0.15, Math.min(2, from * Math.min(canvas.clientWidth / width, canvas.clientHeight / height)));
+        var ratio = to / from;
+        setZoom(to);
+        canvas.scrollLeft = (minX + maxX) / 2 * ratio - canvas.clientWidth / 2;
+        canvas.scrollTop = (minY + maxY) / 2 * ratio - canvas.clientHeight / 2;
+    }
     function drawOverlay() {
         if (!overlay || !canvas || !result)
             return;
@@ -463,6 +519,16 @@
                 overlay.appendChild(mid);
             }
         });
+        /* At estate zoom the card ring scales away; the overlay is unzoomed, so
+           draw the selection highlight here instead. */
+        if (selectedId && currentZoom() < 0.5) {
+            var ring = boxOf(selectedId);
+            if (ring) {
+                overlay.appendChild(svgEl('rect', { x: ring.left - 5, y: ring.top - 5,
+                    width: ring.right - ring.left + 10, height: ring.bottom - ring.top + 10, rx: 6,
+                    fill: 'none', stroke: '#e8a33d', 'stroke-width': 2, 'stroke-dasharray': '7 5' }));
+            }
+        }
     }
     function render() {
         if (!sql)
@@ -644,6 +710,15 @@
     var resetLayoutBtn = $('btn-erd-reset-layout');
     if (resetLayoutBtn)
         resetLayoutBtn.addEventListener('click', resetLayout);
+    var zoomOut = $('erd-z-out');
+    if (zoomOut)
+        zoomOut.addEventListener('click', function () { zoomBy(1 / 1.25); });
+    var zoomIn = $('erd-z-in');
+    if (zoomIn)
+        zoomIn.addEventListener('click', function () { zoomBy(1.25); });
+    var zoomFit = $('erd-z-fit');
+    if (zoomFit)
+        zoomFit.addEventListener('click', fitView);
     var fileInput = $('erd-file-input');
     var importBtn = $('btn-erd-import');
     if (importBtn && fileInput)
@@ -712,8 +787,9 @@
                 if (Math.abs(dx) > 4 || Math.abs(dy) > 4)
                     didPan = true;
                 if (didPan && dragCardId && cardEls[dragCardId]) {
+                    var zoom = currentZoom();
                     cardEls[dragCardId].style.transform =
-                        'translate(' + (dragBaseX + dx) + 'px,' + (dragBaseY + dy) + 'px)';
+                        'translate(' + (dragBaseX + dx / zoom) + 'px,' + (dragBaseY + dy / zoom) + 'px)';
                     scheduleOverlay();
                 }
                 return;
@@ -727,7 +803,9 @@
             if (!panning)
                 return;
             if (dragMode === 'card' && dragCardId && didPan) {
-                cardOffsets[dragCardId] = { x: dragBaseX + dragLastDx, y: dragBaseY + dragLastDy };
+                var endZoom = currentZoom();
+                cardOffsets[dragCardId] = { x: dragBaseX + dragLastDx / endZoom,
+                    y: dragBaseY + dragLastDy / endZoom };
                 if (cardEls[dragCardId]) {
                     cardEls[dragCardId].classList.add('moved');
                     cardEls[dragCardId].classList.remove('moving');

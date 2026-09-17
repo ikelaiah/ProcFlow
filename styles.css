@@ -42,6 +42,14 @@ button,select,textarea,input{font-family:inherit;font-size:inherit;color:inherit
 .tagline{font-family:var(--cond);text-transform:uppercase;letter-spacing:.14em;
   font-size:10px;color:var(--ink-faint);margin:0;white-space:nowrap}
 .top-actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.mode-switch{display:flex;gap:2px;padding:2px;border:1px solid var(--rule);
+  border-radius:5px;background:var(--panel)}
+.mode-link{padding:5px 12px;border-radius:3px;color:var(--ink-dim);text-decoration:none;
+  font-family:var(--cond);text-transform:uppercase;letter-spacing:.1em;font-size:11px;
+  font-weight:600;white-space:nowrap}
+.mode-link:hover{color:var(--ink);background:#20333f}
+.mode-link.active{background:var(--marigold);color:#14202a}
+.mode-link:focus-visible{outline:2px solid var(--marigold);outline-offset:2px}
 .privacy-disclosure{position:relative;color:#b9ddcf;font-size:11px}
 .privacy-disclosure summary{
   display:flex;align-items:center;gap:6px;padding:5px 9px;
@@ -324,8 +332,9 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
   padding:40px;pointer-events:none}
 .erd-empty p{font-size:12.5px;max-width:360px;text-align:center}
 .erd-cards{position:relative;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
-  gap:24px;padding:20px;z-index:1}
+  gap:24px;padding:20px;z-index:1;zoom:var(--erd-zoom,1)}
 .erd-overlay{position:absolute;top:0;left:0;pointer-events:none;z-index:0}
+.zoomed-out #erd-overlay text{display:none}
 .erd-card{background:var(--panel);border:1px solid var(--rule);border-radius:5px;
   overflow:hidden;cursor:grab;transition:border-color .15s;align-self:start}
 .erd-card.moving{cursor:grabbing;z-index:30;box-shadow:0 14px 30px rgba(0,0,0,.5);
@@ -407,6 +416,9 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .erd-rel-detail{grid-column:2;color:var(--ink-faint);font-size:10px;overflow-wrap:anywhere}
 .erd-rel-meta{grid-column:2;color:var(--ink-dim);font-size:9.5px}
 .erd-inspector-empty{margin:6px 0 0;color:var(--ink-faint);font-size:11px}
+.erd-zoom{left:14px;right:auto;align-items:center}
+.erd-zoom-val{font-family:var(--mono);font-size:10px;color:var(--ink-faint);
+  min-width:42px;text-align:center}
 @media (max-width:900px){
   .erd-cards{grid-template-columns:1fr;gap:18px;padding:14px}
   .erd-inspector{right:8px;bottom:8px;width:calc(100% - 16px)}
