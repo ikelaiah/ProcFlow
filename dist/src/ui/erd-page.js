@@ -7,7 +7,7 @@
     if (typeof document === 'undefined')
         return;
     var $ = function (id) { return document.getElementById(id); };
-    var sql = $('erd-sql'), gutter = $('erd-gutter'), msg = $('erd-msg'), cardsHost = $('erd-cards'), overlay = $('erd-overlay'), canvas = $('erd-canvas'), empty = $('erd-empty'), mermaidOut = $('erd-mermaid-out'), inspector = $('erd-inspector'), largeNotice = $('erd-large-notice'), findInput = $('erd-find'), findCount = $('erd-find-count'), compactInput = $('erd-compact');
+    var sql = $('erd-sql'), gutter = $('erd-gutter'), msg = $('erd-msg'), cardsHost = $('erd-cards'), overlay = $('erd-overlay'), canvas = $('erd-canvas'), space = $('erd-space'), empty = $('erd-empty'), mermaidOut = $('erd-mermaid-out'), inspector = $('erd-inspector'), largeNotice = $('erd-large-notice'), findInput = $('erd-find'), findCount = $('erd-find-count'), compactInput = $('erd-compact');
     var result = null;
     var cardEls = {};
     var adjacency = {};
@@ -69,7 +69,7 @@
     function buildCard(entity) {
         var card = document.createElement('article');
         card.className = 'erd-card' + (entity.unresolved ? ' unresolved' : '') +
-            (entity.kind === 'view' ? ' view' : '') + (compactMode ? ' compact' : '');
+            (entity.kind === 'view' ? ' erd-view' : '') + (compactMode ? ' compact' : '');
         card.setAttribute('data-entity-id', entity.id);
         var head = document.createElement('header');
         var kind = document.createElement('span');
@@ -347,13 +347,17 @@
         cardsHost.appendChild(frag);
         if (empty)
             empty.hidden = result.entities.length > 0;
+        applyZoomLayout();
     }
     var cachedCanvasRect = null;
     function entityBox(entityId) {
         var el = cardEls[entityId], c = canvas;
         if (!el || !c)
             return null;
-        var r = el.getBoundingClientRect(), cr = cachedCanvasRect || c.getBoundingClientRect();
+        var r = el.getBoundingClientRect();
+        if (!r.width && !r.height)
+            return null;
+        var cr = cachedCanvasRect || c.getBoundingClientRect();
         var left = r.left - cr.left + c.scrollLeft, top = r.top - cr.top + c.scrollTop;
         return { left: left, top: top, right: left + r.width, bottom: top + r.height,
             cx: left + r.width / 2, cy: top + r.height / 2 };
@@ -393,32 +397,59 @@
         });
         scheduleOverlay();
     }
+    var ERD_MIN_ZOOM = 0.02, ERD_MAX_ZOOM = 2;
     function currentZoom() {
         if (!canvas)
             return 1;
         var value = parseFloat(canvas.style.getPropertyValue('--erd-zoom'));
         return isNaN(value) ? 1 : value;
     }
+    /* The card stage is laid out once at 100% and scaled with a transform, so
+       the grid never reflows while zooming (reflowing made repeated Fit clicks
+       shrink forever). A spacer carries the scaled scroll area. */
+    function applyZoomLayout() {
+        if (!canvas || !cardsHost || !space)
+            return;
+        var zoom = currentZoom();
+        cardsHost.style.width = canvas.clientWidth + 'px';
+        var width = Math.ceil(cardsHost.offsetWidth * zoom) + 40;
+        var height = Math.ceil(cardsHost.offsetHeight * zoom) + 40;
+        space.style.width = Math.max(width, canvas.clientWidth) + 'px';
+        space.style.height = Math.max(height, canvas.clientHeight) + 'px';
+    }
     function setZoom(value) {
         if (!canvas)
             return;
-        var zoom = Math.max(0.15, Math.min(2, value));
+        var zoom = Math.max(ERD_MIN_ZOOM, Math.min(ERD_MAX_ZOOM, value));
         canvas.style.setProperty('--erd-zoom', String(zoom));
         canvas.classList.toggle('zoomed-out', zoom < 0.5);
         var label = $('erd-zoom-val');
         if (label)
             label.textContent = Math.round(zoom * 100) + '%';
+        applyZoomLayout();
         drawOverlay();
+    }
+    /* Zoom keeping the point under the cursor fixed. */
+    function zoomAt(clientX, clientY, factor) {
+        if (!canvas)
+            return;
+        var from = currentZoom();
+        var to = Math.max(ERD_MIN_ZOOM, Math.min(ERD_MAX_ZOOM, from * factor));
+        if (to === from)
+            return;
+        var rect = canvas.getBoundingClientRect();
+        var offsetX = clientX - rect.left, offsetY = clientY - rect.top;
+        var logicalX = (canvas.scrollLeft + offsetX) / from;
+        var logicalY = (canvas.scrollTop + offsetY) / from;
+        setZoom(to);
+        canvas.scrollLeft = logicalX * to - offsetX;
+        canvas.scrollTop = logicalY * to - offsetY;
     }
     function zoomBy(factor) {
         if (!canvas)
             return;
-        var from = currentZoom(), to = Math.max(0.15, Math.min(2, from * factor));
-        var cx = (canvas.scrollLeft + canvas.clientWidth / 2) / from;
-        var cy = (canvas.scrollTop + canvas.clientHeight / 2) / from;
-        setZoom(to);
-        canvas.scrollLeft = cx * to - canvas.clientWidth / 2;
-        canvas.scrollTop = cy * to - canvas.clientHeight / 2;
+        var rect = canvas.getBoundingClientRect();
+        zoomAt(rect.left + canvas.clientWidth / 2, rect.top + canvas.clientHeight / 2, factor);
     }
     /* Fit the whole estate, or — with a table selected — that table and its
        declared neighbours, so the highlighted entity is immediately readable. */
@@ -443,7 +474,7 @@
         var pad = 40;
         var width = maxX - minX + pad * 2, height = maxY - minY + pad * 2;
         var from = currentZoom();
-        var to = Math.max(0.15, Math.min(2, from * Math.min(canvas.clientWidth / width, canvas.clientHeight / height)));
+        var to = Math.max(ERD_MIN_ZOOM, Math.min(ERD_MAX_ZOOM, from * Math.min(canvas.clientWidth / width, canvas.clientHeight / height)));
         var ratio = to / from;
         setZoom(to);
         canvas.scrollLeft = (minX + maxX) / 2 * ratio - canvas.clientWidth / 2;
@@ -454,8 +485,8 @@
             return;
         while (overlay.firstChild)
             overlay.removeChild(overlay.firstChild);
-        var width = Math.max(cardsHost.scrollWidth + 40, canvas.clientWidth);
-        var height = Math.max(cardsHost.scrollHeight + 40, canvas.clientHeight);
+        var width = Math.max(space ? space.scrollWidth : cardsHost.scrollWidth + 40, canvas.clientWidth);
+        var height = Math.max(space ? space.scrollHeight : cardsHost.scrollHeight + 40, canvas.clientHeight);
         overlay.setAttribute('width', String(width));
         overlay.setAttribute('height', String(height));
         overlay.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
@@ -712,10 +743,10 @@
         resetLayoutBtn.addEventListener('click', resetLayout);
     var zoomOut = $('erd-z-out');
     if (zoomOut)
-        zoomOut.addEventListener('click', function () { zoomBy(1 / 1.25); });
+        zoomOut.addEventListener('click', function () { zoomBy(1 / 1.15); });
     var zoomIn = $('erd-z-in');
     if (zoomIn)
-        zoomIn.addEventListener('click', function () { zoomBy(1.25); });
+        zoomIn.addEventListener('click', function () { zoomBy(1.15); });
     var zoomFit = $('erd-z-fit');
     if (zoomFit)
         zoomFit.addEventListener('click', fitView);
@@ -743,7 +774,10 @@
                 fileInput.value = '';
             });
         });
-    window.addEventListener('resize', function () { requestAnimationFrame(drawOverlay); });
+    window.addEventListener('resize', function () {
+        applyZoomLayout();
+        requestAnimationFrame(drawOverlay);
+    });
     if (typeof ResizeObserver !== 'undefined' && cardsHost) {
         new ResizeObserver(function () { drawOverlay(); }).observe(cardsHost);
     }
@@ -828,6 +862,12 @@
                 event.preventDefault();
             }
         }, true);
+        /* Smooth wheel zoom: continuous and cursor-anchored, instead of stepped
+           button jumps. Trackpad pinch (ctrl+wheel) works through the same path. */
+        canvas.addEventListener('wheel', function (event) {
+            event.preventDefault();
+            zoomAt(event.clientX, event.clientY, Math.exp(-event.deltaY * 0.0015));
+        }, { passive: false });
     }
     document.addEventListener('keydown', function (event) {
         if (event.key === 'Escape' && selectedId)
