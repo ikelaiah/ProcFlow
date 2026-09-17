@@ -53,9 +53,12 @@ For schema DDL, open `erd.html`, paste or import `CREATE TABLE` / `ALTER TABLE`
 statements (T-SQL, PostgreSQL, DB2, or SQLite), and review the declared
 entities and foreign keys. Drag the canvas to pan, select a table to highlight
 its declared foreign keys and list each one with its column mapping and
-cardinality, and press **Clear** (or Escape) to deselect. The ERD page asserts
-declared constraints only; it never infers a relationship from query text, and
-unresolved references stay explicit.
+cardinality, and press **Clear** (or Escape) to deselect. Estates with hundreds
+of tables stay responsive: auto-draw pauses above the shared large-input
+threshold until **Refresh**, boxes switch to a compact summary automatically,
+and **Find** highlights matches and jumps between them with Enter. The ERD page
+asserts declared constraints only; it never infers a relationship from query
+text, and unresolved references stay explicit.
 
 For development, see [Development](docs/DEVELOPMENT.md). For a simple served
 run, use `python -m http.server 8000` from the runtime directory and open

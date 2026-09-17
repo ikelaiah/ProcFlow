@@ -8,11 +8,17 @@
   var sql=$('erd-sql'), gutter=$('erd-gutter'), msg=$('erd-msg'),
       cardsHost=$('erd-cards'), overlay=$('erd-overlay'), canvas=$('erd-canvas'),
       empty=$('erd-empty'), mermaidOut=$('erd-mermaid-out'),
-      inspector=$('erd-inspector');
+      inspector=$('erd-inspector'), largeNotice=$('erd-large-notice'),
+      findInput=$('erd-find'), findCount=$('erd-find-count'),
+      compactInput=$('erd-compact');
   var result: SchemaResult | null=null;
   var cardEls: Record<string, HTMLElement>={};
+  var adjacency: Record<string, string[]>={};
+  var relCounts: Record<string, number>={};
   var selectedId: string | null=null;
   var renderSeq=0;
+  var compactMode=false, compactTouched=false;
+  var findMatches: string[]=[], findIndex=0;
   var panning=false, panStartX=0, panStartY=0,
       panStartScrollLeft=0, panStartScrollTop=0, didPan=false;
 
@@ -43,17 +49,22 @@
     });
   }
 
-  function relationCount(entityId: string): number {
-    if(!result) return 0;
-    return result.relationships.filter(function(rel){
-      return rel.fromId===entityId||rel.toId===entityId;
-    }).length;
+  function compactSummary(entity: SchemaEntity): string {
+    var fkColumns: Record<string, 1>={}, pkCount=0;
+    entity.keys.forEach(function(key){
+      if(key.kind==='pk') pkCount++;
+      if(key.kind==='fk') key.columns.forEach(function(name){
+        fkColumns[name.toUpperCase()]=1;
+      });
+    });
+    return entity.columns.length+' cols \u00b7 '+pkCount+' PK \u00b7 '+
+      Object.keys(fkColumns).length+' FK';
   }
 
   function buildCard(entity: SchemaEntity): HTMLElement {
     var card=document.createElement('article');
     card.className='erd-card'+(entity.unresolved?' unresolved':'')+
-      (entity.kind==='view'?' view':'');
+      (entity.kind==='view'?' view':'')+(compactMode?' compact':'');
     card.setAttribute('data-entity-id',entity.id);
     var head=document.createElement('header');
     var kind=document.createElement('span');
@@ -63,7 +74,7 @@
     title.textContent=entity.name;
     head.appendChild(kind);
     head.appendChild(title);
-    var count=relationCount(entity.id);
+    var count=relCounts[entity.id]||0;
     if(count){
       var badge=document.createElement('span');
       badge.className='erd-relcount';
@@ -72,59 +83,68 @@
       head.appendChild(badge);
     }
     card.appendChild(head);
-    var list=document.createElement('ul');
-    list.className='erd-cols';
-    if(entity.columns.length){
-      entity.columns.forEach(function(column){
-        var row=document.createElement('li');
-        var name=document.createElement('span');
-        name.className='erd-col-name';
-        name.textContent=column.name;
-        var type=document.createElement('span');
-        type.className='erd-col-type';
-        type.textContent=column.type||'—';
-        type.title=column.type||'no declared type';
-        var flags=document.createElement('span');
-        flags.className='erd-badges';
-        erdColumnKeys(entity,column).forEach(function(key){
-          var tag=document.createElement('b');
-          tag.className='erd-badge erd-badge-'+key.toLowerCase();
-          tag.textContent=key;
-          flags.appendChild(tag);
-        });
-        if(column.identity){
-          var idTag=document.createElement('b');
-          idTag.className='erd-badge erd-badge-id';
-          idTag.textContent='ID';
-          idTag.title='identity / auto-increment';
-          flags.appendChild(idTag);
-        }
-        if(column.generated||column.computed){
-          var genTag=document.createElement('b');
-          genTag.className='erd-badge erd-badge-gen';
-          genTag.textContent=column.computed?'COMP':'GEN';
-          genTag.title=column.computed?'computed column':'generated column';
-          flags.appendChild(genTag);
-        }
-        if(!column.nullable){
-          var nnTag=document.createElement('b');
-          nnTag.className='erd-badge erd-badge-nn';
-          nnTag.textContent='NN';
-          nnTag.title='not null';
-          flags.appendChild(nnTag);
-        }
-        row.appendChild(name);
-        row.appendChild(type);
-        row.appendChild(flags);
-        list.appendChild(row);
-      });
+    if(compactMode){
+      var summary=document.createElement('p');
+      summary.className='erd-summary';
+      summary.textContent=compactSummary(entity);
+      card.appendChild(summary);
     } else {
-      var none=document.createElement('li');
-      none.className='erd-no-cols';
-      none.textContent=entity.unresolved?'referenced but not declared':'no declared columns';
-      list.appendChild(none);
+      var list=document.createElement('ul');
+      list.className='erd-cols';
+      if(entity.columns.length){
+        var frag=document.createDocumentFragment();
+        entity.columns.forEach(function(column){
+          var row=document.createElement('li');
+          var name=document.createElement('span');
+          name.className='erd-col-name';
+          name.textContent=column.name;
+          var type=document.createElement('span');
+          type.className='erd-col-type';
+          type.textContent=column.type||'—';
+          type.title=column.type||'no declared type';
+          var flags=document.createElement('span');
+          flags.className='erd-badges';
+          erdColumnKeys(entity,column).forEach(function(key){
+            var tag=document.createElement('b');
+            tag.className='erd-badge erd-badge-'+key.toLowerCase();
+            tag.textContent=key;
+            flags.appendChild(tag);
+          });
+          if(column.identity){
+            var idTag=document.createElement('b');
+            idTag.className='erd-badge erd-badge-id';
+            idTag.textContent='ID';
+            idTag.title='identity / auto-increment';
+            flags.appendChild(idTag);
+          }
+          if(column.generated||column.computed){
+            var genTag=document.createElement('b');
+            genTag.className='erd-badge erd-badge-gen';
+            genTag.textContent=column.computed?'COMP':'GEN';
+            genTag.title=column.computed?'computed column':'generated column';
+            flags.appendChild(genTag);
+          }
+          if(!column.nullable){
+            var nnTag=document.createElement('b');
+            nnTag.className='erd-badge erd-badge-nn';
+            nnTag.textContent='NN';
+            nnTag.title='not null';
+            flags.appendChild(nnTag);
+          }
+          row.appendChild(name);
+          row.appendChild(type);
+          row.appendChild(flags);
+          frag.appendChild(row);
+        });
+        list.appendChild(frag);
+      } else {
+        var none=document.createElement('li');
+        none.className='erd-no-cols';
+        none.textContent=entity.unresolved?'referenced but not declared':'no declared columns';
+        list.appendChild(none);
+      }
+      card.appendChild(list);
     }
-    card.appendChild(list);
     card.tabIndex=0;
     card.addEventListener('click',function(){
       selectEntity(selectedId===entity.id?null:entity.id);
@@ -138,25 +158,54 @@
     return card;
   }
 
-  function relationshipTouches(entityId: string, selected: string): boolean {
-    if(!result) return false;
-    return result.relationships.some(function(rel){
-      return (rel.fromId===entityId&&rel.toId===selected)||
-        (rel.toId===entityId&&rel.fromId===selected);
-    });
-  }
 
   function selectEntity(id: string | null): void {
     selectedId=id;
+    var related: Record<string, 1>={};
+    if(selectedId){
+      (adjacency[selectedId]||[]).forEach(function(other){ related[other]=1; });
+    }
     Object.keys(cardEls).forEach(function(entityId){
-      var connected=!selectedId||relationshipTouches(entityId,selectedId);
-      cardEls[entityId].classList.toggle('focus',entityId===selectedId);
-      cardEls[entityId].classList.toggle('related',
-        !!selectedId&&connected&&entityId!==selectedId);
-      cardEls[entityId].classList.toggle('dim',!!selectedId&&!connected);
+      var card=cardEls[entityId];
+      card.classList.toggle('focus',entityId===selectedId);
+      card.classList.toggle('related',
+        !!selectedId&&entityId!==selectedId&&related[entityId]===1);
+      card.classList.toggle('dim',
+        !!selectedId&&entityId!==selectedId&&related[entityId]!==1);
     });
     renderInspector();
     drawOverlay();
+  }
+
+  /* Find highlights matches and jumps between them (Enter / Shift+Enter). */
+  function applyFind(jump: boolean): void {
+    Object.keys(cardEls).forEach(function(id){ cardEls[id].classList.remove('match'); });
+    findMatches=[];
+    var query=(findInput?String(findInput.value||''):'').trim().toUpperCase();
+    if(!query||!result){
+      if(findCount) findCount.textContent='';
+      return;
+    }
+    result.entities.forEach(function(entity){
+      if(entity.name.toUpperCase().indexOf(query)>=0||entity.id.indexOf(query)>=0){
+        findMatches.push(entity.id);
+      }
+    });
+    findMatches.forEach(function(id){
+      if(cardEls[id]) cardEls[id].classList.add('match');
+    });
+    if(findCount){
+      findCount.textContent=findMatches.length
+        ? findMatches.length+' match'+(findMatches.length===1?'':'es')
+        : '0 matches';
+    }
+    if(jump&&findMatches.length){
+      var id=findMatches[findIndex%findMatches.length];
+      var card=cardEls[id];
+      if(card&&card.scrollIntoView){
+        card.scrollIntoView({block:'center',inline:'nearest',behavior:'smooth'});
+      }
+    }
   }
 
   /* Selection inspector: every declared FK touching the selected entity, with
@@ -242,15 +291,32 @@
     }
   }
 
+  /* Adjacency and degree are precomputed so selecting a hub table in an
+     800-table estate stays O(degree) instead of O(tables × relationships). */
   function renderCards(): void {
     if(!cardsHost||!result) return;
+    adjacency={};
+    relCounts={};
+    result.relationships.forEach(function(rel){
+      (adjacency[rel.fromId]=adjacency[rel.fromId]||[]).push(rel.toId);
+      (adjacency[rel.toId]=adjacency[rel.toId]||[]).push(rel.fromId);
+      relCounts[rel.fromId]=(relCounts[rel.fromId]||0)+1;
+      relCounts[rel.toId]=(relCounts[rel.toId]||0)+1;
+    });
+    if(!compactTouched&&result.entities.length>150){
+      compactMode=true;
+      if(compactInput) compactInput.checked=true;
+    }
+    cardsHost.classList.toggle('compact',compactMode);
     cardEls={};
     cardsHost.textContent='';
+    var frag=document.createDocumentFragment();
     result.entities.forEach(function(entity){
       var card=buildCard(entity);
       cardEls[entity.id]=card;
-      cardsHost.appendChild(card);
+      frag.appendChild(card);
     });
+    cardsHost.appendChild(frag);
     if(empty) empty.hidden=result.entities.length>0;
   }
 
@@ -259,10 +325,12 @@
     left: number; top: number; right: number; bottom: number;
   }
 
+  var cachedCanvasRect: DOMRect | null=null;
+
   function entityBox(entityId: string): ErdBox | null {
     var el=cardEls[entityId], c=canvas;
     if(!el||!c) return null;
-    var r=el.getBoundingClientRect(), cr=c.getBoundingClientRect();
+    var r=el.getBoundingClientRect(), cr=cachedCanvasRect||c.getBoundingClientRect();
     var left=r.left-cr.left+c.scrollLeft, top=r.top-cr.top+c.scrollTop;
     return {left:left,top:top,right:left+r.width,bottom:top+r.height,
             cx:left+r.width/2,cy:top+r.height/2};
@@ -293,8 +361,14 @@
     overlay.setAttribute('width',String(width));
     overlay.setAttribute('height',String(height));
     overlay.setAttribute('viewBox','0 0 '+width+' '+height);
+    cachedCanvasRect=canvas.getBoundingClientRect();
+    var boxCache: Record<string, ErdBox | null>={};
+    function boxOf(id: string): ErdBox | null {
+      if(!(id in boxCache)) boxCache[id]=entityBox(id);
+      return boxCache[id];
+    }
     result.relationships.forEach(function(rel){
-      var from=entityBox(rel.fromId), to=entityBox(rel.toId);
+      var from=boxOf(rel.fromId), to=boxOf(rel.toId);
       if(!from||!to) return;
       var active=!!selectedId;
       var connected=!active||rel.fromId===selectedId||rel.toId===selectedId;
@@ -322,15 +396,17 @@
         'stroke-linecap':'round'});
       path.setAttribute('data-relationship',rel.id);
       overlay.appendChild(path);
-      var leftLabel=rel.optional?'0..1':'1', rightLabel=rel.unique?'1':'N';
-      [{text:leftLabel,at:labelAt[0]},{text:rightLabel,at:labelAt[1]}].forEach(function(item){
-        var text=svgEl('text',{x:item.at.x,y:item.at.y,fill:color,'font-size':10,
-          'font-family':'ui-monospace,Consolas,monospace',
-          opacity:active?(connected?1:0.1):1,
-          'text-anchor':'middle','dominant-baseline':'middle'});
-        text.textContent=item.text;
-        overlay.appendChild(text);
-      });
+      if(!active||connected){
+        var leftLabel=rel.optional?'0..1':'1', rightLabel=rel.unique?'1':'N';
+        [{text:leftLabel,at:labelAt[0]},{text:rightLabel,at:labelAt[1]}].forEach(function(item){
+          var text=svgEl('text',{x:item.at.x,y:item.at.y,fill:color,'font-size':10,
+            'font-family':'ui-monospace,Consolas,monospace',
+            opacity:active?(connected?1:0.1):1,
+            'text-anchor':'middle','dominant-baseline':'middle'});
+          text.textContent=item.text;
+          overlay.appendChild(text);
+        });
+      }
       if(active&&connected){
         var label=rel.name||(rel.toColumns.join(',')+' \u2192 '+
           (rel.fromColumns.join(',')||'PK'));
@@ -358,6 +434,8 @@
     renderCards();
     renderInspector();
     showDiagnostics();
+    applyFind(false);
+    updateLargeInputNotice();
     if(mermaidOut) mermaidOut.textContent=toMermaidER(result);
     var seq=++renderSeq;
     requestAnimationFrame(function(){
@@ -366,7 +444,25 @@
     });
   }
 
+  /* Large, exported-estate DDL must not reparse and rebuild hundreds of cards
+     on every keystroke: auto-draw pauses above the shared local threshold and
+     resumes when the input shrinks or Refresh is pressed. */
+  function updateLargeInputNotice(): boolean {
+    if(!sql) return false;
+    var policy=largeInputPolicy(sql.value.length);
+    if(largeNotice){
+      largeNotice.hidden=!policy.large;
+      if(policy.large){
+        largeNotice.textContent='Large DDL ('+policy.length.toLocaleString('en-US')+
+          ' characters). Auto-draw is paused — press Refresh (Ctrl+Enter) or edit below '+
+          policy.threshold.toLocaleString('en-US')+' characters to resume live updates.';
+      }
+    }
+    return policy.large;
+  }
+
   function schedule(): void {
+    if(updateLargeInputNotice()) return;
     if(scheduleTimer!==null) clearTimeout(scheduleTimer);
     scheduleTimer=setTimeout(render,220);
   }
@@ -439,6 +535,31 @@
   if(tabDiagram) tabDiagram.addEventListener('click',function(){ tab('diagram'); });
   var tabMermaid=$('tab-erd-mermaid');
   if(tabMermaid) tabMermaid.addEventListener('click',function(){ tab('mermaid'); });
+
+  if(findInput){
+    findInput.addEventListener('input',function(){ findIndex=0; applyFind(true); });
+    findInput.addEventListener('keydown',function(event: KeyboardEvent){
+      if(event.key==='Enter'){
+        event.preventDefault();
+        if(findMatches.length){
+          findIndex=event.shiftKey
+            ? (findIndex-1+findMatches.length)%findMatches.length
+            : (findIndex+1)%findMatches.length;
+          applyFind(true);
+        }
+      } else if(event.key==='Escape'){
+        findInput.value=''; findIndex=0; applyFind(false);
+      }
+    });
+  }
+  if(compactInput) compactInput.addEventListener('change',function(){
+    compactTouched=true;
+    compactMode=!!compactInput.checked;
+    renderCards();
+    applyFind(false);
+    renderInspector();
+    requestAnimationFrame(drawOverlay);
+  });
 
   var fileInput=$('erd-file-input');
   var importBtn=$('btn-erd-import');

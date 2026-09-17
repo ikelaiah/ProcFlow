@@ -291,6 +291,29 @@
     record('v2.1.0 DB2 ERD sample parses 8 tables, 4 views, and 6 relationships',false,String(err&&err.stack||err));
   }
 
+  /* ---- Bulk estate: a generated 300-table chain parses without drops ---- */
+  try{
+    var bulkLines=[];
+    for(var bulkIndex=1;bulkIndex<=300;bulkIndex++){
+      bulkLines.push('CREATE TABLE app.t'+bulkIndex+' (');
+      bulkLines.push('  id INT NOT NULL,');
+      bulkLines.push('  ref_id INT,');
+      bulkLines.push('  CONSTRAINT pk_t'+bulkIndex+' PRIMARY KEY (id),');
+      bulkLines.push('  CONSTRAINT fk_t'+bulkIndex+' FOREIGN KEY (ref_id) REFERENCES app.t'+
+        (bulkIndex===1?300:bulkIndex-1)+' (id)');
+      bulkLines.push(');');
+    }
+    var bulkResult=parseSchema(bulkLines.join('\n'));
+    record('v2.1.0 bulk DDL estate parses without silent drops',
+      bulkResult.stats.tables===300&&bulkResult.stats.relationships===300&&
+        bulkResult.stats.columns===600&&bulkResult.stats.unresolved===0&&
+        !bulkResult.diagnostics.some(function(x){ return x.severity!=='info'; })&&
+        spansValid(bulkResult),
+      bulkResult.stats);
+  }catch(err){
+    record('v2.1.0 bulk DDL estate parses without silent drops',false,String(err&&err.stack||err));
+  }
+
   /* ---- Mermaid erDiagram export ---- */
   try{
     var tm=toMermaidER(parseSchema(TSQL));

@@ -50,6 +50,8 @@
       <div class="gutter" id="erd-gutter">1</div>
       <textarea id="erd-sql" spellcheck="false" placeholder="Paste CREATE TABLE / ALTER TABLE DDL — T-SQL, PostgreSQL, DB2 or SQLite. Or press Load sample. Declared PRIMARY KEY, UNIQUE, and FOREIGN KEY constraints become the diagram."></textarea>
     </div>
+    <div class="large-input-notice" id="erd-large-notice" role="status"
+         aria-live="polite" hidden></div>
     <div class="readout" aria-live="polite">
       <div class="status-summary">
         <div class="analysis-health" id="erd-stats">
@@ -72,6 +74,12 @@
         <button class="tab" id="tab-erd-mermaid" role="tab" aria-selected="false" aria-controls="view-erd-mermaid">Mermaid ERD</button>
       </div>
       <div class="command-menus">
+        <label class="opt erd-find-label">Find
+          <input type="search" id="erd-find" placeholder="table name" spellcheck="false"
+                 aria-label="Find a table or view">
+          <span class="erd-find-count" id="erd-find-count" aria-live="polite"></span>
+        </label>
+        <label class="opt"><input type="checkbox" id="erd-compact"> Compact boxes</label>
         <button class="btn" id="btn-erd-copy">Copy Mermaid</button>
       </div>
     </div>
@@ -96,6 +104,7 @@
 <script src="dist/src/tokenizer.js"></script>
 <script src="dist/src/schema.js"></script>
 <script src="dist/src/erd.js"></script>
+<script src="dist/src/ui/large-input.js"></script>
 <script src="dist/src/ui/erd-page.js"></script>
 </body>
 </html>

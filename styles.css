@@ -326,6 +326,18 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .erd-card.focus{border-color:var(--marigold);box-shadow:0 0 0 1px rgba(232,163,61,.45)}
 .erd-card.related{border-color:var(--steel);box-shadow:0 0 0 1px rgba(126,166,224,.35)}
 .erd-card.dim{opacity:.32}
+.erd-card.match{border-color:var(--jade);box-shadow:0 0 0 1px rgba(84,195,155,.4)}
+.erd-cards.compact{grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:12px;padding:14px}
+.erd-card.compact header{padding:6px 8px}
+.erd-card.compact h3{font-size:12px}
+.erd-summary{margin:0;padding:6px 10px 8px;color:var(--ink-dim);
+  font-family:var(--mono);font-size:10.5px}
+.erd-find-label input{
+  width:150px;padding:4px 7px;border:1px solid var(--rule);border-radius:3px;
+  background:#11222d;color:var(--ink);font-family:var(--mono);font-size:11px
+}
+.erd-find-count{font-family:var(--mono);font-size:10px;color:var(--ink-faint);
+  min-width:56px}
 .erd-card.unresolved{border-style:dashed;border-color:#6b3a38;background:#1c1a1c}
 .erd-card.view{border-color:#2f4a63}
 .erd-card header{display:flex;align-items:center;gap:8px;padding:8px 10px;
