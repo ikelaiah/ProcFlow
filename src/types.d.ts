@@ -951,6 +951,9 @@ interface SchemaEntity {
   keys: SchemaKey[];
   unresolved: boolean;
   span: SourceSpan;
+  /* v2.2.0 — normalized object names referenced by a view body (FROM/JOIN),
+     used only as a layout hint. Declared evidence, never inferred edges. */
+  sources?: string[];
 }
 
 interface SchemaRelationship {
@@ -981,6 +984,37 @@ interface SchemaResult {
   relationships: SchemaRelationship[];
   diagnostics: Diagnostic[];
   stats: SchemaStats;
+}
+
+/* v2.2.0 — deterministic ERD layout. Positions are logical canvas pixels at
+   100% zoom; sizes come from measured cards so layout never overlaps. */
+interface ErdLayoutPosition {
+  x: number;
+  y: number;
+}
+
+interface ErdLayoutSize {
+  w: number;
+  h: number;
+}
+
+interface ErdLayoutResult {
+  positions: Record<string, ErdLayoutPosition>;
+  columns: string[][];
+  width: number;
+  height: number;
+}
+
+interface ErdLayoutFile {
+  format: string;
+  version: number;
+  fingerprint: string;
+  positions: Record<string, ErdLayoutPosition>;
+}
+
+interface ErdLayoutParseResult {
+  file: ErdLayoutFile | null;
+  diagnostics: Diagnostic[];
 }
 
 interface Window {
@@ -1103,6 +1137,11 @@ interface Window {
   PROCFLOW_SECURITY_DETAIL?: Array<{name: string; pass: boolean; detail?: unknown}>;
   /* v1.8.0 opt-in workspace persistence globals (src/workspace.ts), exposed for
      the browser UI tests. */
+  /* v2.2.0 ERD layout persistence (src/workspace.ts, opt-in only). */
+  writeErdLayout(text: string): boolean;
+  readErdLayout(): string | null;
+  hasStoredErdLayout(): boolean;
+  clearErdLayout(): void;
   clearWorkspace(): void;
   hasSavedWorkspace(): boolean;
   readWorkspace(): WorkspaceSnapshot | null;

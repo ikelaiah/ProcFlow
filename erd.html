@@ -86,7 +86,20 @@
           <span class="erd-find-count" id="erd-find-count" aria-live="polite"></span>
         </label>
         <label class="opt"><input type="checkbox" id="erd-compact"> Compact boxes</label>
-        <button class="btn" id="btn-erd-reset-layout" title="Restore the grid layout (double-click a table to reset just that one)">Reset layout</button>
+        <details class="command-menu" id="erd-layout-menu">
+          <summary class="btn">Layout</summary>
+          <div class="command-menu-panel export-actions" aria-label="ERD layout actions">
+            <button class="menu-action primary-action" id="btn-erd-auto-arrange">Auto arrange</button>
+            <button class="menu-action" id="btn-erd-reset-layout">Reset to declaration order</button>
+            <button class="menu-action" id="btn-erd-save-layout">Save layout to this browser</button>
+            <button class="menu-action" id="btn-erd-restore-layout">Restore saved layout</button>
+            <button class="menu-action" id="btn-erd-forget-layout">Forget saved layout</button>
+            <input id="erd-layout-file-input" type="file" accept=".json,application/json" hidden>
+            <button class="menu-action" id="btn-erd-export-layout">Export layout file</button>
+            <button class="menu-action" id="btn-erd-import-layout">Import layout file</button>
+            <p class="ws-note" id="erd-layout-status">No layout saved in this browser.</p>
+          </div>
+        </details>
         <button class="btn" id="btn-erd-copy">Copy Mermaid</button>
       </div>
     </div>
@@ -118,6 +131,7 @@
 <script src="dist/src/tokenizer.js"></script>
 <script src="dist/src/schema.js"></script>
 <script src="dist/src/erd.js"></script>
+<script src="dist/src/workspace.js"></script>
 <script src="dist/src/ui/large-input.js"></script>
 <script src="dist/src/ui/splitter.js"></script>
 <script src="dist/src/ui/erd-page.js"></script>

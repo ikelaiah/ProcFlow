@@ -158,6 +158,32 @@ function workspaceLastError(): string | null {
   return WORKSPACE_LAST_ERROR;
 }
 
+/* v2.2.0 — ERD layout persistence. Same opt-in rule as the workspace: an
+   explicit Save/Restore/Clear only, under its own key so a layout survives
+   independent of the workspace snapshot and can be forgotten separately. */
+var ERD_LAYOUT_STORAGE_KEY = 'procflow.erd.layout';
+
+function writeErdLayout(text: string): boolean {
+  try {
+    window.localStorage.setItem(ERD_LAYOUT_STORAGE_KEY,text);
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
+function readErdLayout(): string | null {
+  try { return window.localStorage.getItem(ERD_LAYOUT_STORAGE_KEY); } catch(e){ return null; }
+}
+
+function hasStoredErdLayout(): boolean {
+  try { return !!window.localStorage.getItem(ERD_LAYOUT_STORAGE_KEY); } catch(e){ return false; }
+}
+
+function clearErdLayout(): void {
+  try { window.localStorage.removeItem(ERD_LAYOUT_STORAGE_KEY); } catch(e){}
+}
+
 function hasSavedWorkspace(): boolean {
   try { return !!window.localStorage.getItem(WORKSPACE_STORAGE_KEY); } catch(e){ return false; }
 }

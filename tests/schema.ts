@@ -314,6 +314,141 @@
     record('v2.1.0 bulk DDL estate parses without silent drops',false,String(err&&err.stack||err));
   }
 
+  /* ---- v2.2.0 deterministic layout and layout files ---- */
+  try{
+    var layoutSchema=parseSchema(TSQL);
+    var layoutSizes: Record<string, ErdLayoutSize>={};
+    layoutSchema.entities.forEach(function(entity){
+      layoutSizes[entity.id]={w:260,h:140};
+    });
+    var autoLayout=erdAutoLayout(layoutSchema,layoutSizes);
+    var autoLayoutAgain=erdAutoLayout(layoutSchema,layoutSizes);
+    record('v2.2.0 auto layout is deterministic and places every entity',
+      JSON.stringify(autoLayout)===JSON.stringify(autoLayoutAgain)&&
+        layoutSchema.entities.every(function(entity){
+          return !!autoLayout.positions[entity.id];
+        }),
+      autoLayout);
+    var overlaps=0;
+    layoutSchema.entities.forEach(function(a){
+      layoutSchema.entities.forEach(function(b){
+        if(a.id>=b.id) return;
+        var pa=autoLayout.positions[a.id], pb=autoLayout.positions[b.id];
+        var sa=layoutSizes[a.id], sb=layoutSizes[b.id];
+        if(pa.x<pb.x+sb.w&&pb.x<pa.x+sa.w&&pa.y<pb.y+sb.h&&pb.y<pa.y+sa.h){
+          overlaps++;
+        }
+      });
+    });
+    var layoutColumnOf: Record<string, number>={};
+    autoLayout.columns.forEach(function(column,index){
+      column.forEach(function(id){ layoutColumnOf[id]=index; });
+    });
+    record('v2.2.0 auto layout orders parents before children without overlaps',
+      overlaps===0&&
+        layoutColumnOf['DBO.STUDENT']<layoutColumnOf['DBO.ENROLLMENT']&&
+        layoutColumnOf['DBO.COURSE']<layoutColumnOf['DBO.ENROLLMENT'],
+      {columns:autoLayout.columns,overlaps:overlaps,positions:autoLayout.positions});
+    var defaultLayout=erdDefaultLayout(layoutSchema,layoutSizes);
+    record('v2.2.0 default layout preserves declaration order',
+      defaultLayout.positions['DBO.STUDENT'].x<defaultLayout.positions['DBO.COURSE'].x&&
+        defaultLayout.positions['DBO.STUDENT'].x===defaultLayout.positions['DBO.ENROLLMENT'].x,
+      defaultLayout.positions);
+  }catch(err){
+    record('v2.2.0 auto layout is deterministic and places every entity',false,String(err&&err.stack||err));
+    record('v2.2.0 auto layout orders parents before children without overlaps',false,String(err&&err.stack||err));
+    record('v2.2.0 default layout preserves declaration order',false,String(err&&err.stack||err));
+  }
+
+  try{
+    var viewLayoutSchema=parseSchema(PROCFLOW_ERD_SAMPLE_DB2);
+    var viewLayoutSizes: Record<string, ErdLayoutSize>={};
+    viewLayoutSchema.entities.forEach(function(entity){
+      viewLayoutSizes[entity.id]={w:260,h:140};
+    });
+    var viewLayout=erdAutoLayout(viewLayoutSchema,viewLayoutSizes);
+    var viewColumnOf: Record<string, number>={};
+    viewLayout.columns.forEach(function(column,index){
+      column.forEach(function(id){ viewColumnOf[id]=index; });
+    });
+    var orderSummary=entity(viewLayoutSchema,'SALES.V_ORDER_SUMMARY');
+    record('v2.2.0 view bodies declare layout sources and place views downstream',
+      !!orderSummary&&!!orderSummary.sources&&
+        orderSummary.sources.indexOf('SALES.ORDERS')>=0&&
+        orderSummary.sources.indexOf('SALES.CUSTOMER')>=0&&
+        viewColumnOf['SALES.ORDERS']<viewColumnOf['SALES.V_ORDER_SUMMARY']&&
+        viewColumnOf['SALES.AUDIT_LOG']<viewColumnOf['SALES.V_AUDIT_RECENT'],
+      {sources:orderSummary&&orderSummary.sources,columns:viewLayout.columns});
+  }catch(err){
+    record('v2.2.0 view bodies declare layout sources and place views downstream',false,String(err&&err.stack||err));
+  }
+
+  try{
+    var layoutSchema2=parseSchema(TSQL);
+    var layoutSizes2: Record<string, ErdLayoutSize>={};
+    layoutSchema2.entities.forEach(function(entity){ layoutSizes2[entity.id]={w:260,h:140}; });
+    var layoutForFile=erdAutoLayout(layoutSchema2,layoutSizes2);
+    var fileText=erdLayoutToJSON(layoutSchema2,layoutForFile.positions);
+    var parsedFile=erdLayoutFromJSON(fileText);
+    var roundTrips=!!parsedFile.file&&parsedFile.diagnostics.length===0&&
+      parsedFile.file.fingerprint===erdLayoutFingerprint(layoutSchema2)&&
+      layoutSchema2.entities.every(function(entity){
+        var a=layoutForFile.positions[entity.id], b=parsedFile.file.positions[entity.id];
+        return b&&a.x===b.x&&a.y===b.y;
+      });
+    record('v2.2.0 layout file round-trips with a schema fingerprint',
+      roundTrips&&
+        erdLayoutFingerprint(layoutSchema2)!==
+          erdLayoutFingerprint(parseSchema(SQLITE)),
+      parsedFile);
+    var badFormat=erdLayoutFromJSON('{"format":"other","version":1,"positions":{}}');
+    var badVersion=erdLayoutFromJSON('{"format":"procflow-erd-layout","version":9,"positions":{}}');
+    var badJson=erdLayoutFromJSON('not json');
+    record('v2.2.0 layout parser rejects foreign, stale, and malformed files',
+      !badFormat.file&&!badVersion.file&&!badJson.file&&
+        badFormat.diagnostics[0].code==='erd_layout_format_error'&&
+        badVersion.diagnostics[0].code==='erd_layout_version_error'&&
+        badJson.diagnostics[0].code==='erd_layout_parse_error',
+      {badFormat:badFormat,badVersion:badVersion,badJson:badJson});
+  }catch(err){
+    record('v2.2.0 layout file round-trips with a schema fingerprint',false,String(err&&err.stack||err));
+    record('v2.2.0 layout parser rejects foreign, stale, and malformed files',false,String(err&&err.stack||err));
+  }
+
+  try{
+    var bulkLayoutLines=[];
+    for(var bulkLayoutIndex=1;bulkLayoutIndex<=300;bulkLayoutIndex++){
+      bulkLayoutLines.push('CREATE TABLE app.t'+bulkLayoutIndex+' (',
+        '  id INT NOT NULL,',
+        '  ref_id INT,',
+        '  CONSTRAINT pk_t'+bulkLayoutIndex+' PRIMARY KEY (id),',
+        '  CONSTRAINT fk_t'+bulkLayoutIndex+' FOREIGN KEY (ref_id) REFERENCES app.t'+
+          (bulkLayoutIndex===1?300:bulkLayoutIndex-1)+' (id)',
+        ');');
+    }
+    var bulkLayoutSchema=parseSchema(bulkLayoutLines.join('\n'));
+    var bulkLayoutSizes: Record<string, ErdLayoutSize>={};
+    bulkLayoutSchema.entities.forEach(function(entity){ bulkLayoutSizes[entity.id]={w:260,h:140}; });
+    var bulkLayout=erdAutoLayout(bulkLayoutSchema,bulkLayoutSizes);
+    var bulkLayoutOverlap=0;
+    var placedIds=Object.keys(bulkLayout.positions);
+    for(var p1=0;p1<placedIds.length&&bulkLayoutOverlap===0;p1++){
+      for(var p2=p1+1;p2<placedIds.length;p2++){
+        var pp1=bulkLayout.positions[placedIds[p1]], pp2=bulkLayout.positions[placedIds[p2]];
+        if(pp1.x<pp2.x+260&&pp2.x<pp1.x+260&&pp1.y<pp2.y+140&&pp2.y<pp1.y+140){
+          bulkLayoutOverlap=1;
+          break;
+        }
+      }
+    }
+    record('v2.2.0 auto layout stays deterministic and overlap-free at 300 tables',
+      placedIds.length===300&&bulkLayoutOverlap===0&&
+        bulkLayout.width>0&&bulkLayout.height>0,
+      {placed:placedIds.length,overlap:bulkLayoutOverlap,columns:bulkLayout.columns.length});
+  }catch(err){
+    record('v2.2.0 auto layout stays deterministic and overlap-free at 300 tables',false,String(err&&err.stack||err));
+  }
+
   /* ---- Mermaid erDiagram export ---- */
   try{
     var tm=toMermaidER(parseSchema(TSQL));
