@@ -54,10 +54,14 @@ statements (T-SQL, PostgreSQL, DB2, or SQLite), and review the declared
 entities and foreign keys. Drag the canvas to pan, drag a table card to move it
 out of the way and declutter relationship lines, select a table to highlight
 its declared foreign keys and list each one with its column mapping and
-cardinality, and press **Clear** (or Escape) to deselect. The **Layout** menu
-arranges the whole estate deterministically (**Auto arrange**: referenced
+cardinality, and press **Clear** (or Escape) to deselect. A freshly parsed
+schema auto-arranges; edges anchor at the referenced column row and route
+orthogonally through card-free gutters, with crossings, direction (LR/TB/Auto),
+and spacing (Compact/Normal/Roomy) reported in the Layout menu. The **Layout**
+menu also arranges on demand (**Auto arrange**: referenced
 tables before referencing tables, views downstream of their `FROM`/`JOIN`
-sources), resets to declaration order, saves/restores the layout in this
+sources), resets to declaration order, pins tables so Auto arrange keeps their
+position (**Unpin all** clears them), saves/restores the layout in this
 browser (opt-in), and exports/imports a versioned layout file keyed by a schema
 fingerprint. Zoom controls under
 the canvas (or **Fit**) frame the whole estate; with a table selected, **Fit**
