@@ -339,7 +339,11 @@
       cardSizes[entity.id]={w:card.offsetWidth||260,h:card.offsetHeight||140};
     });
     if(!Object.keys(cardPositions).length&&result.entities.length){
-      applyLayout(erdDefaultLayout(result,cardSizes),'default');
+      /* First parse of a schema auto-arranges; Reset returns to declaration
+         order, and any drag, restore, or import switches to manual. */
+      applyLayout(erdAutoLayout(result,cardSizes),'auto');
+      layoutStatus('Auto-arranged '+result.entities.length+
+        ' entities \u00b7 Reset layout for declaration order.');
     } else {
       placeMissingEntities();
       applyPositions();
