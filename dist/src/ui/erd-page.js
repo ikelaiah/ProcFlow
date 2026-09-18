@@ -21,6 +21,13 @@
     var cardPositions = {};
     var cardSizes = {};
     var layoutKind = 'default';
+    var layoutOrientation = 'auto';
+    var layoutOrientationUsed = 'LR';
+    var layoutDensity = 'normal';
+    var layoutBands = [];
+    var columnOf = {};
+    var bandOf = {};
+    var pinned = {};
     var stageWidth = 0, stageHeight = 0;
     var overlayRaf = 0;
     function drawGutter() {
@@ -72,7 +79,8 @@
     function buildCard(entity) {
         var card = document.createElement('article');
         card.className = 'erd-card' + (entity.unresolved ? ' unresolved' : '') +
-            (entity.kind === 'view' ? ' erd-view' : '') + (compactMode ? ' compact' : '');
+            (entity.kind === 'view' ? ' erd-view' : '') + (compactMode ? ' compact' : '') +
+            (pinned[entity.id] ? ' pinned' : '');
         card.setAttribute('data-entity-id', entity.id);
         var head = document.createElement('header');
         var kind = document.createElement('span');
@@ -90,6 +98,28 @@
             badge.textContent = String(count);
             head.appendChild(badge);
         }
+        var pin = document.createElement('button');
+        pin.type = 'button';
+        pin.className = 'erd-pin' + (pinned[entity.id] ? ' pinned' : '');
+        pin.textContent = '\u25C6';
+        pin.title = pinned[entity.id] ? 'Unpin position (Auto arrange may move it)'
+            : 'Pin position (Auto arrange keeps it)';
+        pin.addEventListener('click', function (event) {
+            event.stopPropagation();
+            if (pinned[entity.id]) {
+                delete pinned[entity.id];
+                layoutStatus('Unpinned ' + entity.name + '.');
+            }
+            else {
+                pinned[entity.id] = 1;
+                layoutStatus('Pinned ' + entity.name + ' \u00b7 Auto arrange keeps this position.');
+            }
+            pin.classList.toggle('pinned', !!pinned[entity.id]);
+            pin.title = pinned[entity.id] ? 'Unpin position (Auto arrange may move it)'
+                : 'Pin position (Auto arrange keeps it)';
+            card.classList.toggle('pinned', !!pinned[entity.id]);
+        });
+        head.appendChild(pin);
         card.appendChild(head);
         if (compactMode) {
             var summary = document.createElement('p');
@@ -104,6 +134,7 @@
                 var frag = document.createDocumentFragment();
                 entity.columns.forEach(function (column) {
                     var row = document.createElement('li');
+                    row.setAttribute('data-column', column.name);
                     var name = document.createElement('span');
                     name.className = 'erd-col-name';
                     name.textContent = column.name;
@@ -342,7 +373,13 @@
             cardSizes[entity.id] = { w: card.offsetWidth || 260, h: card.offsetHeight || 140 };
         });
         if (!Object.keys(cardPositions).length && result.entities.length) {
-            applyLayout(erdDefaultLayout(result, cardSizes), 'default');
+            /* First parse of a schema auto-arranges; Reset returns to declaration
+               order, and any drag, restore, or import switches to manual. */
+            var firstLayout = erdAutoLayout(result, cardSizes, { orientation: layoutOrientation, density: layoutDensity });
+            applyLayout(firstLayout, 'auto');
+            layoutStatus('Auto-arranged ' + result.entities.length + ' entities \u00b7 ' +
+                (firstLayout.crossings || 0) + ' crossings \u00b7 ' + (firstLayout.orientation || 'LR') +
+                ' \u00b7 Reset layout for declaration order.');
         }
         else {
             placeMissingEntities();
@@ -414,17 +451,6 @@
         return { left: left, top: top, right: left + r.width, bottom: top + r.height,
             cx: left + r.width / 2, cy: top + r.height / 2 };
     }
-    /* Intersection of the line from a box centre toward (tx, ty) with the box
-       edge, so relationship lines stop at the entity border. */
-    function edgePoint(box, tx, ty) {
-        var dx = tx - box.cx, dy = ty - box.cy;
-        if (!dx && !dy)
-            return { x: box.cx, y: box.cy };
-        var sx = dx ? Math.abs((box.right - box.left) / 2 / dx) : Infinity;
-        var sy = dy ? Math.abs((box.bottom - box.top) / 2 / dy) : Infinity;
-        var s = Math.min(sx, sy);
-        return { x: box.cx + dx * s, y: box.cy + dy * s };
-    }
     function svgEl(name, attrs) {
         var el = document.createElementNS('http://www.w3.org/2000/svg', name);
         if (attrs)
@@ -439,23 +465,58 @@
             drawOverlay();
         });
     }
+    function setLayoutGeometry(layout) {
+        layoutBands = layout.bands || [];
+        layoutOrientationUsed = layout.orientation || 'LR';
+        columnOf = {};
+        bandOf = {};
+        layoutBands.forEach(function (band, bandIndex) {
+            band.forEach(function (column, columnIndex) {
+                column.forEach(function (id) {
+                    columnOf[id] = columnIndex;
+                    bandOf[id] = bandIndex;
+                });
+            });
+        });
+    }
     function applyLayout(layout, kind) {
         cardPositions = layout.positions;
         layoutKind = kind;
+        setLayoutGeometry(layout);
         applyPositions();
         scheduleOverlay();
     }
     function defaultLayout() {
         if (!result)
             return;
+        pinned = {};
+        Object.keys(cardEls).forEach(function (id) {
+            cardEls[id].classList.remove('pinned');
+            var pin = cardEls[id].querySelector('.erd-pin');
+            if (pin)
+                pin.classList.remove('pinned');
+        });
         applyLayout(erdDefaultLayout(result, cardSizes), 'default');
-        layoutStatus('Default declaration-order layout.');
+        layoutStatus('Declaration-order layout \u00b7 pins cleared.');
+    }
+    function pinnedPositions() {
+        var positions = {};
+        Object.keys(pinned).forEach(function (id) {
+            if (cardPositions[id])
+                positions[id] = cardPositions[id];
+        });
+        return positions;
     }
     function autoArrange() {
         if (!result)
             return;
-        applyLayout(erdAutoLayout(result, cardSizes), 'auto');
-        layoutStatus('Auto-arranged ' + result.entities.length + ' entities (declared keys only).');
+        var pins = pinnedPositions();
+        var layout = erdAutoLayout(result, cardSizes, { orientation: layoutOrientation, density: layoutDensity, pinned: pins });
+        applyLayout(layout, 'auto');
+        layoutStatus('Auto-arranged ' + result.entities.length + ' entities \u00b7 ' +
+            (layout.crossings || 0) + ' crossing' + ((layout.crossings || 0) === 1 ? '' : 's') +
+            ' \u00b7 ' + (layout.orientation || 'LR') + ' \u00b7 ' + layoutDensity +
+            (Object.keys(pins).length ? ' \u00b7 ' + Object.keys(pins).length + ' pinned' : '') + '.');
     }
     function layoutStatus(text) {
         var el = $('erd-layout-status');
@@ -617,6 +678,188 @@
         canvas.scrollLeft = (minX + maxX) / 2 * ratio - canvas.clientWidth / 2;
         canvas.scrollTop = (minY + maxY) / 2 * ratio - canvas.clientHeight / 2;
     }
+    /* v2.3.0 — port-anchored orthogonal routing. Edges leave the card at the row
+       of the referenced column and travel in the gutter between columns, with a
+       per-parent stagger so hub fan-outs read as a bundle. */
+    function portOffset(entityId, box, columnName) {
+        if (!columnName)
+            return box.cy;
+        var card = cardEls[entityId];
+        if (!card)
+            return box.cy;
+        var rows = card.querySelectorAll('.erd-cols li[data-column]');
+        for (var i = 0; i < rows.length; i++) {
+            if (rows[i].getAttribute('data-column') === columnName) {
+                var rowRect = rows[i].getBoundingClientRect();
+                var cardRect = card.getBoundingClientRect();
+                return box.top + (rowRect.top + rowRect.height / 2 - cardRect.top);
+            }
+        }
+        return box.cy;
+    }
+    var portCache = {};
+    function portAt(entityId, box, columnName) {
+        if (!columnName)
+            return box.cy;
+        var key = entityId + '|' + columnName;
+        if (portCache[key] === undefined) {
+            portCache[key] = portOffset(entityId, box, columnName);
+        }
+        return portCache[key];
+    }
+    function edgeDirection(from, to) {
+        if (to.left - from.right >= 8)
+            return 'right';
+        if (from.left - to.right >= 8)
+            return 'left';
+        if (to.top - from.bottom >= 8)
+            return 'down';
+        if (from.top - to.bottom >= 8)
+            return 'up';
+        return 'around';
+    }
+    function routeFromPoints(points) {
+        var d = 'M ' + points[0].x + ' ' + points[0].y;
+        for (var i = 1; i < points.length; i++)
+            d += ' L ' + points[i].x + ' ' + points[i].y;
+        function along(a, b, distance) {
+            var dx = b.x - a.x, dy = b.y - a.y;
+            var length = Math.sqrt(dx * dx + dy * dy) || 1;
+            return { x: a.x + dx / length * distance, y: a.y + dy / length * distance };
+        }
+        var last = points.length - 1, middle = Math.floor(last / 2);
+        return { d: d,
+            labelAt: [along(points[0], points[1], 16), along(points[last], points[last - 1], 16)],
+            midAt: { x: (points[middle].x + points[middle + 1].x) / 2,
+                y: (points[middle].y + points[middle + 1].y) / 2 } };
+    }
+    /* Card-safe routing for auto layouts: every bend travels in the card-free
+       gutters between layout columns, or in the horizontal corridor between
+       bands, so edge paths cannot cross an entity card. Manual layouts fall
+       back to the best-effort router. */
+    function structuredRoute(rel, from, to, stagger, bandExtents) {
+        if (layoutOrientationUsed !== 'LR' || layoutKind === 'manual' || !layoutBands.length) {
+            return null;
+        }
+        var bandA = bandOf[rel.fromId], bandB = bandOf[rel.toId];
+        if (bandA === undefined || bandB === undefined)
+            return null;
+        var colA = columnOf[rel.fromId], colB = columnOf[rel.toId];
+        if (colA === undefined || colB === undefined)
+            return null;
+        var fromY = portAt(rel.fromId, from, rel.fromColumns[0]);
+        var toY = portAt(rel.toId, to, rel.toColumns[0]);
+        function rightGutterSafe(ext, column) {
+            var raw = ext.right[column] + 24 + stagger;
+            if (column + 1 < ext.left.length) {
+                raw = Math.min(raw, (ext.right[column] + ext.left[column + 1]) / 2);
+            }
+            return raw;
+        }
+        var points = [];
+        if (bandA === bandB) {
+            var ext = bandExtents[bandA];
+            if (!ext)
+                return null;
+            if (colB === colA + 1) {
+                var rightGutter = (ext.right[colA] + ext.left[colB]) / 2 + stagger;
+                points = [{ x: from.right, y: fromY }, { x: rightGutter, y: fromY },
+                    { x: rightGutter, y: toY }, { x: to.left, y: toY }];
+            }
+            else if (colB === colA - 1) {
+                var leftGutter = (ext.right[colB] + ext.left[colA]) / 2 - stagger;
+                points = [{ x: from.left, y: fromY }, { x: leftGutter, y: fromY },
+                    { x: leftGutter, y: toY }, { x: to.right, y: toY }];
+            }
+            else {
+                /* Same column or skipped columns: travel in the card-free right
+                   gutters and use the corridor below the band, so the path never
+                   crosses an intermediate column or negative canvas space. */
+                var bandCorridor = (bandA + 1 < bandExtents.length)
+                    ? (ext.bottom + bandExtents[bandA + 1].top) / 2
+                    : ext.bottom + 24;
+                var gutterFrom = rightGutterSafe(ext, colA);
+                var gutterTo = rightGutterSafe(ext, colB);
+                points = [{ x: from.right, y: fromY },
+                    { x: gutterFrom, y: fromY },
+                    { x: gutterFrom, y: bandCorridor },
+                    { x: gutterTo, y: bandCorridor },
+                    { x: gutterTo, y: toY },
+                    { x: to.right, y: toY }];
+            }
+        }
+        else {
+            var extA = bandExtents[bandA], extB = bandExtents[bandB];
+            if (!extA || !extB)
+                return null;
+            var delta = bandB - bandA;
+            var gutterA = rightGutterSafe(extA, colA);
+            var gutterB = rightGutterSafe(extB, colB);
+            if (delta === 1 || delta === -1) {
+                var corridorY = delta === 1 ? (extA.bottom + extB.top) / 2 : (extB.bottom + extA.top) / 2;
+                points = [{ x: from.right, y: fromY },
+                    { x: gutterA, y: fromY },
+                    { x: gutterA, y: corridorY },
+                    { x: gutterB, y: corridorY },
+                    { x: gutterB, y: toY },
+                    { x: to.right, y: toY }];
+            }
+            else {
+                /* Non-adjacent bands: run long horizontal segments only through band
+                   gaps, connect them with a vertical channel outside all cards. */
+                var gapA = delta > 0 ? (extA.bottom + bandExtents[bandA + 1].top) / 2
+                    : (bandExtents[bandA - 1].bottom + extA.top) / 2;
+                var gapB = delta > 0 ? (bandExtents[bandB - 1].bottom + extB.top) / 2
+                    : (extB.bottom + bandExtents[bandB + 1].top) / 2;
+                var outerX = 0;
+                bandExtents.forEach(function (band) {
+                    band.right.forEach(function (right) { outerX = Math.max(outerX, right); });
+                });
+                outerX += 40 + stagger;
+                points = [{ x: from.right, y: fromY },
+                    { x: gutterA, y: fromY },
+                    { x: gutterA, y: gapA },
+                    { x: outerX, y: gapA },
+                    { x: outerX, y: gapB },
+                    { x: gutterB, y: gapB },
+                    { x: gutterB, y: toY },
+                    { x: to.right, y: toY }];
+            }
+        }
+        return routeFromPoints(points);
+    }
+    function orthogonalRoute(rel, from, to, stagger) {
+        var fromY = portAt(rel.fromId, from, rel.fromColumns[0]);
+        var toY = portAt(rel.toId, to, rel.toColumns[0]);
+        var direction = edgeDirection(from, to);
+        var points = [];
+        if (direction === 'right' || direction === 'left') {
+            var right = direction === 'right';
+            var gx = right ? (from.right + to.left) / 2 + stagger
+                : (to.right + from.left) / 2 - stagger;
+            points = [{ x: right ? from.right : from.left, y: fromY },
+                { x: gx, y: fromY },
+                { x: gx, y: toY },
+                { x: right ? to.left : to.right, y: toY }];
+        }
+        else if (direction === 'down' || direction === 'up') {
+            var down = direction === 'down';
+            var gy = down ? (from.bottom + to.top) / 2 + stagger
+                : (to.bottom + from.top) / 2 - stagger;
+            points = [{ x: from.cx, y: down ? from.bottom : from.top },
+                { x: from.cx, y: gy },
+                { x: to.cx, y: gy },
+                { x: to.cx, y: down ? to.top : to.bottom }];
+        }
+        else {
+            var aroundX = Math.max(from.right, to.right) + 30 + stagger;
+            points = [{ x: from.right, y: fromY },
+                { x: aroundX, y: fromY },
+                { x: aroundX, y: toY },
+                { x: to.right, y: toY }];
+        }
+        return routeFromPoints(points);
+    }
     function drawOverlay() {
         if (!overlay || !canvas || !result)
             return;
@@ -628,12 +871,38 @@
         overlay.setAttribute('height', String(height));
         overlay.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
         cachedCanvasRect = canvas.getBoundingClientRect();
+        portCache = {};
         var boxCache = {};
         function boxOf(id) {
             if (!(id in boxCache))
                 boxCache[id] = entityBox(id);
             return boxCache[id];
         }
+        var bandExtents = [];
+        if (layoutBands.length) {
+            layoutBands.forEach(function (band) {
+                var lefts = [], rights = [];
+                var top = Infinity, bottom = -Infinity;
+                band.forEach(function (column, columnIndex) {
+                    var left = Infinity, right = -Infinity;
+                    column.forEach(function (id) {
+                        var box = boxOf(id);
+                        if (!box)
+                            return;
+                        left = Math.min(left, box.left);
+                        right = Math.max(right, box.right);
+                        top = Math.min(top, box.top);
+                        bottom = Math.max(bottom, box.bottom);
+                    });
+                    lefts[columnIndex] = left === Infinity ? 0 : left;
+                    rights[columnIndex] = right === -Infinity ? 0 : right;
+                });
+                bandExtents.push({ left: lefts, right: rights,
+                    top: top === Infinity ? 0 : top,
+                    bottom: bottom === -Infinity ? 0 : bottom });
+            });
+        }
+        var bundleCounts = {};
         result.relationships.forEach(function (rel) {
             var from = boxOf(rel.fromId), to = boxOf(rel.toId);
             if (!from || !to)
@@ -643,26 +912,30 @@
             var dash = rel.resolution === 'exact' ? '' : (rel.resolution === 'heuristic' ? '7 4' : '2 4');
             var color = rel.resolution === 'opaque' ? '#e4645e' :
                 (rel.resolution === 'heuristic' ? '#e8a33d' : '#7ea6e0');
-            var d, labelAt, midAt;
+            var bundle = bundleCounts[rel.fromId] || 0;
+            bundleCounts[rel.fromId] = bundle + 1;
+            var stagger = (bundle % 6) * 6;
+            var routed;
             if (rel.fromId === rel.toId) {
-                var loopX = from.right + 10, loopY = from.cy;
-                d = 'M ' + from.right + ' ' + (from.top + 14) + ' C ' + (loopX + 34) + ' ' + (from.top - 14) + ', ' +
-                    (loopX + 34) + ' ' + (from.bottom + 14) + ', ' + from.right + ' ' + (from.bottom - 14);
-                labelAt = [{ x: loopX + 30, y: from.top + 6 }, { x: loopX + 30, y: from.bottom - 4 }];
-                midAt = { x: loopX + 34, y: loopY };
+                var startY = portAt(rel.fromId, from, rel.fromColumns[0]);
+                var endY = portAt(rel.toId, to, rel.toColumns[0]);
+                var loopX = from.right + 10 + stagger;
+                routed = {
+                    d: 'M ' + from.right + ' ' + startY + ' C ' + (loopX + 40) + ' ' + (startY - 24) + ', ' +
+                        (loopX + 40) + ' ' + (endY + 24) + ', ' + from.right + ' ' + endY,
+                    labelAt: [{ x: loopX + 34, y: startY - 12 }, { x: loopX + 34, y: endY + 12 }],
+                    midAt: { x: loopX + 40, y: (startY + endY) / 2 }
+                };
             }
             else {
-                var p1 = edgePoint(from, to.cx, to.cy), p2 = edgePoint(to, from.cx, from.cy);
-                var midX = (p1.x + p2.x) / 2;
-                d = 'M ' + p1.x + ' ' + p1.y + ' C ' + midX + ' ' + p1.y + ', ' + midX + ' ' + p2.y + ', ' + p2.x + ' ' + p2.y;
-                labelAt = [{ x: p1.x + (p2.x - p1.x) * 0.16, y: p1.y + (p2.y - p1.y) * 0.16 },
-                    { x: p1.x + (p2.x - p1.x) * 0.84, y: p1.y + (p2.y - p1.y) * 0.84 }];
-                midAt = { x: midX, y: (p1.y + p2.y) / 2 };
+                routed = structuredRoute(rel, from, to, stagger, bandExtents) ||
+                    orthogonalRoute(rel, from, to, stagger);
             }
+            var d = routed.d, labelAt = routed.labelAt, midAt = routed.midAt;
             var path = svgEl('path', { d: d, fill: 'none', stroke: color,
                 'stroke-width': active && connected ? 2.6 : (connected ? 2 : 1.4),
                 'stroke-dasharray': dash, opacity: active ? (connected ? 0.95 : 0.07) : 0.95,
-                'stroke-linecap': 'round' });
+                'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
             path.setAttribute('data-relationship', rel.id);
             overlay.appendChild(path);
             if (!active || connected) {
@@ -872,7 +1145,7 @@
             compactMode = !!compactInput.checked;
             renderCards();
             if (layoutKind === 'auto' && result)
-                applyLayout(erdAutoLayout(result, cardSizes), 'auto');
+                autoArrange();
             else if (layoutKind === 'default' && result)
                 applyLayout(erdDefaultLayout(result, cardSizes), 'default');
             else
@@ -914,6 +1187,40 @@
             if (files.length)
                 importLayoutFile(files[0]);
             layoutFileInput.value = '';
+        });
+    var orientationSelect = $('erd-layout-orientation');
+    if (orientationSelect) {
+        layoutOrientation = orientationSelect.value;
+        orientationSelect.addEventListener('change', function () {
+            layoutOrientation = orientationSelect.value;
+            if (layoutKind === 'auto')
+                autoArrange();
+            else
+                layoutStatus('Direction ' + layoutOrientation + ': press Auto arrange to apply.');
+        });
+    }
+    var densitySelect = $('erd-layout-density');
+    if (densitySelect) {
+        layoutDensity = densitySelect.value;
+        densitySelect.addEventListener('change', function () {
+            layoutDensity = densitySelect.value;
+            if (layoutKind === 'auto')
+                autoArrange();
+            else
+                layoutStatus('Spacing ' + layoutDensity + ': press Auto arrange to apply.');
+        });
+    }
+    var unpinAll = $('btn-erd-unpin-all');
+    if (unpinAll)
+        unpinAll.addEventListener('click', function () {
+            pinned = {};
+            Object.keys(cardEls).forEach(function (id) {
+                cardEls[id].classList.remove('pinned');
+                var marker = cardEls[id].querySelector('.erd-pin');
+                if (marker)
+                    marker.classList.remove('pinned');
+            });
+            layoutStatus('All positions unpinned.');
         });
     var zoomOut = $('erd-z-out');
     if (zoomOut)

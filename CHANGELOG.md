@@ -3,6 +3,22 @@
 All notable released ProcFlow changes are recorded here. Detailed verification
 evidence belongs in the canonical release note under `docs/releases/`.
 
+## v2.3.0 — Readable estate layouts
+
+- Auto-arranged a schema on first parse; Reset still returns to declaration
+  order.
+- Edges now anchor at the referenced foreign-key column row and route
+  orthogonally through card-free layout gutters, with band corridors and an
+  outer channel for long multi-band edges. Zero path/card intrusions verified
+  on the DB2 sample, a 300-table chain, and a sampled 800-table chain.
+- Crossing reduction now uses median sweeps plus a monotonic adjacent-transpose
+  pass, counts crossings by inversion counting, and supports LR/TB/Auto
+  direction; Auto keeps whichever direction fits a 16:9 viewport better.
+- Added position pinning (per-card diamond, Unpin all) so Auto arrange keeps
+  chosen positions, with deterministic de-overlap for the rest.
+- Added spacing presets (Compact/Normal/Roomy) and moved isolated tables and
+  sourceless views to a downstream band.
+
 ## v2.2.0 — Arrange and save the ERD
 
 - Added deterministic Auto arrange: layered parent→child flow with bounded

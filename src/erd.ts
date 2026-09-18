@@ -193,14 +193,177 @@ function erdDefaultLayout(result: SchemaResult,
           height:Math.max(height-gapY,0)};
 }
 
-/* Layered parent→child flow with bounded crossing reduction. */
+/* --- v2.3.0 ordering: median sweeps, monotonic transpose, orientation,
+   pins, and crossing counts ------------------------------------------- */
+
+function erdLayerRows(order: number[][]): number[] {
+  var rows: number[]=[];
+  order.forEach(function(column){
+    column.forEach(function(index,row){ rows[index]=row; });
+  });
+  return rows;
+}
+
+function erdInversions(values: number[]): number {
+  function mergeSort(list: number[]): {sorted: number[]; count: number} {
+    if(list.length<2) return {sorted:list,count:0};
+    var mid=Math.floor(list.length/2);
+    var left=mergeSort(list.slice(0,mid)), right=mergeSort(list.slice(mid));
+    var sorted: number[]=[], count=left.count+right.count, i=0, j=0;
+    while(i<left.sorted.length&&j<right.sorted.length){
+      if(left.sorted[i]<=right.sorted[j]) sorted.push(left.sorted[i++]);
+      else { sorted.push(right.sorted[j++]); count+=left.sorted.length-i; }
+    }
+    while(i<left.sorted.length) sorted.push(left.sorted[i++]);
+    while(j<right.sorted.length) sorted.push(right.sorted[j++]);
+    return {sorted:sorted,count:count};
+  }
+  return mergeSort(values).count;
+}
+
+function erdCountCrossings(order: number[][], edges: number[][],
+                           layer: number[]): number {
+  var total=0, rows=erdLayerRows(order);
+  for(var c=0;c<order.length-1;c++){
+    var pairs: number[][]=[];
+    edges.forEach(function(edge){
+      if(layer[edge[0]]===c&&layer[edge[1]]===c+1) pairs.push(edge);
+    });
+    if(pairs.length<2) continue;
+    pairs.sort(function(a,b){
+      return rows[a[0]]-rows[b[0]]||rows[a[1]]-rows[b[1]];
+    });
+    total+=erdInversions(pairs.map(function(edge){ return rows[edge[1]]; }));
+  }
+  return total;
+}
+
+function erdMedian(rows: number[]): number {
+  if(!rows.length) return -1;
+  var sorted=rows.slice().sort(function(a,b){ return a-b; });
+  var mid=Math.floor(sorted.length/2);
+  return sorted.length%2?sorted[mid]:(sorted[mid-1]+sorted[mid])/2;
+}
+
+/* Crossing delta of swapping adjacent rows u,v: negative means fewer
+   crossings. Counts only pairs that involve both u and v. */
+function erdSwapDelta(u: number, v: number, neighbor: number[][],
+                      rows: number[]): number {
+  var delta=0;
+  neighbor[u].forEach(function(a){
+    neighbor[v].forEach(function(b){
+      if(a===b) return;
+      delta+=(rows[a]<rows[b]?1:0)-(rows[a]>rows[b]?1:0);
+    });
+  });
+  return delta;
+}
+
+function erdTranspose(order: number[][], parents: number[][],
+                      children: number[][]): void {
+  for(var pass=0;pass<3;pass++){
+    var improved=false, rows=erdLayerRows(order);
+    order.forEach(function(column){
+      for(var i=0;i+1<column.length;i++){
+        var u=column[i], v=column[i+1];
+        if(erdSwapDelta(u,v,parents,rows)+erdSwapDelta(u,v,children,rows)<0){
+          column[i]=v; column[i+1]=u;
+          rows[u]=i+1; rows[v]=i;
+          improved=true;
+        }
+      }
+    });
+    if(!improved) break;
+  }
+}
+
+/* Pinned entities keep their exact positions; unpinned cards are pushed down
+   deterministically until they no longer overlap a placed card. */
+function erdApplyPins(positions: Record<string, ErdLayoutPosition>,
+                      idsInOrder: string[],
+                      sizes: Record<string, ErdLayoutSize>,
+                      pinnedWork: Record<string, ErdLayoutPosition>,
+                      gapY: number): void {
+  var pinnedIds=Object.keys(pinnedWork).filter(function(id){
+    return !!positions[id];
+  });
+  if(!pinnedIds.length) return;
+  pinnedIds.forEach(function(id){
+    positions[id]={x:pinnedWork[id].x,y:pinnedWork[id].y};
+  });
+  var pinnedSet: StringSet={};
+  pinnedIds.forEach(function(id){ pinnedSet[id]=1; });
+  var placed: Array<{x: number; y: number; w: number; h: number}>=[];
+  function overlaps(candidate: {x: number; y: number; w: number; h: number}): boolean {
+    return placed.some(function(other){
+      return candidate.x<other.x+other.w&&other.x<candidate.x+candidate.w&&
+             candidate.y<other.y+other.h&&other.y<candidate.y+candidate.h;
+    });
+  }
+  pinnedIds.forEach(function(id){
+    var position=positions[id], size=erdSizeOf(sizes,id);
+    placed.push({x:position.x,y:position.y,w:size.w,h:size.h});
+  });
+  idsInOrder.forEach(function(id){
+    if(pinnedSet[id]) return;
+    var position=positions[id];
+    if(!position) return;
+    var size=erdSizeOf(sizes,id);
+    var candidate={x:position.x,y:position.y,w:size.w,h:size.h};
+    var guard=0;
+    while(overlaps(candidate)&&guard++<idsInOrder.length*3){
+      candidate.y+=size.h+gapY;
+    }
+    positions[id]={x:candidate.x,y:candidate.y};
+    placed.push(candidate);
+  });
+}
+
+function erdOrientationScore(layout: ErdLayoutResult): number {
+  return Math.max(layout.width/1600,layout.height/900);
+}
+
+/* Layered parent→child flow: median sweeps, monotonic transpose, optional
+   top-to-bottom orientation, and pinned positions. Bounded and deterministic.
+   Auto orientation keeps whichever direction fits a 16:9 viewport better. */
 function erdAutoLayout(result: SchemaResult,
-                       sizes: Record<string, ErdLayoutSize>): ErdLayoutResult {
+                       sizes: Record<string, ErdLayoutSize>,
+                       options?: {orientation?: 'LR' | 'TB' | 'auto';
+                                  density?: 'compact' | 'normal' | 'roomy';
+                                  pinned?: Record<string, ErdLayoutPosition>}): ErdLayoutResult {
+  var orientation=(options&&options.orientation)||'LR';
+  var pinned=options&&options.pinned;
+  var density=(options&&options.density)||'normal';
+  if(orientation==='auto'){
+    var lr=erdLayeredLayout(result,sizes,'LR',pinned,density);
+    var tb=erdLayeredLayout(result,sizes,'TB',pinned,density);
+    return erdOrientationScore(tb)<erdOrientationScore(lr)?tb:lr;
+  }
+  return erdLayeredLayout(result,sizes,orientation,pinned,density);
+}
+
+function erdLayeredLayout(result: SchemaResult,
+                          sizes: Record<string, ErdLayoutSize>,
+                          orientation: 'LR' | 'TB',
+                          pinned: Record<string, ErdLayoutPosition> | undefined,
+                          density: 'compact' | 'normal' | 'roomy'): ErdLayoutResult {
+  var metrics=density==='compact'?{gapX:44,gapY:32,bandGapY:88,rows:18,band:16}
+            :density==='roomy'?{gapX:110,gapY:84,bandGapY:220,rows:10,band:8}
+            :{gapX:72,gapY:56,bandGapY:140,rows:14,band:12};
+  var transposed=orientation==='TB';
+  if(transposed){
+    var swapped: Record<string, ErdLayoutSize>={};
+    Object.keys(sizes).forEach(function(id){
+      swapped[id]={w:sizes[id].h,h:sizes[id].w};
+    });
+    sizes=swapped;
+  }
   var entities=result.entities, count=entities.length;
   if(!count) return {positions:{},columns:[],width:0,height:0};
   var indexOf: Record<string, number>={};
   entities.forEach(function(entity,index){ indexOf[entity.id]=index; });
   var parents: number[][]=[], children: number[][]=[], seen: StringSet={};
+  var edgeList: number[][]=[];
   for(var a=0;a<count;a++){ parents.push([]); children.push([]); }
   function edge(parentId: string, childId: string): void {
     var p=indexOf[parentId], c=indexOf[childId];
@@ -210,6 +373,7 @@ function erdAutoLayout(result: SchemaResult,
     seen[key]=1;
     parents[c].push(p);
     children[p].push(c);
+    edgeList.push([p,c]);
   }
   result.relationships.forEach(function(rel){ edge(rel.fromId,rel.toId); });
   entities.forEach(function(entity){
@@ -249,9 +413,14 @@ function erdAutoLayout(result: SchemaResult,
   }
   var maxLayer=0;
   layer.forEach(function(value){ maxLayer=Math.max(maxLayer,value); });
-  /* Views with no declared sources sit in their own downstream band. */
+  /* Views with no declared sources and isolated tables sit in their own
+     downstream band instead of crowding the root column. */
   entities.forEach(function(entity,index){
-    if(entity.kind==='view'&&!parents[index].length) layer[index]=maxLayer+1;
+    if(!parents[index].length&&!children[index].length){
+      layer[index]=maxLayer+1;
+    } else if(entity.kind==='view'&&!parents[index].length){
+      layer[index]=maxLayer+1;
+    }
   });
   var distinct: number[]=[];
   layer.forEach(function(value){ if(distinct.indexOf(value)<0) distinct.push(value); });
@@ -264,47 +433,40 @@ function erdAutoLayout(result: SchemaResult,
   entities.forEach(function(entity,index){
     order[layerToColumn[String(layer[index])]].push(index);
   });
-  var rowOf: number[]=[];
-  entities.forEach(function(){ rowOf.push(0); });
-  function refreshRows(): void {
-    order.forEach(function(column){
-      column.forEach(function(index,row){ rowOf[index]=row; });
-    });
-  }
-  refreshRows();
-  function barycenter(index: number, neighbor: number[][]): number {
-    var list=neighbor[index];
-    if(!list||!list.length) return rowOf[index];
-    var sum=0;
-    list.forEach(function(other){ sum+=rowOf[other]; });
-    return sum/list.length;
-  }
-  for(var pass=0;pass<4;pass++){
+  for(var pass=0;pass<6;pass++){
     var forward=pass%2===0;
     if(forward){
       for(var c=1;c<columnCount;c++){
-        var colList=order[c];
-        colList.sort(function(x,y){
-          var diff=barycenter(x,parents)-barycenter(y,parents);
-          return diff!==0?diff:x-y;
+        var rowsForward=erdLayerRows(order);
+        order[c].sort(function(x,y){
+          var mx=erdMedian(parents[x].map(function(p){ return rowsForward[p]; }));
+          var my=erdMedian(parents[y].map(function(p){ return rowsForward[p]; }));
+          if(mx<0&&my<0) return x-y;
+          if(mx<0) return 1;
+          if(my<0) return -1;
+          return mx-my||x-y;
         });
-        refreshRows();
       }
     } else {
       for(var d=columnCount-2;d>=0;d--){
-        var backList=order[d];
-        backList.sort(function(x,y){
-          var diff=barycenter(x,children)-barycenter(y,children);
-          return diff!==0?diff:x-y;
+        var rowsBack=erdLayerRows(order);
+        order[d].sort(function(x,y){
+          var mx=erdMedian(children[x].map(function(p){ return rowsBack[p]; }));
+          var my=erdMedian(children[y].map(function(p){ return rowsBack[p]; }));
+          if(mx<0&&my<0) return x-y;
+          if(mx<0) return 1;
+          if(my<0) return -1;
+          return mx-my||x-y;
         });
-        refreshRows();
       }
     }
+    erdTranspose(order,parents,children);
   }
+  var crossings=erdCountCrossings(order,edgeList,layer);
   /* Tall columns are chunked before banding: a 799-leaf fan becomes a readable
      grid instead of one 128,000-pixel column. Chunks stay in the same layer,
      so declared parent→child order is preserved. */
-  var maxRowsPerColumn=14;
+  var maxRowsPerColumn=metrics.rows;
   var chunkedOrder: number[][]=[];
   order.forEach(function(column){
     if(column.length<=maxRowsPerColumn){ chunkedOrder.push(column); return; }
@@ -317,11 +479,14 @@ function erdAutoLayout(result: SchemaResult,
   /* Wide estates wrap into bands (snake layout): a 800-long chain becomes a
      readable grid instead of one 200,000-pixel line. Bands are deterministic
      and keep parent→child order inside each band. */
-  var gapX=72, gapY=56, bandGapY=140, maxColumnsPerBand=12;
+  var gapX=metrics.gapX, gapY=metrics.gapY, bandGapY=metrics.bandGapY;
+  var maxColumnsPerBand=metrics.band;
   var positions: Record<string, ErdLayoutPosition>={}, placedColumns: string[][]=[];
+  var bands: string[][][]=[];
   var bandStart=0, bandY=0;
   while(bandStart<columnCountExpanded){
     var bandEnd=Math.min(columnCountExpanded,bandStart+maxColumnsPerBand);
+    var bandColumns: string[][]=[];
     var localWidth: number[]=[], localHeight: number[]=[];
     for(var bandColumn=bandStart;bandColumn<bandEnd;bandColumn++){
       var widthMax=0, heightSum=0;
@@ -347,10 +512,26 @@ function erdAutoLayout(result: SchemaResult,
         y+=size.h;
       });
       placedColumns.push(ids);
+      bandColumns.push(ids);
       x+=localWidth[local]+gapX;
     }
+    bands.push(bandColumns);
     bandY+=bandTallest+bandGapY;
     bandStart=bandEnd;
+  }
+  var idsInOrder: string[]=[];
+  placedColumns.forEach(function(column){
+    column.forEach(function(id){ idsInOrder.push(id); });
+  });
+  if(pinned&&Object.keys(pinned).length){
+    var pinnedWork: Record<string, ErdLayoutPosition>={};
+    Object.keys(pinned).forEach(function(id){
+      var position=pinned[id];
+      if(!position) return;
+      pinnedWork[id]=transposed?{x:position.y,y:position.x}
+                               :{x:position.x,y:position.y};
+    });
+    erdApplyPins(positions,idsInOrder,sizes,pinnedWork,metrics.gapY);
   }
   var width=0, height=0;
   Object.keys(positions).forEach(function(id){
@@ -358,7 +539,16 @@ function erdAutoLayout(result: SchemaResult,
     width=Math.max(width,positions[id].x+size.w);
     height=Math.max(height,positions[id].y+size.h);
   });
-  return {positions:positions,columns:placedColumns,width:width,height:height};
+  if(transposed){
+    var flipped: Record<string, ErdLayoutPosition>={};
+    Object.keys(positions).forEach(function(id){
+      flipped[id]={x:positions[id].y,y:positions[id].x};
+    });
+    return {positions:flipped,columns:placedColumns,width:height,height:width,
+            orientation:'TB',crossings:crossings,bands:bands};
+  }
+  return {positions:positions,columns:placedColumns,width:width,height:height,
+          orientation:'LR',crossings:crossings,bands:bands};
 }
 
 /* Layout files are explicit, versioned, and keyed by schema fingerprint so a

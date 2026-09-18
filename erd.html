@@ -90,10 +90,25 @@
           <summary class="btn">Layout</summary>
           <div class="command-menu-panel export-actions" aria-label="ERD layout actions">
             <button class="menu-action primary-action" id="btn-erd-auto-arrange">Auto arrange</button>
+            <label class="opt erd-layout-direction">Direction
+              <select id="erd-layout-orientation">
+                <option value="auto">Auto</option>
+                <option value="LR">Left → right</option>
+                <option value="TB">Top → bottom</option>
+              </select>
+            </label>
+            <label class="opt erd-layout-direction">Spacing
+              <select id="erd-layout-density">
+                <option value="compact">Compact</option>
+                <option value="normal">Normal</option>
+                <option value="roomy">Roomy</option>
+              </select>
+            </label>
             <button class="menu-action" id="btn-erd-reset-layout">Reset to declaration order</button>
             <button class="menu-action" id="btn-erd-save-layout">Save layout to this browser</button>
             <button class="menu-action" id="btn-erd-restore-layout">Restore saved layout</button>
             <button class="menu-action" id="btn-erd-forget-layout">Forget saved layout</button>
+            <button class="menu-action" id="btn-erd-unpin-all">Unpin all</button>
             <input id="erd-layout-file-input" type="file" accept=".json,application/json" hidden>
             <button class="menu-action" id="btn-erd-export-layout">Export layout file</button>
             <button class="menu-action" id="btn-erd-import-layout">Import layout file</button>

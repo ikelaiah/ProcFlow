@@ -22,7 +22,7 @@ connection, sign-in, or installation is required.
 > database compiler. Treat diagrams as investigation aids and verify important
 > findings against the source SQL and target database.
 
-> **Trust model:** ProcFlow v2.0.0 asserts semantic relationships only where
+> **Trust model:** ProcFlow v2.3.0 asserts semantic relationships only where
 > static evidence supports them. Dynamic and ambiguous regions stay explicit.
 > See [Accuracy](docs/ACCURACY.md) and the [v2 accuracy contract](docs/V2_ACCURACY_CONTRACT.md).
 
@@ -42,7 +42,7 @@ connection, sign-in, or installation is required.
 
 ## Quick start
 
-1. Download the `v2.0.0` runtime ZIP from the [GitHub release](https://github.com/ikelaiah/ProcFlow/releases/tag/v2.0.0), or clone this repository.
+1. Download the `v2.3.0` runtime ZIP from the [GitHub release](https://github.com/ikelaiah/ProcFlow/releases/tag/v2.3.0), or clone this repository.
 2. Open `index.html` in a current Chromium, Firefox, or Edge browser.
 3. Paste SQL or import local files, select a dialect or **Auto**, and choose
    **Refresh**.
@@ -54,10 +54,14 @@ statements (T-SQL, PostgreSQL, DB2, or SQLite), and review the declared
 entities and foreign keys. Drag the canvas to pan, drag a table card to move it
 out of the way and declutter relationship lines, select a table to highlight
 its declared foreign keys and list each one with its column mapping and
-cardinality, and press **Clear** (or Escape) to deselect. The **Layout** menu
-arranges the whole estate deterministically (**Auto arrange**: referenced
+cardinality, and press **Clear** (or Escape) to deselect. A freshly parsed
+schema auto-arranges; edges anchor at the referenced column row and route
+orthogonally through card-free gutters, with crossings, direction (LR/TB/Auto),
+and spacing (Compact/Normal/Roomy) reported in the Layout menu. The **Layout**
+menu also arranges on demand (**Auto arrange**: referenced
 tables before referencing tables, views downstream of their `FROM`/`JOIN`
-sources), resets to declaration order, saves/restores the layout in this
+sources), resets to declaration order, pins tables so Auto arrange keeps their
+position (**Unpin all** clears them), saves/restores the layout in this
 browser (opt-in), and exports/imports a versioned layout file keyed by a schema
 fingerprint. Zoom controls under
 the canvas (or **Fit**) frame the whole estate; with a table selected, **Fit**
@@ -99,7 +103,7 @@ in the browser.
 
 ## Supported dialects
 
-ProcFlow v2.0.0 supports Microsoft T-SQL, IBM DB2 SQL PL, PostgreSQL
+ProcFlow v2.3.0 supports Microsoft T-SQL, IBM DB2 SQL PL, PostgreSQL
 PL/pgSQL, and SQLite. Detection is automatic but can be overridden. Vendor
 extensions outside these tested constructs may produce diagnostics or reduced
 coverage; see [Accuracy](docs/ACCURACY.md).
@@ -125,9 +129,9 @@ suite, and hostile labels are escaped for diagram/XML output. Read the full
 - [Release history](docs/RELEASES.md) — versioning and release notes.
 - [Changelog](CHANGELOG.md) — concise release history and current qualification
   status.
-- [v2.0.0 accuracy contract](docs/V2_ACCURACY_CONTRACT.md) — stable guarantees,
+- [v2 accuracy contract](docs/V2_ACCURACY_CONTRACT.md) — stable guarantees,
   semantics, compatibility, and qualification evidence.
-- [v2.0.0 release note](docs/releases/v2.0.0.md) — current release details.
+- [v2.3.0 release note](docs/releases/v2.3.0.md) — current release details.
 - [Roadmap](ROADMAP.md) — planned convergence work.
 
 ## Contributing
