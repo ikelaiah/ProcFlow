@@ -44,6 +44,29 @@ jobs:
             exit 1
           fi
 
+      - name: Verify the current release is referenced in the docs
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if ! grep -q "releases/tag/v${version}" README.md; then
+            echo "README.md quick start must link the current release (v${version})."
+            exit 1
+          fi
+          if ! grep -q "v${version} runtime ZIP" docs/USER_GUIDE.md; then
+            echo "docs/USER_GUIDE.md must reference the current release (v${version})."
+            exit 1
+          fi
+          if ! grep -q "v${version} is the current released version" docs/ACCURACY.md; then
+            echo "docs/ACCURACY.md must name the current release (v${version})."
+            exit 1
+          fi
+          for file in "docs/releases/v${version}.md" "docs/metrics-v${version}.json"; do
+            if [ ! -f "$file" ]; then
+              echo "Missing release artifact for v${version}: $file"
+              exit 1
+            fi
+          done
+
       - name: Locate Chromium
         shell: bash
         run: |

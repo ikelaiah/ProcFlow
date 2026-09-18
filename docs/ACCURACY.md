@@ -1,6 +1,6 @@
 # Accuracy and analysis contract
 
-ProcFlow v2.0.0 is the current released version. It is a deterministic
+ProcFlow v2.3.0 is the current released version. It is a deterministic
 heuristic analyser, not a database compiler, and does not execute SQL.
 Diagrams are investigation aids: verify material findings against the source
 and the target database.
@@ -36,7 +36,7 @@ SQL into a resolved dependency.
 
 ## Fixture evidence
 
-The current snapshot is [metrics-v2.0.0.json](metrics-v2.0.0.json). It covers
+The current snapshot is [metrics-v2.3.0.json](metrics-v2.3.0.json). It covers
 the historical golden and fuzz corpus, browser interaction, parity, layout,
 workspace, catalogue, column, column-flow, report, and report-graph suites.
 The v1.14 scale suite exercises 100 KB and 500 KB inputs, 100-object estates,

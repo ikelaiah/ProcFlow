@@ -6,7 +6,7 @@ SSRS/RDL report definition and renders an explorable diagram.
 
 ## First run
 
-1. Download the v2.0.0 runtime ZIP from the repository release, or clone the
+1. Download the v2.3.0 runtime ZIP from the repository release, or clone the
    repository for development.
 2. Open `index.html` in a current Chromium, Firefox, or Edge browser. The
    runtime does not require a server or a database connection.
