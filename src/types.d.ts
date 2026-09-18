@@ -1005,6 +1005,9 @@ interface ErdLayoutResult {
   height: number;
   orientation?: 'LR' | 'TB';
   crossings?: number;
+  /* Bands of columns, in reading order; used by the structured router to keep
+     edge paths inside card-free gutters. */
+  bands?: string[][][];
 }
 
 interface ErdLayoutFile {

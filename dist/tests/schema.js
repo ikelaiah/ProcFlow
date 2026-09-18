@@ -451,6 +451,38 @@
         record('v2.3.0 pinned entities hold their exact position without overlaps', false, String(err && err.stack || err));
         record('v2.3.0 unpinned layout ignores pin state', false, String(err && err.stack || err));
     }
+    try {
+        var densitySchema = parseSchema(PROCFLOW_ERD_SAMPLE_DB2);
+        var densitySizes = {};
+        densitySchema.entities.forEach(function (entity) { densitySizes[entity.id] = { w: 260, h: 140 }; });
+        var compactLayout = erdAutoLayout(densitySchema, densitySizes, { orientation: 'LR', density: 'compact' });
+        var normalLayout = erdAutoLayout(densitySchema, densitySizes, { orientation: 'LR', density: 'normal' });
+        var roomyLayout = erdAutoLayout(densitySchema, densitySizes, { orientation: 'LR', density: 'roomy' });
+        record('v2.3.0 spacing presets scale deterministically', compactLayout.width < normalLayout.width && normalLayout.width < roomyLayout.width &&
+            compactLayout.height < normalLayout.height && normalLayout.height < roomyLayout.height, { compact: [compactLayout.width, compactLayout.height],
+            normal: [normalLayout.width, normalLayout.height],
+            roomy: [roomyLayout.width, roomyLayout.height] });
+        record('v2.3.0 layout reports bands and isolates sourceless entities downstream', !!normalLayout.bands && normalLayout.bands.length >= 1 &&
+            normalLayout.columns[normalLayout.columns.length - 1].indexOf('SALES.APP_SETTINGS') >= 0, { bands: normalLayout.bands, columns: normalLayout.columns });
+        var chainLines = [];
+        for (var chainIndex = 1; chainIndex <= 300; chainIndex++) {
+            chainLines.push('CREATE TABLE app.t' + chainIndex + ' (', '  id INT NOT NULL,', '  ref_id INT,', '  CONSTRAINT pk_t' + chainIndex + ' PRIMARY KEY (id),', '  CONSTRAINT fk_t' + chainIndex + ' FOREIGN KEY (ref_id) REFERENCES app.t' +
+                (chainIndex === 1 ? 300 : chainIndex - 1) + ' (id)', ');');
+        }
+        var chainSchema = parseSchema(chainLines.join('\n'));
+        var chainSizes = {};
+        chainSchema.entities.forEach(function (entity) { chainSizes[entity.id] = { w: 200, h: 104 }; });
+        var chainLayout = erdAutoLayout(chainSchema, chainSizes, { orientation: 'LR' });
+        var chainBands = chainLayout.bands || [];
+        record('v2.3.0 wide chains wrap into multiple deterministic bands', chainBands.length > 1 &&
+            chainBands[0].length > 0 && chainBands[chainBands.length - 1].length > 0 &&
+            JSON.stringify(chainLayout) === JSON.stringify(erdAutoLayout(chainSchema, chainSizes, { orientation: 'LR' })), { bands: chainBands.length, columns: chainLayout.columns.length });
+    }
+    catch (err) {
+        record('v2.3.0 spacing presets scale deterministically', false, String(err && err.stack || err));
+        record('v2.3.0 layout reports bands and isolates sourceless entities downstream', false, String(err && err.stack || err));
+        record('v2.3.0 wide chains wrap into multiple deterministic bands', false, String(err && err.stack || err));
+    }
     /* ---- Mermaid erDiagram export ---- */
     try {
         var tm = toMermaidER(parseSchema(TSQL));

@@ -330,14 +330,18 @@ function erdOrientationScore(layout) {
 function erdAutoLayout(result, sizes, options) {
     var orientation = (options && options.orientation) || 'LR';
     var pinned = options && options.pinned;
+    var density = (options && options.density) || 'normal';
     if (orientation === 'auto') {
-        var lr = erdLayeredLayout(result, sizes, 'LR', pinned);
-        var tb = erdLayeredLayout(result, sizes, 'TB', pinned);
+        var lr = erdLayeredLayout(result, sizes, 'LR', pinned, density);
+        var tb = erdLayeredLayout(result, sizes, 'TB', pinned, density);
         return erdOrientationScore(tb) < erdOrientationScore(lr) ? tb : lr;
     }
-    return erdLayeredLayout(result, sizes, orientation, pinned);
+    return erdLayeredLayout(result, sizes, orientation, pinned, density);
 }
-function erdLayeredLayout(result, sizes, orientation, pinned) {
+function erdLayeredLayout(result, sizes, orientation, pinned, density) {
+    var metrics = density === 'compact' ? { gapX: 44, gapY: 32, bandGapY: 88, rows: 18, band: 16 }
+        : density === 'roomy' ? { gapX: 110, gapY: 84, bandGapY: 220, rows: 10, band: 8 }
+            : { gapX: 72, gapY: 56, bandGapY: 140, rows: 14, band: 12 };
     var transposed = orientation === 'TB';
     if (transposed) {
         var swapped = {};
@@ -423,10 +427,15 @@ function erdLayeredLayout(result, sizes, orientation, pinned) {
     }
     var maxLayer = 0;
     layer.forEach(function (value) { maxLayer = Math.max(maxLayer, value); });
-    /* Views with no declared sources sit in their own downstream band. */
+    /* Views with no declared sources and isolated tables sit in their own
+       downstream band instead of crowding the root column. */
     entities.forEach(function (entity, index) {
-        if (entity.kind === 'view' && !parents[index].length)
+        if (!parents[index].length && !children[index].length) {
             layer[index] = maxLayer + 1;
+        }
+        else if (entity.kind === 'view' && !parents[index].length) {
+            layer[index] = maxLayer + 1;
+        }
     });
     var distinct = [];
     layer.forEach(function (value) { if (distinct.indexOf(value) < 0)
@@ -481,7 +490,7 @@ function erdLayeredLayout(result, sizes, orientation, pinned) {
     /* Tall columns are chunked before banding: a 799-leaf fan becomes a readable
        grid instead of one 128,000-pixel column. Chunks stay in the same layer,
        so declared parent→child order is preserved. */
-    var maxRowsPerColumn = 14;
+    var maxRowsPerColumn = metrics.rows;
     var chunkedOrder = [];
     order.forEach(function (column) {
         if (column.length <= maxRowsPerColumn) {
@@ -497,11 +506,14 @@ function erdLayeredLayout(result, sizes, orientation, pinned) {
     /* Wide estates wrap into bands (snake layout): a 800-long chain becomes a
        readable grid instead of one 200,000-pixel line. Bands are deterministic
        and keep parent→child order inside each band. */
-    var gapX = 72, gapY = 56, bandGapY = 140, maxColumnsPerBand = 12;
+    var gapX = metrics.gapX, gapY = metrics.gapY, bandGapY = metrics.bandGapY;
+    var maxColumnsPerBand = metrics.band;
     var positions = {}, placedColumns = [];
+    var bands = [];
     var bandStart = 0, bandY = 0;
     while (bandStart < columnCountExpanded) {
         var bandEnd = Math.min(columnCountExpanded, bandStart + maxColumnsPerBand);
+        var bandColumns = [];
         var localWidth = [], localHeight = [];
         for (var bandColumn = bandStart; bandColumn < bandEnd; bandColumn++) {
             var widthMax = 0, heightSum = 0;
@@ -529,8 +541,10 @@ function erdLayeredLayout(result, sizes, orientation, pinned) {
                 y += size.h;
             });
             placedColumns.push(ids);
+            bandColumns.push(ids);
             x += localWidth[local] + gapX;
         }
+        bands.push(bandColumns);
         bandY += bandTallest + bandGapY;
         bandStart = bandEnd;
     }
@@ -547,7 +561,7 @@ function erdLayeredLayout(result, sizes, orientation, pinned) {
             pinnedWork[id] = transposed ? { x: position.y, y: position.x }
                 : { x: position.x, y: position.y };
         });
-        erdApplyPins(positions, idsInOrder, sizes, pinnedWork, gapY);
+        erdApplyPins(positions, idsInOrder, sizes, pinnedWork, metrics.gapY);
     }
     var width = 0, height = 0;
     Object.keys(positions).forEach(function (id) {
@@ -561,10 +575,10 @@ function erdLayeredLayout(result, sizes, orientation, pinned) {
             flipped[id] = { x: positions[id].y, y: positions[id].x };
         });
         return { positions: flipped, columns: placedColumns, width: height, height: width,
-            orientation: 'TB', crossings: crossings };
+            orientation: 'TB', crossings: crossings, bands: bands };
     }
     return { positions: positions, columns: placedColumns, width: width, height: height,
-        orientation: 'LR', crossings: crossings };
+        orientation: 'LR', crossings: crossings, bands: bands };
 }
 /* Layout files are explicit, versioned, and keyed by schema fingerprint so a
    stale layout cannot silently mismatch a changed schema. */

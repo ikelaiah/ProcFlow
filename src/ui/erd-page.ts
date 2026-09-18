@@ -28,6 +28,11 @@
   var cardSizes: Record<string, ErdLayoutSize>={};
   var layoutKind: 'default' | 'auto' | 'manual'='default';
   var layoutOrientation: 'auto' | 'LR' | 'TB'='auto';
+  var layoutOrientationUsed: 'LR' | 'TB'='LR';
+  var layoutDensity: 'compact' | 'normal' | 'roomy'='normal';
+  var layoutBands: string[][][]=[];
+  var columnOf: Record<string, number>={};
+  var bandOf: Record<string, number>={};
   var pinned: StringSet={};
   var stageWidth=0, stageHeight=0;
   var overlayRaf=0;
@@ -366,7 +371,8 @@
     if(!Object.keys(cardPositions).length&&result.entities.length){
       /* First parse of a schema auto-arranges; Reset returns to declaration
          order, and any drag, restore, or import switches to manual. */
-      var firstLayout=erdAutoLayout(result,cardSizes,{orientation:layoutOrientation});
+      var firstLayout=erdAutoLayout(result,cardSizes,
+        {orientation:layoutOrientation,density:layoutDensity});
       applyLayout(firstLayout,'auto');
       layoutStatus('Auto-arranged '+result.entities.length+' entities \u00b7 '+
         (firstLayout.crossings||0)+' crossings \u00b7 '+(firstLayout.orientation||'LR')+
@@ -457,9 +463,25 @@
     });
   }
 
+  function setLayoutGeometry(layout: ErdLayoutResult): void {
+    layoutBands=layout.bands||[];
+    layoutOrientationUsed=layout.orientation||'LR';
+    columnOf={};
+    bandOf={};
+    layoutBands.forEach(function(band,bandIndex){
+      band.forEach(function(column,columnIndex){
+        column.forEach(function(id){
+          columnOf[id]=columnIndex;
+          bandOf[id]=bandIndex;
+        });
+      });
+    });
+  }
+
   function applyLayout(layout: ErdLayoutResult, kind: 'default' | 'auto' | 'manual'): void {
     cardPositions=layout.positions;
     layoutKind=kind;
+    setLayoutGeometry(layout);
     applyPositions();
     scheduleOverlay();
   }
@@ -487,11 +509,12 @@
   function autoArrange(): void {
     if(!result) return;
     var pins=pinnedPositions();
-    var layout=erdAutoLayout(result,cardSizes,{orientation:layoutOrientation,pinned:pins});
+    var layout=erdAutoLayout(result,cardSizes,
+      {orientation:layoutOrientation,density:layoutDensity,pinned:pins});
     applyLayout(layout,'auto');
     layoutStatus('Auto-arranged '+result.entities.length+' entities \u00b7 '+
       (layout.crossings||0)+' crossing'+((layout.crossings||0)===1?'':'s')+
-      ' \u00b7 '+(layout.orientation||'LR')+
+      ' \u00b7 '+(layout.orientation||'LR')+' \u00b7 '+layoutDensity+
       (Object.keys(pins).length?' \u00b7 '+Object.keys(pins).length+' pinned':'')+'.');
   }
 
@@ -687,6 +710,116 @@
     return 'around';
   }
 
+  function routeFromPoints(points: Array<{x: number; y: number}>):
+      {d: string; labelAt: {x: number; y: number}[]; midAt: {x: number; y: number}} {
+    var d='M '+points[0].x+' '+points[0].y;
+    for(var i=1;i<points.length;i++) d+=' L '+points[i].x+' '+points[i].y;
+    function along(a: {x: number; y: number}, b: {x: number; y: number},
+                   distance: number): {x: number; y: number} {
+      var dx=b.x-a.x, dy=b.y-a.y;
+      var length=Math.sqrt(dx*dx+dy*dy)||1;
+      return {x:a.x+dx/length*distance,y:a.y+dy/length*distance};
+    }
+    var last=points.length-1, middle=Math.floor(last/2);
+    return {d:d,
+            labelAt:[along(points[0],points[1],16),along(points[last],points[last-1],16)],
+            midAt:{x:(points[middle].x+points[middle+1].x)/2,
+                   y:(points[middle].y+points[middle+1].y)/2}};
+  }
+
+  /* Card-safe routing for auto layouts: every bend travels in the card-free
+     gutters between layout columns, or in the horizontal corridor between
+     bands, so edge paths cannot cross an entity card. Manual layouts fall
+     back to the best-effort router. */
+  function structuredRoute(rel: SchemaRelationship, from: ErdBox, to: ErdBox,
+                           stagger: number,
+                           bandExtents: Array<{left: number[]; right: number[];
+                                               top: number; bottom: number}>):
+      {d: string; labelAt: {x: number; y: number}[]; midAt: {x: number; y: number}} | null {
+    if(layoutOrientationUsed!=='LR'||layoutKind==='manual'||!layoutBands.length){
+      return null;
+    }
+    var bandA=bandOf[rel.fromId], bandB=bandOf[rel.toId];
+    if(bandA===undefined||bandB===undefined) return null;
+    var colA=columnOf[rel.fromId], colB=columnOf[rel.toId];
+    if(colA===undefined||colB===undefined) return null;
+    var fromY=portAt(rel.fromId,from,rel.fromColumns[0]);
+    var toY=portAt(rel.toId,to,rel.toColumns[0]);
+    function rightGutterSafe(ext: {left: number[]; right: number[]},
+                             column: number): number {
+      var raw=ext.right[column]+24+stagger;
+      if(column+1<ext.left.length){
+        raw=Math.min(raw,(ext.right[column]+ext.left[column+1])/2);
+      }
+      return raw;
+    }
+    var points: Array<{x: number; y: number}>=[];
+    if(bandA===bandB){
+      var ext=bandExtents[bandA];
+      if(!ext) return null;
+      if(colB===colA+1){
+        var rightGutter=(ext.right[colA]+ext.left[colB])/2+stagger;
+        points=[{x:from.right,y:fromY},{x:rightGutter,y:fromY},
+                {x:rightGutter,y:toY},{x:to.left,y:toY}];
+      } else if(colB===colA-1){
+        var leftGutter=(ext.right[colB]+ext.left[colA])/2-stagger;
+        points=[{x:from.left,y:fromY},{x:leftGutter,y:fromY},
+                {x:leftGutter,y:toY},{x:to.right,y:toY}];
+      } else {
+        /* Same column or skipped columns: travel in the card-free right
+           gutters and use the corridor below the band, so the path never
+           crosses an intermediate column or negative canvas space. */
+        var bandCorridor=(bandA+1<bandExtents.length)
+          ?(ext.bottom+bandExtents[bandA+1].top)/2
+          :ext.bottom+24;
+        var gutterFrom=rightGutterSafe(ext,colA);
+        var gutterTo=rightGutterSafe(ext,colB);
+        points=[{x:from.right,y:fromY},
+                {x:gutterFrom,y:fromY},
+                {x:gutterFrom,y:bandCorridor},
+                {x:gutterTo,y:bandCorridor},
+                {x:gutterTo,y:toY},
+                {x:to.right,y:toY}];
+      }
+    } else {
+      var extA=bandExtents[bandA], extB=bandExtents[bandB];
+      if(!extA||!extB) return null;
+      var delta=bandB-bandA;
+      var gutterA=rightGutterSafe(extA,colA);
+      var gutterB=rightGutterSafe(extB,colB);
+      if(delta===1||delta===-1){
+        var corridorY=delta===1?(extA.bottom+extB.top)/2:(extB.bottom+extA.top)/2;
+        points=[{x:from.right,y:fromY},
+                {x:gutterA,y:fromY},
+                {x:gutterA,y:corridorY},
+                {x:gutterB,y:corridorY},
+                {x:gutterB,y:toY},
+                {x:to.right,y:toY}];
+      } else {
+        /* Non-adjacent bands: run long horizontal segments only through band
+           gaps, connect them with a vertical channel outside all cards. */
+        var gapA=delta>0?(extA.bottom+bandExtents[bandA+1].top)/2
+                         :(bandExtents[bandA-1].bottom+extA.top)/2;
+        var gapB=delta>0?(bandExtents[bandB-1].bottom+extB.top)/2
+                         :(extB.bottom+bandExtents[bandB+1].top)/2;
+        var outerX=0;
+        bandExtents.forEach(function(band){
+          band.right.forEach(function(right){ outerX=Math.max(outerX,right); });
+        });
+        outerX+=40+stagger;
+        points=[{x:from.right,y:fromY},
+                {x:gutterA,y:fromY},
+                {x:gutterA,y:gapA},
+                {x:outerX,y:gapA},
+                {x:outerX,y:gapB},
+                {x:gutterB,y:gapB},
+                {x:gutterB,y:toY},
+                {x:to.right,y:toY}];
+      }
+    }
+    return routeFromPoints(points);
+  }
+
   function orthogonalRoute(rel: SchemaRelationship, from: ErdBox, to: ErdBox,
                            stagger: number):
       {d: string; labelAt: {x: number; y: number}[]; midAt: {x: number; y: number}} {
@@ -717,17 +850,7 @@
               {x:aroundX,y:toY},
               {x:to.right,y:toY}];
     }
-    var d='M '+points[0].x+' '+points[0].y;
-    for(var i=1;i<points.length;i++) d+=' L '+points[i].x+' '+points[i].y;
-    function along(a: {x: number; y: number}, b: {x: number; y: number},
-                   distance: number): {x: number; y: number} {
-      var dx=b.x-a.x, dy=b.y-a.y;
-      var length=Math.sqrt(dx*dx+dy*dy)||1;
-      return {x:a.x+dx/length*distance,y:a.y+dy/length*distance};
-    }
-    return {d:d,
-            labelAt:[along(points[0],points[1],16),along(points[3],points[2],16)],
-            midAt:{x:(points[1].x+points[2].x)/2,y:(points[1].y+points[2].y)/2}};
+    return routeFromPoints(points);
   }
 
   function drawOverlay(): void {
@@ -744,6 +867,30 @@
     function boxOf(id: string): ErdBox | null {
       if(!(id in boxCache)) boxCache[id]=entityBox(id);
       return boxCache[id];
+    }
+    var bandExtents: Array<{left: number[]; right: number[];
+                            top: number; bottom: number}>=[];
+    if(layoutBands.length){
+      layoutBands.forEach(function(band){
+        var lefts: number[]=[], rights: number[]=[];
+        var top=Infinity, bottom=-Infinity;
+        band.forEach(function(column,columnIndex){
+          var left=Infinity, right=-Infinity;
+          column.forEach(function(id){
+            var box=boxOf(id);
+            if(!box) return;
+            left=Math.min(left,box.left);
+            right=Math.max(right,box.right);
+            top=Math.min(top,box.top);
+            bottom=Math.max(bottom,box.bottom);
+          });
+          lefts[columnIndex]=left===Infinity?0:left;
+          rights[columnIndex]=right===-Infinity?0:right;
+        });
+        bandExtents.push({left:lefts,right:rights,
+                          top:top===Infinity?0:top,
+                          bottom:bottom===-Infinity?0:bottom});
+      });
     }
     var bundleCounts: Record<string, number>={};
     result.relationships.forEach(function(rel){
@@ -769,7 +916,8 @@
           midAt:{x:loopX+40,y:(startY+endY)/2}
         };
       } else {
-        routed=orthogonalRoute(rel,from,to,stagger);
+        routed=structuredRoute(rel,from,to,stagger,bandExtents)||
+               orthogonalRoute(rel,from,to,stagger);
       }
       var d=routed.d, labelAt=routed.labelAt, midAt=routed.midAt;
       var path=svgEl('path',{d:d,fill:'none',stroke:color,
@@ -987,6 +1135,15 @@
       layoutOrientation=orientationSelect.value as 'auto' | 'LR' | 'TB';
       if(layoutKind==='auto') autoArrange();
       else layoutStatus('Direction '+layoutOrientation+': press Auto arrange to apply.');
+    });
+  }
+  var densitySelect=$('erd-layout-density');
+  if(densitySelect){
+    layoutDensity=densitySelect.value as 'compact' | 'normal' | 'roomy';
+    densitySelect.addEventListener('change',function(){
+      layoutDensity=densitySelect.value as 'compact' | 'normal' | 'roomy';
+      if(layoutKind==='auto') autoArrange();
+      else layoutStatus('Spacing '+layoutDensity+': press Auto arrange to apply.');
     });
   }
   var unpinAll=$('btn-erd-unpin-all');
