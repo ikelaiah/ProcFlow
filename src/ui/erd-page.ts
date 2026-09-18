@@ -27,6 +27,8 @@
   var cardPositions: Record<string, ErdLayoutPosition>={};
   var cardSizes: Record<string, ErdLayoutSize>={};
   var layoutKind: 'default' | 'auto' | 'manual'='default';
+  var layoutOrientation: 'auto' | 'LR' | 'TB'='auto';
+  var pinned: StringSet={};
   var stageWidth=0, stageHeight=0;
   var overlayRaf=0;
 
@@ -72,7 +74,8 @@
   function buildCard(entity: SchemaEntity): HTMLElement {
     var card=document.createElement('article');
     card.className='erd-card'+(entity.unresolved?' unresolved':'')+
-      (entity.kind==='view'?' erd-view':'')+(compactMode?' compact':'');
+      (entity.kind==='view'?' erd-view':'')+(compactMode?' compact':'')+
+      (pinned[entity.id]?' pinned':'');
     card.setAttribute('data-entity-id',entity.id);
     var head=document.createElement('header');
     var kind=document.createElement('span');
@@ -90,6 +93,27 @@
       badge.textContent=String(count);
       head.appendChild(badge);
     }
+    var pin=document.createElement('button');
+    pin.type='button';
+    pin.className='erd-pin'+(pinned[entity.id]?' pinned':'');
+    pin.textContent='\u25C6';
+    pin.title=pinned[entity.id]?'Unpin position (Auto arrange may move it)'
+                               :'Pin position (Auto arrange keeps it)';
+    pin.addEventListener('click',function(event: MouseEvent){
+      event.stopPropagation();
+      if(pinned[entity.id]){
+        delete pinned[entity.id];
+        layoutStatus('Unpinned '+entity.name+'.');
+      } else {
+        pinned[entity.id]=1;
+        layoutStatus('Pinned '+entity.name+' \u00b7 Auto arrange keeps this position.');
+      }
+      pin.classList.toggle('pinned',!!pinned[entity.id]);
+      pin.title=pinned[entity.id]?'Unpin position (Auto arrange may move it)'
+                                 :'Pin position (Auto arrange keeps it)';
+      card.classList.toggle('pinned',!!pinned[entity.id]);
+    });
+    head.appendChild(pin);
     card.appendChild(head);
     if(compactMode){
       var summary=document.createElement('p');
@@ -103,6 +127,7 @@
         var frag=document.createDocumentFragment();
         entity.columns.forEach(function(column){
           var row=document.createElement('li');
+          row.setAttribute('data-column',column.name);
           var name=document.createElement('span');
           name.className='erd-col-name';
           name.textContent=column.name;
@@ -341,9 +366,11 @@
     if(!Object.keys(cardPositions).length&&result.entities.length){
       /* First parse of a schema auto-arranges; Reset returns to declaration
          order, and any drag, restore, or import switches to manual. */
-      applyLayout(erdAutoLayout(result,cardSizes),'auto');
-      layoutStatus('Auto-arranged '+result.entities.length+
-        ' entities \u00b7 Reset layout for declaration order.');
+      var firstLayout=erdAutoLayout(result,cardSizes,{orientation:layoutOrientation});
+      applyLayout(firstLayout,'auto');
+      layoutStatus('Auto-arranged '+result.entities.length+' entities \u00b7 '+
+        (firstLayout.crossings||0)+' crossings \u00b7 '+(firstLayout.orientation||'LR')+
+        ' \u00b7 Reset layout for declaration order.');
     } else {
       placeMissingEntities();
       applyPositions();
@@ -416,17 +443,6 @@
             cx:left+r.width/2,cy:top+r.height/2};
   }
 
-  /* Intersection of the line from a box centre toward (tx, ty) with the box
-     edge, so relationship lines stop at the entity border. */
-  function edgePoint(box: ErdBox, tx: number, ty: number): {x: number; y: number} {
-    var dx=tx-box.cx, dy=ty-box.cy;
-    if(!dx&&!dy) return {x:box.cx,y:box.cy};
-    var sx=dx?Math.abs((box.right-box.left)/2/dx):Infinity;
-    var sy=dy?Math.abs((box.bottom-box.top)/2/dy):Infinity;
-    var s=Math.min(sx,sy);
-    return {x:box.cx+dx*s,y:box.cy+dy*s};
-  }
-
   function svgEl(name: string, attrs?: Record<string, string|number>): SVGElement {
     var el=document.createElementNS('http://www.w3.org/2000/svg',name);
     if(attrs) Object.keys(attrs).forEach(function(k){ el.setAttribute(k,String(attrs[k])); });
@@ -450,14 +466,33 @@
 
   function defaultLayout(): void {
     if(!result) return;
+    pinned={};
+    Object.keys(cardEls).forEach(function(id){
+      cardEls[id].classList.remove('pinned');
+      var pin=cardEls[id].querySelector('.erd-pin');
+      if(pin) pin.classList.remove('pinned');
+    });
     applyLayout(erdDefaultLayout(result,cardSizes),'default');
-    layoutStatus('Default declaration-order layout.');
+    layoutStatus('Declaration-order layout \u00b7 pins cleared.');
+  }
+
+  function pinnedPositions(): Record<string, ErdLayoutPosition> {
+    var positions: Record<string, ErdLayoutPosition>={};
+    Object.keys(pinned).forEach(function(id){
+      if(cardPositions[id]) positions[id]=cardPositions[id];
+    });
+    return positions;
   }
 
   function autoArrange(): void {
     if(!result) return;
-    applyLayout(erdAutoLayout(result,cardSizes),'auto');
-    layoutStatus('Auto-arranged '+result.entities.length+' entities (declared keys only).');
+    var pins=pinnedPositions();
+    var layout=erdAutoLayout(result,cardSizes,{orientation:layoutOrientation,pinned:pins});
+    applyLayout(layout,'auto');
+    layoutStatus('Auto-arranged '+result.entities.length+' entities \u00b7 '+
+      (layout.crossings||0)+' crossing'+((layout.crossings||0)===1?'':'s')+
+      ' \u00b7 '+(layout.orientation||'LR')+
+      (Object.keys(pins).length?' \u00b7 '+Object.keys(pins).length+' pinned':'')+'.');
   }
 
   function layoutStatus(text: string): void {
@@ -614,6 +649,87 @@
     canvas.scrollTop=(minY+maxY)/2*ratio-canvas.clientHeight/2;
   }
 
+  /* v2.3.0 — port-anchored orthogonal routing. Edges leave the card at the row
+     of the referenced column and travel in the gutter between columns, with a
+     per-parent stagger so hub fan-outs read as a bundle. */
+  function portOffset(entityId: string, box: ErdBox,
+                      columnName: string | undefined): number {
+    if(!columnName) return box.cy;
+    var card=cardEls[entityId];
+    if(!card) return box.cy;
+    var rows=card.querySelectorAll('.erd-cols li[data-column]');
+    for(var i=0;i<rows.length;i++){
+      if(rows[i].getAttribute('data-column')===columnName){
+        var rowRect=rows[i].getBoundingClientRect();
+        var cardRect=card.getBoundingClientRect();
+        return box.top+(rowRect.top+rowRect.height/2-cardRect.top);
+      }
+    }
+    return box.cy;
+  }
+
+  var portCache: Record<string, number>={};
+
+  function portAt(entityId: string, box: ErdBox, columnName: string | undefined): number {
+    if(!columnName) return box.cy;
+    var key=entityId+'|'+columnName;
+    if(portCache[key]===undefined){
+      portCache[key]=portOffset(entityId,box,columnName);
+    }
+    return portCache[key];
+  }
+
+  function edgeDirection(from: ErdBox, to: ErdBox): 'right' | 'left' | 'down' | 'up' | 'around' {
+    if(to.left-from.right>=8) return 'right';
+    if(from.left-to.right>=8) return 'left';
+    if(to.top-from.bottom>=8) return 'down';
+    if(from.top-to.bottom>=8) return 'up';
+    return 'around';
+  }
+
+  function orthogonalRoute(rel: SchemaRelationship, from: ErdBox, to: ErdBox,
+                           stagger: number):
+      {d: string; labelAt: {x: number; y: number}[]; midAt: {x: number; y: number}} {
+    var fromY=portAt(rel.fromId,from,rel.fromColumns[0]);
+    var toY=portAt(rel.toId,to,rel.toColumns[0]);
+    var direction=edgeDirection(from,to);
+    var points: Array<{x: number; y: number}>=[];
+    if(direction==='right'||direction==='left'){
+      var right=direction==='right';
+      var gx=right?(from.right+to.left)/2+stagger
+                   :(to.right+from.left)/2-stagger;
+      points=[{x:right?from.right:from.left,y:fromY},
+              {x:gx,y:fromY},
+              {x:gx,y:toY},
+              {x:right?to.left:to.right,y:toY}];
+    } else if(direction==='down'||direction==='up'){
+      var down=direction==='down';
+      var gy=down?(from.bottom+to.top)/2+stagger
+                  :(to.bottom+from.top)/2-stagger;
+      points=[{x:from.cx,y:down?from.bottom:from.top},
+              {x:from.cx,y:gy},
+              {x:to.cx,y:gy},
+              {x:to.cx,y:down?to.top:to.bottom}];
+    } else {
+      var aroundX=Math.max(from.right,to.right)+30+stagger;
+      points=[{x:from.right,y:fromY},
+              {x:aroundX,y:fromY},
+              {x:aroundX,y:toY},
+              {x:to.right,y:toY}];
+    }
+    var d='M '+points[0].x+' '+points[0].y;
+    for(var i=1;i<points.length;i++) d+=' L '+points[i].x+' '+points[i].y;
+    function along(a: {x: number; y: number}, b: {x: number; y: number},
+                   distance: number): {x: number; y: number} {
+      var dx=b.x-a.x, dy=b.y-a.y;
+      var length=Math.sqrt(dx*dx+dy*dy)||1;
+      return {x:a.x+dx/length*distance,y:a.y+dy/length*distance};
+    }
+    return {d:d,
+            labelAt:[along(points[0],points[1],16),along(points[3],points[2],16)],
+            midAt:{x:(points[1].x+points[2].x)/2,y:(points[1].y+points[2].y)/2}};
+  }
+
   function drawOverlay(): void {
     if(!overlay||!canvas||!result) return;
     while(overlay.firstChild) overlay.removeChild(overlay.firstChild);
@@ -623,11 +739,13 @@
     overlay.setAttribute('height',String(height));
     overlay.setAttribute('viewBox','0 0 '+width+' '+height);
     cachedCanvasRect=canvas.getBoundingClientRect();
+    portCache={};
     var boxCache: Record<string, ErdBox | null>={};
     function boxOf(id: string): ErdBox | null {
       if(!(id in boxCache)) boxCache[id]=entityBox(id);
       return boxCache[id];
     }
+    var bundleCounts: Record<string, number>={};
     result.relationships.forEach(function(rel){
       var from=boxOf(rel.fromId), to=boxOf(rel.toId);
       if(!from||!to) return;
@@ -636,25 +754,28 @@
       var dash=rel.resolution==='exact'?'':(rel.resolution==='heuristic'?'7 4':'2 4');
       var color=rel.resolution==='opaque'?'#e4645e':
         (rel.resolution==='heuristic'?'#e8a33d':'#7ea6e0');
-      var d: string, labelAt: {x: number; y: number}[], midAt: {x: number; y: number};
+      var bundle=bundleCounts[rel.fromId]||0;
+      bundleCounts[rel.fromId]=bundle+1;
+      var stagger=(bundle%6)*6;
+      var routed: {d: string; labelAt: {x: number; y: number}[]; midAt: {x: number; y: number}};
       if(rel.fromId===rel.toId){
-        var loopX=from.right+10, loopY=from.cy;
-        d='M '+from.right+' '+(from.top+14)+' C '+(loopX+34)+' '+(from.top-14)+', '+
-          (loopX+34)+' '+(from.bottom+14)+', '+from.right+' '+(from.bottom-14);
-        labelAt=[{x:loopX+30,y:from.top+6},{x:loopX+30,y:from.bottom-4}];
-        midAt={x:loopX+34,y:loopY};
+        var startY=portAt(rel.fromId,from,rel.fromColumns[0]);
+        var endY=portAt(rel.toId,to,rel.toColumns[0]);
+        var loopX=from.right+10+stagger;
+        routed={
+          d:'M '+from.right+' '+startY+' C '+(loopX+40)+' '+(startY-24)+', '+
+            (loopX+40)+' '+(endY+24)+', '+from.right+' '+endY,
+          labelAt:[{x:loopX+34,y:startY-12},{x:loopX+34,y:endY+12}],
+          midAt:{x:loopX+40,y:(startY+endY)/2}
+        };
       } else {
-        var p1=edgePoint(from,to.cx,to.cy), p2=edgePoint(to,from.cx,from.cy);
-        var midX=(p1.x+p2.x)/2;
-        d='M '+p1.x+' '+p1.y+' C '+midX+' '+p1.y+', '+midX+' '+p2.y+', '+p2.x+' '+p2.y;
-        labelAt=[{x:p1.x+(p2.x-p1.x)*0.16,y:p1.y+(p2.y-p1.y)*0.16},
-                 {x:p1.x+(p2.x-p1.x)*0.84,y:p1.y+(p2.y-p1.y)*0.84}];
-        midAt={x:midX,y:(p1.y+p2.y)/2};
+        routed=orthogonalRoute(rel,from,to,stagger);
       }
+      var d=routed.d, labelAt=routed.labelAt, midAt=routed.midAt;
       var path=svgEl('path',{d:d,fill:'none',stroke:color,
         'stroke-width':active&&connected?2.6:(connected?2:1.4),
         'stroke-dasharray':dash,opacity:active?(connected?0.95:0.07):0.95,
-        'stroke-linecap':'round'});
+        'stroke-linecap':'round','stroke-linejoin':'round'});
       path.setAttribute('data-relationship',rel.id);
       overlay.appendChild(path);
       if(!active||connected){
@@ -827,7 +948,7 @@
     compactTouched=true;
     compactMode=!!compactInput.checked;
     renderCards();
-    if(layoutKind==='auto'&&result) applyLayout(erdAutoLayout(result,cardSizes),'auto');
+    if(layoutKind==='auto'&&result) autoArrange();
     else if(layoutKind==='default'&&result) applyLayout(erdDefaultLayout(result,cardSizes),'default');
     else layoutStatus('Box sizes changed; use Auto arrange to re-pack.');
     applyFind(false);
@@ -858,6 +979,25 @@
     var files=Array.prototype.slice.call(layoutFileInput.files||[]);
     if(files.length) importLayoutFile(files[0]);
     layoutFileInput.value='';
+  });
+  var orientationSelect=$('erd-layout-orientation');
+  if(orientationSelect){
+    layoutOrientation=orientationSelect.value as 'auto' | 'LR' | 'TB';
+    orientationSelect.addEventListener('change',function(){
+      layoutOrientation=orientationSelect.value as 'auto' | 'LR' | 'TB';
+      if(layoutKind==='auto') autoArrange();
+      else layoutStatus('Direction '+layoutOrientation+': press Auto arrange to apply.');
+    });
+  }
+  var unpinAll=$('btn-erd-unpin-all');
+  if(unpinAll) unpinAll.addEventListener('click',function(){
+    pinned={};
+    Object.keys(cardEls).forEach(function(id){
+      cardEls[id].classList.remove('pinned');
+      var marker=cardEls[id].querySelector('.erd-pin');
+      if(marker) marker.classList.remove('pinned');
+    });
+    layoutStatus('All positions unpinned.');
   });
   var zoomOut=$('erd-z-out');
   if(zoomOut) zoomOut.addEventListener('click',function(){ zoomBy(1/1.15); });

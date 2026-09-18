@@ -1003,6 +1003,8 @@ interface ErdLayoutResult {
   columns: string[][];
   width: number;
   height: number;
+  orientation?: 'LR' | 'TB';
+  crossings?: number;
 }
 
 interface ErdLayoutFile {

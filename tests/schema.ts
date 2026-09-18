@@ -449,6 +449,61 @@
     record('v2.2.0 auto layout stays deterministic and overlap-free at 300 tables',false,String(err&&err.stack||err));
   }
 
+  try{
+    var orientSchema=parseSchema(PROCFLOW_ERD_SAMPLE_DB2);
+    var orientSizes: Record<string, ErdLayoutSize>={};
+    orientSchema.entities.forEach(function(entity){ orientSizes[entity.id]={w:260,h:140}; });
+    var lrLayout=erdAutoLayout(orientSchema,orientSizes,{orientation:'LR'});
+    var tbLayout=erdAutoLayout(orientSchema,orientSizes,{orientation:'TB'});
+    var autoOrient=erdAutoLayout(orientSchema,orientSizes,{orientation:'auto'});
+    record('v2.3.0 LR/TB orientation keeps parent→child order and joins crossings',
+      lrLayout.orientation==='LR'&&tbLayout.orientation==='TB'&&
+        lrLayout.crossings===0&&tbLayout.crossings===0&&
+        lrLayout.positions['SALES.DEPARTMENT'].x<lrLayout.positions['SALES.EMPLOYEE'].x&&
+        tbLayout.positions['SALES.DEPARTMENT'].y<tbLayout.positions['SALES.EMPLOYEE'].y&&
+        (autoOrient.orientation==='LR'||autoOrient.orientation==='TB')&&
+        JSON.stringify(autoOrient)===
+          JSON.stringify(erdAutoLayout(orientSchema,orientSizes,{orientation:'auto'})),
+      {lr:lrLayout.crossings,tb:tbLayout.crossings,auto:autoOrient.orientation});
+  }catch(err){
+    record('v2.3.0 LR/TB orientation keeps parent→child order and joins crossings',false,String(err&&err.stack||err));
+  }
+
+  try{
+    var pinSchema=parseSchema(TSQL);
+    var pinSizes: Record<string, ErdLayoutSize>={};
+    pinSchema.entities.forEach(function(entity){ pinSizes[entity.id]={w:260,h:140}; });
+    var pinnedPositions: Record<string, ErdLayoutPosition>={};
+    pinnedPositions['DBO.ENROLLMENT']={x:5000,y:5000};
+    var pinnedLayout=erdAutoLayout(pinSchema,pinSizes,
+      {orientation:'LR',pinned:pinnedPositions});
+    var pinOverlap=0;
+    var pinIds=Object.keys(pinnedLayout.positions);
+    for(var pinA=0;pinA<pinIds.length&&pinOverlap===0;pinA++){
+      for(var pinB=pinA+1;pinB<pinIds.length;pinB++){
+        var pA=pinnedLayout.positions[pinIds[pinA]];
+        var pB=pinnedLayout.positions[pinIds[pinB]];
+        if(pA.x<pB.x+260&&pB.x<pA.x+260&&pA.y<pB.y+140&&pB.y<pA.y+140){
+          pinOverlap=1;
+          break;
+        }
+      }
+    }
+    var held=pinnedLayout.positions['DBO.ENROLLMENT'];
+    record('v2.3.0 pinned entities hold their exact position without overlaps',
+      !!held&&held.x===5000&&held.y===5000&&pinOverlap===0&&
+        pinnedLayout.positions['DBO.STUDENT'].x!==5000,
+      {held:held,overlap:pinOverlap});
+    var unpinnedLayout=erdAutoLayout(pinSchema,pinSizes,{orientation:'LR'});
+    record('v2.3.0 unpinned layout ignores pin state',
+      !!unpinnedLayout.positions['DBO.ENROLLMENT']&&
+        unpinnedLayout.positions['DBO.ENROLLMENT'].x!==5000,
+      unpinnedLayout.positions['DBO.ENROLLMENT']);
+  }catch(err){
+    record('v2.3.0 pinned entities hold their exact position without overlaps',false,String(err&&err.stack||err));
+    record('v2.3.0 unpinned layout ignores pin state',false,String(err&&err.stack||err));
+  }
+
   /* ---- Mermaid erDiagram export ---- */
   try{
     var tm=toMermaidER(parseSchema(TSQL));
