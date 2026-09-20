@@ -5,8 +5,9 @@ on the table cards, and a floating window shows the SQL, the join plan, and
 anything the declared DDL cannot connect. This document explains how the plan
 is chosen, what is guaranteed, and what is deliberately out of scope. The
 decision records are
-[ADR-001](decisions/ADR-001-declared-evidence-query-builder.md) and
-[ADR-002](decisions/ADR-002-query-persistence.md).
+[ADR-001](decisions/ADR-001-declared-evidence-query-builder.md),
+[ADR-002](decisions/ADR-002-query-persistence.md), and
+[ADR-003](decisions/ADR-003-aggregates-derive-group-by.md).
 
 ## The declared-evidence rule
 
@@ -111,6 +112,40 @@ tables are aliased (`customer_email`, `appuser_email`). Syntax highlighting is
 purely visual: the concatenated token text is byte-identical to the SQL, so
 Copy always copies the raw statement.
 
+## Aggregates and grouping
+
+Each picked-column chip has a small selector: `—`, `COUNT`, `COUNT DISTINCT`,
+`SUM`, `AVG`, `MIN`, `MAX`. Choosing one turns that column into an aggregate
+expression; **every other picked column becomes the `GROUP BY` list, in pick
+order**. If every pick is aggregated, `GROUP BY` is omitted and the query
+returns one row.
+
+```sql
+SELECT
+  customer.[Email],
+  COUNT(orderheader.[OrderId]) AS count_orderheader_orderid
+FROM [dbo].[Customer] AS customer
+LEFT JOIN [dbo].[OrderHeader] AS orderheader
+  ON customer.[CustomerId] = orderheader.[CustomerId]
+GROUP BY customer.[Email];
+```
+
+- Aggregate expressions always get a deterministic alias
+  (`count_orderheader_orderid`, `sum_orderline_quantity`).
+- Sorting an aggregated column orders by the expression:
+  `ORDER BY COUNT(orderheader.[OrderId]) DESC`.
+- `DISTINCT` is redundant with `GROUP BY`: the toggle is disabled while an
+  aggregate is set, and the provenance header says the clause was ignored.
+- The header records both lists — `Grouped by: …` and `Aggregates: …` — so a
+  copied statement explains itself.
+- A plan tip warns that `SUM`/`AVG` over a one-to-many join can multiply
+  unless the detail rows are pre-aggregated.
+
+Limits, stated plainly: there is no `HAVING` clause, no window functions, and
+no `COUNT(*)` — `COUNT(column)` ignores NULLs, so count a `NOT NULL` key for
+row counts. `GROUP BY` covers picked columns only. See
+[ADR-003](decisions/ADR-003-aggregates-derive-group-by.md).
+
 ## Saving, exporting, and restoring
 
 Picks and options are session state by default. The **Query** menu keeps them
@@ -130,16 +165,21 @@ The file format is small and stable:
 ```json
 {
   "format": "procflow-erd-query",
-  "version": 1,
+  "version": 2,
   "fingerprint": "f971b08a",
   "name": "orders by customer",
   "selections": [{"entityId": "DBO.ORDERHEADER", "column": "OrderId"}],
   "manual": [], "cross": [], "excluded": [],
   "joinTypes": {}, "pathChoices": {},
   "options": {"dialect": "tsql", "comments": true, "distinct": false,
-              "rowLimit": 0, "onlyUsed": false, "sorts": []}
+              "rowLimit": 0, "onlyUsed": false, "sorts": [],
+              "aggregates": {}}
 }
 ```
+
+Version-1 files (written before aggregates existed) still load: the missing
+field migrates to an empty map on read. Files from a newer version are rejected
+with a diagnostic rather than guessed at.
 
 Restoring is never blocked by drift. References that no longer exist — tables,
 columns, taught joins, sorts, cross/excluded ids, path choices — are dropped
@@ -156,6 +196,8 @@ explicit slot per browser rather than an auto-saved library.
 - No silent cartesian products and no silent row caps.
 - No execution, validation, or connection to a database.
 - No multiple instances of the same table except the explicit self-join copy.
+- No `HAVING`, window functions, or `COUNT(*)`; aggregate support is `GROUP BY`
+  over picked columns only.
 - No automatic storage: a query is saved only when you choose Save, and only
   one saved query exists per browser. Layouts and queries are independent
   keys, so forgetting one never drops the other.

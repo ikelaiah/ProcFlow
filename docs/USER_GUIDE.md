@@ -55,11 +55,13 @@ grip) shows the generated SQL. The window controls:
 
 Picked-column chips at the top of the window cycle through ascending and
 descending sorts (the arrow button), reveal the table on the diagram, and
-remove the pick. **Only used tables** narrows the canvas to the query's tables
-plus any that need a resolution. Query mode dims edges outside the plan,
-suspends compact boxes, and hides the selection inspector while you build.
-Press **Q** to toggle query mode from the keyboard, and Escape to cancel
-teaching.
+remove the pick. Each chip also has an aggregate selector — **COUNT**,
+**COUNT DISTINCT**, **SUM**, **AVG**, **MIN**, **MAX** — and every remaining
+picked column becomes the `GROUP BY` list. **Only used tables** narrows the
+canvas to the query's tables plus any that need a resolution. Query mode dims
+edges outside the plan, suspends compact boxes, and hides the selection
+inspector while you build. Press **Q** to toggle query mode from the keyboard,
+and Escape to cancel teaching.
 
 The **Query** menu keeps the work. **Save to this browser** / **Restore saved**
 / **Forget saved** store one query locally, and nothing is stored until you
