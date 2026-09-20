@@ -1,5 +1,5 @@
 "use strict";
-/* proc>flow v2.4.0 — clipboard helper shared by the flowchart and ERD pages. */
+/* proc>flow v2.4.1 — clipboard helper shared by the flowchart and ERD pages. */
 function copyText(text, done) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(done, function () {

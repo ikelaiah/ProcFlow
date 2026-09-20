@@ -1,4 +1,4 @@
-/* proc>flow v2.4.0 — ERD query-builder fixtures.
+/* proc>flow v2.4.1 — ERD query-builder fixtures.
    Join graph construction from declared FKs only, shortest-path selection
    with equal-cost alternatives, bridge discovery, optional/reverse join
    policy, hand-taught joins, disconnected-selection problems, dialect
@@ -674,3 +674,4 @@
   window.PROCFLOW_QUERY_RESULT={passed:passed,total:results.length};
   window.PROCFLOW_QUERY_PASS=passed===results.length;
 })();
+

@@ -1,4 +1,4 @@
-/* proc>flow v2.4.0 — clipboard helper shared by the flowchart and ERD pages. */
+/* proc>flow v2.4.1 — clipboard helper shared by the flowchart and ERD pages. */
 function copyText(text: string, done: () => void): void {
   if(navigator.clipboard&&navigator.clipboard.writeText){
     navigator.clipboard.writeText(text).then(done,function(){
@@ -22,3 +22,4 @@ function fallbackCopyText(text: string, done: () => void): void {
   try { document.execCommand('copy'); done(); } catch(err){ /* clipboard unavailable */ }
   document.body.removeChild(area);
 }
+

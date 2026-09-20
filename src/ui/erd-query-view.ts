@@ -1,4 +1,4 @@
-/* proc>flow v2.4.0 — ERD query-builder view builders.
+/* proc>flow v2.4.1 — ERD query-builder view builders.
    Pure DOM construction for the floating window: chips, join cards, problem
    cards, ambiguity choices, the teaching banner, and the learn list. These
    functions hold no state and attach no listeners; every interaction is wired
@@ -386,3 +386,4 @@ function qbViewLearn(education: string[]): HTMLElement | null {
   details.appendChild(list);
   return details;
 }
+

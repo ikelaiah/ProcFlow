@@ -1,4 +1,4 @@
-/* proc>flow v2.4.0 — ERD query builder (picked columns → declared-FK joins → SQL).
+/* proc>flow v2.4.1 — ERD query builder (picked columns → declared-FK joins → SQL).
    Picked columns define a set of tables. The builder follows declared
    FOREIGN KEY constraints to connect those tables, preferring exact
    resolutions over name-matched ones, and emits a SELECT ready to paste into
@@ -829,3 +829,4 @@ function queryPlanSQL(plan: QueryPlan, options: QuerySQLOptions): string {
   });
   return '/*\n'+header.map(querySafeComment).join('\n')+'\n*/\n'+body;
 }
+

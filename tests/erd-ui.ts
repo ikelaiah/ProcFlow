@@ -1,4 +1,4 @@
-/* proc>flow v2.4.0 — ERD query-builder browser interaction suite.
+/* proc>flow v2.4.1 — ERD query-builder browser interaction suite.
    Drives erd.html in an iframe: query mode, on-card picking, join and problem
    cards, teaching by clicks, self joins, SQL options, highlighting, resize,
    Find, and the only-used filter. Publishes pass/fail on the page body so the
@@ -294,4 +294,5 @@
     });
   });
 })();
+
 
