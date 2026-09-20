@@ -1,4 +1,4 @@
-/* ===== v1.8.0 Usable local workspace (README post-v1.0.0 item 7) =====
+/* ===== v2.5.0 Usable local workspace (README post-v1.0.0 item 7) =====
    Optional local workspace persistence and dependency filtering.
 
    Persistence is opt-in: nothing is ever written to storage automatically.
@@ -315,3 +315,4 @@ function filterDependencyGraph(graph: Graph, filter?: WorkspaceFilter): Graph {
      filter never changes what the analysis reports, only what the view draws. */
   return {nodes:nodes, edges:edges, stats:graph.stats};
 }
+
