@@ -3,21 +3,26 @@
 All notable released ProcFlow changes are recorded here. Detailed verification
 evidence belongs in the canonical release note under `docs/releases/`.
 
-## Unreleased
+## v2.4.1 — Query builder hardening and release discipline
 
-- Release documentation now tracks the tagged version: `package-lock.json`
-  stays in sync with `package.json`, release notes are listed in
-  `docs/RELEASES.md`, and CI guards all of it.
-- Added `tests/erd-ui.html`, a committed browser suite for the ERD query
-  builder, and registered it in the correctness workflow.
-- Hardened the query engine (stack-safe shortest-path enumeration and a
-  1,000-table scale fixture), fixed stale sorts after exclusion, removed
-  duplicate clipboard code, and documented the header version convention.
+- Hardened the query engine: shortest-path enumeration is iterative, so long
+  declared chains cannot exhaust the call stack; a 1,000-table scale fixture
+  asserts 999 joins, 998 bridges, and deterministic output.
+- Fixed plan-edge highlighting when the overlay redraw was starved by
+  animation-frame scheduling; query-state changes now draw synchronously.
+- Excluding a problem table now prunes its sorts; the dropdown teach flow
+  explains the same-table self-join case; the clipboard fallback is shared.
+- Moved pure DOM builders to `src/ui/erd-query-view.ts` (no behavior change).
 - Accessibility: one concise status announcement replaces noisy live regions,
-  and the floating query window is a labelled dialog.
-- Documentation: `docs/QUERY_BUILDER.md` deep dive, ADR-001 for the
-  declared-evidence query model, and a test-suite cookbook in
-  `docs/DEVELOPMENT.md`.
+  the floating query window is a labelled dialog, **Q** toggles query mode,
+  and Escape cancels teaching without clearing the diagram selection.
+- Added `tests/erd-ui.html` (49 interaction checks) and registered it in CI;
+  the Firefox smoke now loads `erd.html`.
+- Release discipline: `package-lock.json` tracks `package.json`, and CI guards
+  the changelog, README, release index, and lockfile version.
+- Documentation: `docs/QUERY_BUILDER.md`, ADR-001, and the suite cookbook and
+  header convention in `docs/DEVELOPMENT.md`.
+- Updated CI actions (`actions/checkout`, `actions/setup-node`).
 
 ## v2.4.0 — Query builder on the ERD
 
