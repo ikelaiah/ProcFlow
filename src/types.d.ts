@@ -1022,6 +1022,191 @@ interface ErdLayoutParseResult {
   diagnostics: Diagnostic[];
 }
 
+/* v2.4.0 — ERD query builder. Assembles a SELECT from picked columns by
+   traversing declared foreign-key evidence only. Tables the declared graph
+   cannot reach are reported as problems with explicit resolutions: teach the
+   join by hand, opt into a cartesian product, or leave the columns out. */
+type QueryDialect = 'tsql' | 'postgres' | 'db2' | 'sqlite';
+type QueryJoinType = 'inner' | 'left' | 'cross';
+type QueryJoinKind = 'declared' | 'manual' | 'cross';
+type QueryPolicy = 'preserve' | 'strict';
+
+interface QueryColumnRef {
+  entityId: string;
+  column: string;
+}
+
+interface QueryGraphEdge {
+  id: string;
+  childId: string;
+  parentId: string;
+  childColumns: string[];
+  parentColumns: string[];
+  cardinality: SchemaCardinality;
+  optional: boolean;
+  unique: boolean;
+  resolution: SchemaLinkResolution;
+  name?: string;
+  weight: number;
+  index: number;
+  manualId?: string;
+  predicate?: string;
+}
+
+interface QueryGraphNode {
+  id: string;
+  name: string;
+  kind: SchemaObjectKind;
+  columns: string[];
+  edges: QueryGraphEdge[];
+}
+
+interface QueryGraphSkipped {
+  id: string;
+  name: string;
+  reason: 'external' | 'no-columns';
+}
+
+interface QueryGraph {
+  nodes: Record<string, QueryGraphNode>;
+  order: string[];
+  edges: QueryGraphEdge[];
+  skipped: QueryGraphSkipped[];
+}
+
+interface QueryPathStep {
+  edgeId: string;
+  fromId: string;
+  toId: string;
+  reverse: boolean;
+}
+
+interface QueryPath {
+  steps: QueryPathStep[];
+  cost: number;
+  entityIds: string[];
+}
+
+/* A join the user taught the builder. It is never presented as declared
+   evidence: the SQL carries a "not declared" marker and the plan labels it.
+   When both sides are the same entity the join runs against a second aliased
+   copy of the table; `selfColumns` are the picked columns that render from
+   that copy. */
+interface QueryManualJoin {
+  id: string;
+  leftId: string;
+  leftColumn: string;
+  rightId: string;
+  rightColumn: string;
+  predicate?: string;
+  selfColumns?: string[];
+}
+
+interface QueryJoin {
+  id: string;
+  kind: QueryJoinKind;
+  attachToId: string;
+  entityId: string;
+  leftColumns: string[];
+  rightColumns: string[];
+  joinType: QueryJoinType;
+  resolution: SchemaLinkResolution | null;
+  cardinality: SchemaCardinality | null;
+  optional: boolean | null;
+  constraintName?: string;
+  predicate?: string;
+  /* Declared joins carry the relationship id so the ERD overlay can highlight
+     the exact edge the plan uses. Absent for taught and cross joins. */
+  edgeId?: string;
+  manualId?: string;
+  selfJoin?: boolean;
+  copyColumns?: string[];
+  bridge: boolean;
+  reverse: boolean;
+  explanation: string;
+}
+
+interface QueryAmbiguity {
+  fromId: string;
+  toId: string;
+  chosenIndex: number;
+  paths: QueryPath[];
+  summaries: string[];
+  summary: string;
+}
+
+interface QueryProblem {
+  entityIds: string[];
+  code: 'disconnected';
+  title: string;
+  message: string;
+  education: string;
+}
+
+interface QueryBuildInput {
+  result: SchemaResult;
+  selections: QueryColumnRef[];
+  manual?: QueryManualJoin[];
+  cross?: string[];
+  excluded?: string[];
+  joinTypes?: Record<string, QueryJoinType>;
+  policy?: QueryPolicy;
+  pathChoices?: Record<string, number>;
+}
+
+interface QueryPlan {
+  graph: QueryGraph;
+  selections: QueryColumnRef[];
+  fromId: string | null;
+  usedIds: string[];
+  joins: QueryJoin[];
+  bridges: string[];
+  problems: QueryProblem[];
+  ambiguities: QueryAmbiguity[];
+  warnings: string[];
+  education: string[];
+}
+
+interface QuerySQLOptions {
+  dialect: QueryDialect;
+  comments: boolean;
+  /* v2.4.0 query ergonomics: duplicate collapse, a dialect-aware row cap, and
+     explicit ordering on picked columns. */
+  distinct?: boolean;
+  rowLimit?: number;
+  orderBy?: QuerySort[];
+}
+
+interface QuerySort {
+  entityId: string;
+  column: string;
+  direction: 'asc' | 'desc';
+}
+
+/* Generated-SQL highlighting tokens. The panel renders them as spans; the
+   concatenated text is always byte-identical to the emitted SQL. */
+type QuerySqlTokenKind = 'plain' | 'keyword' | 'comment' | 'string' | 'ident' | 'number' | 'punct';
+
+interface QuerySqlToken {
+  text: string;
+  kind: QuerySqlTokenKind;
+}
+
+/* v2.4.0 — query-mode decoration for the diagram and overlay. The ERD asks
+   for this on every card render and overlay draw, so picking columns on the
+   diagram shows which edges the plan actually uses and which tables still
+   need a resolution. */
+interface ErdQueryDecoration {
+  active: boolean;
+  teaching: boolean;
+  teachFirstKey?: string;
+  pickedKeys: Record<string, 1 | undefined>;
+  picked: Record<string, number>;
+  usedEdges: Record<string, 1 | undefined>;
+  usedTables: Record<string, 1 | undefined>;
+  problemTables: Record<string, 1 | undefined>;
+}
+
 interface Window {
   mermaid: {
     initialize(options: Record<string, unknown>): void;
@@ -1136,10 +1321,26 @@ interface Window {
     mermaidTotal: number;
   };
   PROCFLOW_SCHEMA_DETAIL?: Array<{name: string; pass: boolean; detail?: unknown}>;
+  /* v2.4.0 ERD query-builder suite (join graph, pathfinding with alternatives,
+     taught joins, disconnected selections, SQL emission), published for the
+     golden tests. */
+  PROCFLOW_QUERY_PASS?: boolean;
+  PROCFLOW_QUERY_RESULT?: {
+    passed: number;
+    total: number;
+  };
+  PROCFLOW_QUERY_DETAIL?: Array<{name: string; pass: boolean; detail?: unknown}>;
   /* v1.14.0 hostile-input security suite. */
   PROCFLOW_SECURITY_PASS?: boolean;
   PROCFLOW_SECURITY_RESULT?: {passed: number; total: number};
   PROCFLOW_SECURITY_DETAIL?: Array<{name: string; pass: boolean; detail?: unknown}>;
+  /* v2.4.0 ERD query-builder panel (src/ui/erd-query.ts), mounted on erd.html. */
+  erdQueryPanelInit(options?: {focusEntity?: (id: string) => void}): void;
+  erdQueryPanelSetSchema(result: SchemaResult): void;
+  erdQueryPanelState(): ErdQueryDecoration;
+  erdQueryPanelDecorate(): void;
+  erdQueryPanelTogglePick(entityId: string, column: string, on: boolean): void;
+  erdQueryPanelTeachColumn(entityId: string, column: string): void;
   /* v1.8.0 opt-in workspace persistence globals (src/workspace.ts), exposed for
      the browser UI tests. */
   /* v2.2.0 ERD layout persistence (src/workspace.ts, opt-in only). */
