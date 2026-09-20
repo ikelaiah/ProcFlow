@@ -3,6 +3,47 @@
 All notable released ProcFlow changes are recorded here. Detailed verification
 evidence belongs in the canonical release note under `docs/releases/`.
 
+## Unreleased
+
+- Release documentation now tracks the tagged version: `package-lock.json`
+  stays in sync with `package.json`, release notes are listed in
+  `docs/RELEASES.md`, and CI guards all of it.
+- Added `tests/erd-ui.html`, a committed browser suite for the ERD query
+  builder, and registered it in the correctness workflow.
+- Hardened the query engine (stack-safe shortest-path enumeration and a
+  1,000-table scale fixture), fixed stale sorts after exclusion, removed
+  duplicate clipboard code, and documented the header version convention.
+- Accessibility: one concise status announcement replaces noisy live regions,
+  and the floating query window is a labelled dialog.
+- Documentation: `docs/QUERY_BUILDER.md` deep dive, ADR-001 for the
+  declared-evidence query model, and a test-suite cookbook in
+  `docs/DEVELOPMENT.md`.
+
+## v2.4.0 — Query builder on the ERD
+
+- Added the ERD query builder: a toolbar toggle turns column rows into
+  checkboxes and opens a draggable, resizable floating window with the
+  generated SQL, the join plan, and explicit resolutions for tables the
+  declared foreign keys cannot reach.
+- Joins follow declared `PRIMARY KEY` / `UNIQUE` / `FOREIGN KEY` evidence only.
+  Equal-cost paths are offered as a choice, bridges are tagged, and preserve or
+  strict join policy controls INNER/LEFT with per-join overrides.
+- Added teach-by-clicking joins, typed predicates, opt-in `CROSS JOIN`, column
+  exclusion (named in the SQL header), and self joins with a second aliased
+  copy and per-column copy routing.
+- Added query ergonomics: `DISTINCT`, dialect-aware row caps (`TOP` / `LIMIT` /
+  `FETCH FIRST`), per-column sort cycling, and a Distinct tip when a
+  one-to-many join can repeat rows.
+- Generated SQL is dialect-quoted (T-SQL, PostgreSQL, DB2, SQLite) and syntax
+  highlighted with byte-identical Copy output.
+- The diagram reacts to picks: plan edges stay lit while unrelated edges dim,
+  unresolved tables carry a coral ring, join cards highlight their edge and
+  endpoints on hover, Find matches columns, and Only used tables narrows the
+  canvas.
+- Release quality: `package-lock.json` version now tracks `package.json`, and
+  the ERD query UI ships with a committed browser suite and release-doc CI
+  guards.
+
 ## v2.3.0 — Readable estate layouts
 
 - Auto-arranged a schema on first parse; Reset still returns to declaration

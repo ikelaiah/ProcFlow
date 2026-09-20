@@ -66,6 +66,19 @@ jobs:
               exit 1
             fi
           done
+          if ! grep -q "docs/releases/v${version}.md" README.md; then
+            echo "README.md documentation index must link docs/releases/v${version}.md."
+            exit 1
+          fi
+          if ! grep -q "## v${version}" CHANGELOG.md; then
+            echo "CHANGELOG.md must contain a v${version} entry."
+            exit 1
+          fi
+          if ! grep -q "releases/v${version}.md" docs/RELEASES.md; then
+            echo "docs/RELEASES.md must list the current release note (v${version})."
+            exit 1
+          fi
+          node -e 'const p=require("./package.json"),l=require("./package-lock.json");if(p.version!==l.version||p.version!==l.packages[""].version){console.error("package-lock.json version must match package.json ("+p.version+").");process.exit(1);}'
 
       - name: Locate Chromium
         shell: bash
@@ -140,6 +153,7 @@ jobs:
           run_suite golden http://127.0.0.1:8000/tests/index.html
           run_suite fuzz http://127.0.0.1:8000/tests/fuzz.html
           run_suite ui http://127.0.0.1:8000/tests/ui.html
+          run_suite erd-ui http://127.0.0.1:8000/tests/erd-ui.html
           run_suite security http://127.0.0.1:8000/tests/security.html
 
       - name: Verify fixture-corpus metric snapshot is current

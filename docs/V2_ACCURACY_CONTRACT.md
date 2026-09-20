@@ -55,6 +55,18 @@ workspace. Rejected saved-workspace bytes, including corrupt data, remain until
 the user explicitly chooses **Forget**. Imported data is not applied or changed
 when rejected.
 
+## Query builder
+
+Query-builder joins assert declared foreign-key evidence only. Equal-cost paths
+are surfaced rather than hidden, bridge tables are tagged, and tables the
+declared graph cannot reach remain explicit with three resolutions: a taught
+join (labelled not declared in the plan and in the SQL), an opt-in `CROSS JOIN`,
+or exclusion with the omitted columns named in the provenance header. A
+cartesian product is never silent, taught joins and self-join copies are never
+presented as verified, and the generated SQL is read-only. See
+[ACCURACY.md](ACCURACY.md) and
+[ADR-001](decisions/ADR-001-declared-evidence-query-builder.md).
+
 ## Export, privacy, and compatibility
 
 The live graph, Mermaid, SVG, and draw.io exports preserve node identities,

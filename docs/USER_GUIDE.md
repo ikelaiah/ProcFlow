@@ -58,6 +58,11 @@ descending sorts (the arrow button), reveal the table on the diagram, and
 remove the pick. **Only used tables** narrows the canvas to the query's tables
 plus any that need a resolution. Query mode dims edges outside the plan,
 suspends compact boxes, and hides the selection inspector while you build.
+Press **Q** to toggle query mode from the keyboard, and Escape to cancel
+teaching.
+
+Full semantics — join policy, taught and self joins, SQL options, and what the
+builder never does — are in [Query builder](QUERY_BUILDER.md).
 
 ### Report and dataset review
 
