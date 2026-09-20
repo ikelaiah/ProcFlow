@@ -6,7 +6,7 @@ SSRS/RDL report definition and renders an explorable diagram.
 
 ## First run
 
-1. Download the v2.3.0 runtime ZIP from the repository release, or clone the
+1. Download the v2.4.0 runtime ZIP from the repository release, or clone the
    repository for development.
 2. Open `index.html` in a current Chromium, Firefox, or Edge browser. The
    runtime does not require a server or a database connection.
@@ -29,6 +29,35 @@ script, **Object dependencies** shows calls and table relationships.
 
 Use the source span selection and diagnostics before relying on a relationship
 in a change review. Dynamic SQL is deliberately shown as an opaque step.
+
+### ERD query builder
+
+On `erd.html`, choose **Query builder** to pick columns directly on the table
+cards. Every card shows a checkbox per column, and a floating window (drag its
+header to move it, drag the corner grip to resize it, arrow keys work on the
+grip) shows the generated SQL. The window controls:
+
+- **Dialect**, **Distinct**, a row cap, and **Comments** for the provenance
+  header. The SQL is marked up with syntax colours and **Copy SQL** copies the
+  exact text.
+- **Join plan** cards for each join the declared foreign keys imply, with an
+  INNER/LEFT switch and a sentence explaining direction, optionality, and row
+  multiplication. Bridge tables are tagged; hovering a join card highlights
+  the exact edge and both endpoint cards.
+- **Problems** for tables no declared path reaches. ProcFlow never silently
+  cross-joins: teach the join with the column pair (or a typed predicate),
+  opt into a CROSS JOIN, or leave the table's columns out. The SQL header lists
+  anything left out.
+- **Teach join** (toolbar or a problem card) defines a join by clicking two
+  columns on the diagram. Clicking two columns of the same table creates a
+  self join with a second alias; tick which picked columns should read from
+  that second copy.
+
+Picked-column chips at the top of the window cycle through ascending and
+descending sorts (the arrow button), reveal the table on the diagram, and
+remove the pick. **Only used tables** narrows the canvas to the query's tables
+plus any that need a resolution. Query mode dims edges outside the plan,
+suspends compact boxes, and hides the selection inspector while you build.
 
 ### Report and dataset review
 

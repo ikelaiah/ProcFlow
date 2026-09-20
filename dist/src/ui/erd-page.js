@@ -15,6 +15,14 @@
     var selectedId = null;
     var renderSeq = 0;
     var compactMode = false, compactTouched = false;
+    var compactBeforeQuery = false;
+    var queryPicking = false;
+    var queryPickedKeys = {};
+    function queryTeachingNow() {
+        var decoration = typeof window.erdQueryPanelState === 'function'
+            ? window.erdQueryPanelState() : null;
+        return !!(decoration && decoration.active && decoration.teaching);
+    }
     var findMatches = [], findIndex = 0;
     var panning = false, panStartX = 0, panStartY = 0, panStartScrollLeft = 0, panStartScrollTop = 0, didPan = false;
     var dragMode = null, dragCardId = null, dragBaseX = 0, dragBaseY = 0, dragLastDx = 0, dragLastDy = 0;
@@ -135,6 +143,33 @@
                 entity.columns.forEach(function (column) {
                     var row = document.createElement('li');
                     row.setAttribute('data-column', column.name);
+                    if (queryPicking) {
+                        var pick = document.createElement('input');
+                        pick.type = 'checkbox';
+                        pick.className = 'qb-pick';
+                        pick.setAttribute('data-column', column.name);
+                        pick.setAttribute('data-entity-id', entity.id);
+                        pick.setAttribute('aria-label', 'Select ' + entity.name + '.' + column.name + ' for the query');
+                        pick.checked = !!queryPickedKeys[entity.id + '|' +
+                            schemaNormColumn(column.name)];
+                        pick.addEventListener('click', function (event) {
+                            event.stopPropagation();
+                            if (queryTeachingNow()) {
+                                event.preventDefault();
+                                if (typeof window.erdQueryPanelTeachColumn === 'function') {
+                                    window.erdQueryPanelTeachColumn(entity.id, column.name);
+                                }
+                            }
+                        });
+                        pick.addEventListener('change', function () {
+                            if (queryTeachingNow())
+                                return;
+                            if (typeof window.erdQueryPanelTogglePick === 'function') {
+                                window.erdQueryPanelTogglePick(entity.id, column.name, pick.checked);
+                            }
+                        });
+                        row.appendChild(pick);
+                    }
                     var name = document.createElement('span');
                     name.className = 'erd-col-name';
                     name.textContent = column.name;
@@ -187,10 +222,33 @@
             card.appendChild(list);
         }
         card.tabIndex = 0;
-        card.addEventListener('click', function () {
+        card.addEventListener('click', function (event) {
+            if (queryPicking) {
+                var target = event.target;
+                if (target && target.closest && target.closest('.qb-pick'))
+                    return;
+                var row = target && target.closest
+                    ? target.closest('li[data-column]') : null;
+                if (row) {
+                    if (queryTeachingNow()) {
+                        if (typeof window.erdQueryPanelTeachColumn === 'function') {
+                            window.erdQueryPanelTeachColumn(entity.id, row.getAttribute('data-column') || '');
+                        }
+                        return;
+                    }
+                    var box = row.querySelector('input.qb-pick');
+                    if (box) {
+                        box.click();
+                        return;
+                    }
+                }
+            }
             selectEntity(selectedId === entity.id ? null : entity.id);
         });
         card.addEventListener('keydown', function (event) {
+            var target = event.target;
+            if (queryPicking && target && target.closest && target.closest('.qb-pick'))
+                return;
             if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
                 selectEntity(selectedId === entity.id ? null : entity.id);
@@ -208,14 +266,20 @@
             var card = cardEls[entityId];
             card.classList.toggle('focus', entityId === selectedId);
             card.classList.toggle('related', !!selectedId && entityId !== selectedId && related[entityId] === 1);
-            card.classList.toggle('dim', !!selectedId && entityId !== selectedId && related[entityId] !== 1);
+            card.classList.toggle('dim', !queryPicking && !!selectedId && entityId !== selectedId && related[entityId] !== 1);
         });
         renderInspector();
         drawOverlay();
     }
-    /* Find highlights matches and jumps between them (Enter / Shift+Enter). */
+    /* Find matches tables and columns; column hits are marked on the exact
+       rows, so a wide estate can be searched by attribute name. */
     function applyFind(jump) {
-        Object.keys(cardEls).forEach(function (id) { cardEls[id].classList.remove('match'); });
+        Object.keys(cardEls).forEach(function (id) {
+            cardEls[id].classList.remove('match');
+            var rows = cardEls[id].querySelectorAll('.erd-cols li[data-column]');
+            for (var i = 0; i < rows.length; i++)
+                rows[i].classList.remove('col-match');
+        });
         findMatches = [];
         var query = (findInput ? String(findInput.value || '') : '').trim().toUpperCase();
         if (!query || !result) {
@@ -223,19 +287,42 @@
                 findCount.textContent = '';
             return;
         }
+        var columnHits = 0;
         result.entities.forEach(function (entity) {
-            if (entity.name.toUpperCase().indexOf(query) >= 0 || entity.id.indexOf(query) >= 0) {
-                findMatches.push(entity.id);
-            }
-        });
-        findMatches.forEach(function (id) {
-            if (cardEls[id])
-                cardEls[id].classList.add('match');
+            var nameMatch = entity.name.toUpperCase().indexOf(query) >= 0 ||
+                entity.id.indexOf(query) >= 0;
+            var matchedColumns = [];
+            entity.columns.forEach(function (column) {
+                if (column.name.toUpperCase().indexOf(query) >= 0) {
+                    matchedColumns.push(column.name);
+                }
+            });
+            if (!nameMatch && !matchedColumns.length)
+                return;
+            findMatches.push(entity.id);
+            columnHits += matchedColumns.length;
+            var card = cardEls[entity.id];
+            if (!card)
+                return;
+            card.classList.add('match');
+            if (!matchedColumns.length)
+                return;
+            var rows = card.querySelectorAll('.erd-cols li[data-column]');
+            Array.prototype.forEach.call(rows, function (row) {
+                var column = row.getAttribute('data-column') || '';
+                if (matchedColumns.some(function (name) {
+                    return name.toUpperCase() === column.toUpperCase();
+                })) {
+                    row.classList.add('col-match');
+                }
+            });
         });
         if (findCount) {
-            findCount.textContent = findMatches.length
-                ? findMatches.length + ' match' + (findMatches.length === 1 ? '' : 'es')
-                : '0 matches';
+            var message = findMatches.length + ' match' + (findMatches.length === 1 ? '' : 'es');
+            if (columnHits) {
+                message += ' \u00b7 ' + columnHits + ' column' + (columnHits === 1 ? '' : 's');
+            }
+            findCount.textContent = findMatches.length ? message : '0 matches';
         }
         if (jump && findMatches.length) {
             var id = findMatches[findIndex % findMatches.length];
@@ -334,6 +421,11 @@
     function renderCards() {
         if (!cardsHost || !result)
             return;
+        var decoration = typeof window.erdQueryPanelState === 'function'
+            ? window.erdQueryPanelState() : null;
+        queryPicking = !!(decoration && decoration.active);
+        queryPickedKeys = (decoration && decoration.pickedKeys) || {};
+        cardsHost.classList.toggle('qb-picking', queryPicking);
         adjacency = {};
         relCounts = {};
         result.relationships.forEach(function (rel) {
@@ -903,12 +995,19 @@
             });
         }
         var bundleCounts = {};
+        var decoration = typeof window.erdQueryPanelState === 'function'
+            ? window.erdQueryPanelState() : null;
+        var queryActive = !!(decoration && decoration.active);
+        var usedEdges = (decoration && decoration.usedEdges) || {};
         result.relationships.forEach(function (rel) {
             var from = boxOf(rel.fromId), to = boxOf(rel.toId);
             if (!from || !to)
                 return;
-            var active = !!selectedId;
-            var connected = !active || rel.fromId === selectedId || rel.toId === selectedId;
+            var inPlan = queryActive && usedEdges[rel.id] === 1;
+            var active = !!selectedId || queryActive;
+            var connected = queryActive
+                ? inPlan
+                : (!active || rel.fromId === selectedId || rel.toId === selectedId);
             var dash = rel.resolution === 'exact' ? '' : (rel.resolution === 'heuristic' ? '7 4' : '2 4');
             var color = rel.resolution === 'opaque' ? '#e4645e' :
                 (rel.resolution === 'heuristic' ? '#e8a33d' : '#7ea6e0');
@@ -933,8 +1032,9 @@
             }
             var d = routed.d, labelAt = routed.labelAt, midAt = routed.midAt;
             var path = svgEl('path', { d: d, fill: 'none', stroke: color,
-                'stroke-width': active && connected ? 2.6 : (connected ? 2 : 1.4),
-                'stroke-dasharray': dash, opacity: active ? (connected ? 0.95 : 0.07) : 0.95,
+                'stroke-width': inPlan ? 3 : (active && connected ? 2.6 : (connected ? 2 : 1.4)),
+                'stroke-dasharray': dash,
+                opacity: queryActive ? (inPlan ? 0.95 : 0.12) : (active ? (connected ? 0.95 : 0.07) : 0.95),
                 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
             path.setAttribute('data-relationship', rel.id);
             overlay.appendChild(path);
@@ -970,6 +1070,19 @@
                     fill: 'none', stroke: '#e8a33d', 'stroke-width': 2, 'stroke-dasharray': '7 5' }));
             }
         }
+        /* Tables the declared graph cannot reach get a coral ring that matches
+           their problem card in the floating window. */
+        if (queryActive && decoration) {
+            Object.keys(decoration.problemTables || {}).forEach(function (id) {
+                var problemRing = boxOf(id);
+                if (!problemRing)
+                    return;
+                overlay.appendChild(svgEl('rect', { x: problemRing.left - 5, y: problemRing.top - 5,
+                    width: problemRing.right - problemRing.left + 10,
+                    height: problemRing.bottom - problemRing.top + 10, rx: 6,
+                    fill: 'none', stroke: '#e4645e', 'stroke-width': 2, 'stroke-dasharray': '6 4' }));
+            });
+        }
     }
     function render() {
         if (!sql)
@@ -990,6 +1103,9 @@
         updateLargeInputNotice();
         if (mermaidOut)
             mermaidOut.textContent = toMermaidER(result);
+        if (typeof window.erdQueryPanelSetSchema === 'function') {
+            window.erdQueryPanelSetSchema(result);
+        }
         var seq = ++renderSeq;
         requestAnimationFrame(function () {
             if (seq !== renderSeq)
@@ -1023,16 +1139,19 @@
     }
     var scheduleTimer = null;
     function tab(which) {
-        var diagram = $('view-erd-diagram'), mermaid = $('view-erd-mermaid');
-        var diagramTab = $('tab-erd-diagram'), mermaidTab = $('tab-erd-mermaid');
-        if (!diagram || !mermaid || !diagramTab || !mermaidTab)
-            return;
-        var showDiagram = which === 'diagram';
-        diagram.classList.toggle('active', showDiagram);
-        mermaid.classList.toggle('active', !showDiagram);
-        diagramTab.setAttribute('aria-selected', String(showDiagram));
-        mermaidTab.setAttribute('aria-selected', String(!showDiagram));
-        if (showDiagram)
+        var views = { diagram: $('view-erd-diagram'),
+            mermaid: $('view-erd-mermaid') };
+        var tabs = { diagram: $('tab-erd-diagram'),
+            mermaid: $('tab-erd-mermaid') };
+        Object.keys(views).forEach(function (name) {
+            var view = views[name], tabEl = tabs[name];
+            if (!view || !tabEl)
+                return;
+            var active = name === which;
+            view.classList.toggle('active', active);
+            tabEl.setAttribute('aria-selected', String(active));
+        });
+        if (which === 'diagram')
             requestAnimationFrame(drawOverlay);
     }
     function flash(btn, word) {
@@ -1120,6 +1239,33 @@
     var tabMermaid = $('tab-erd-mermaid');
     if (tabMermaid)
         tabMermaid.addEventListener('click', function () { tab('mermaid'); });
+    /* Query mode adds column checkboxes to the cards, so it needs a card
+       rebuild and a redraw; compact mode is suspended while picking. */
+    document.addEventListener('procflow-query-mode', function (event) {
+        var modeActive = !!event.detail.active;
+        if (modeActive && compactMode) {
+            compactBeforeQuery = true;
+            compactTouched = true;
+            compactMode = false;
+            if (compactInput)
+                compactInput.checked = false;
+        }
+        else if (!modeActive && compactBeforeQuery) {
+            compactBeforeQuery = false;
+            compactMode = true;
+            if (compactInput)
+                compactInput.checked = true;
+        }
+        if (compactInput)
+            compactInput.disabled = modeActive;
+        renderCards();
+        if (typeof window.erdQueryPanelDecorate === 'function') {
+            window.erdQueryPanelDecorate();
+        }
+        selectEntity(selectedId);
+        requestAnimationFrame(drawOverlay);
+    });
+    document.addEventListener('procflow-query-changed', scheduleOverlay);
     if (findInput) {
         findInput.addEventListener('input', function () { findIndex = 0; applyFind(true); });
         findInput.addEventListener('keydown', function (event) {
@@ -1270,6 +1416,8 @@
             if (event.button !== 0)
                 return;
             var target = event.target;
+            if (target && target.closest && target.closest('.qb-pick'))
+                return;
             var cardEl = target && target.closest ? target.closest('.erd-card') : null;
             dragMode = cardEl ? 'card' : 'pan';
             dragCardId = cardEl ? cardEl.getAttribute('data-entity-id') : null;
@@ -1350,8 +1498,19 @@
         if (event.key === 'Escape' && selectedId)
             selectEntity(null);
     });
+    if (typeof window.erdQueryPanelInit === 'function') {
+        window.erdQueryPanelInit({ focusEntity: function (id) {
+                tab('diagram');
+                selectEntity(id);
+                var card = cardEls[id];
+                if (card && card.scrollIntoView) {
+                    card.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+                }
+            } });
+    }
     drawGutter();
     render();
-    document.documentElement.setAttribute('data-procflow-ready', String(typeof parseSchema === 'function' && typeof toMermaidER === 'function'));
+    document.documentElement.setAttribute('data-procflow-ready', String(typeof parseSchema === 'function' && typeof toMermaidER === 'function' &&
+        typeof queryBuildPlan === 'function'));
 })();
 //# sourceMappingURL=erd-page.js.map

@@ -28,9 +28,9 @@ const paths = [
 ];
 const distFiles = [
   "app.js", "catalogue.js", "columnflow.js", "columns.js", "dialects.js",
-  "exporters.js", "ir.js", "lineage.js", "report.js", "schema.js",
+  "exporters.js", "ir.js", "lineage.js", "report.js", "schema.js", "query.js",
   "tokenizer.js", "workspace.js", "erd.js", "analysis/confidence.js",
-  "ui/large-input.js", "ui/splitter.js", "ui/erd-page.js"
+  "ui/large-input.js", "ui/splitter.js", "ui/erd-query.js", "ui/erd-page.js"
 ];
 for (const file of distFiles) paths.push(`dist/src/${file}`);
 const missing = paths.filter((path) => !existsSync(join(root, path)));

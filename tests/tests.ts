@@ -1040,6 +1040,20 @@
       false,String(err&&err.stack||err));
   }
 
+  /* v2.4.0: ERD query builder — declared-FK join graph, shortest-path joins
+     with equal-cost alternatives, bridge discovery, taught joins, disconnected
+     selections, and dialect-quoted SQL emission run ahead in tests/query.ts;
+     gate the whole golden page on them. */
+  try{
+    record('v2.4.0 ERD query-builder fixtures',
+      window.PROCFLOW_QUERY_PASS===true&&
+        !!window.PROCFLOW_QUERY_RESULT&&
+        window.PROCFLOW_QUERY_RESULT.passed===window.PROCFLOW_QUERY_RESULT.total,
+      window.PROCFLOW_QUERY_DETAIL||window.PROCFLOW_QUERY_RESULT);
+  }catch(err){
+    record('v2.4.0 ERD query-builder fixtures',false,String(err&&err.stack||err));
+  }
+
   var passed=results.filter(function(r){return r.pass;}).length;
   document.body.className=passed===results.length?'pass':'fail';
   document.getElementById('summary').textContent=passed+'/'+results.length+' tests passed';

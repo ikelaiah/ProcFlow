@@ -81,8 +81,8 @@
       </div>
       <div class="command-menus">
         <label class="opt erd-find-label">Find
-          <input type="search" id="erd-find" placeholder="table name" spellcheck="false"
-                 aria-label="Find a table or view">
+          <input type="search" id="erd-find" placeholder="table or column" spellcheck="false"
+                 aria-label="Find a table or column">
           <span class="erd-find-count" id="erd-find-count" aria-live="polite"></span>
         </label>
         <label class="opt"><input type="checkbox" id="erd-compact"> Compact boxes</label>
@@ -115,6 +115,8 @@
             <p class="ws-note" id="erd-layout-status">No layout saved in this browser.</p>
           </div>
         </details>
+        <button class="btn" id="btn-erd-query" aria-pressed="false"
+                title="Pick columns on the diagram; the SQL appears in a floating window">Query builder<span class="tab-count" id="erd-query-count" hidden></span></button>
         <button class="btn" id="btn-erd-copy">Copy Mermaid</button>
       </div>
     </div>
@@ -134,6 +136,48 @@
         <span class="erd-zoom-val" id="erd-zoom-val">100%</span>
       </div>
       <aside class="erd-inspector" id="erd-inspector" hidden aria-live="polite"></aside>
+      <section class="qb-float" id="qb-float" hidden aria-label="Query builder">
+        <header class="qb-float-head" id="qb-drag">
+          <h3>Query builder</h3>
+          <span class="qb-plan-summary" id="qb-summary" aria-live="polite"></span>
+          <button class="btn quiet" id="btn-qb-clear">Clear</button>
+          <button class="qb-icon" id="btn-qb-collapse" aria-label="Collapse query builder"
+                  title="Collapse">−</button>
+          <button class="qb-icon" id="btn-qb-close" aria-label="Close query builder"
+                  title="Close">×</button>
+        </header>
+        <div class="qb-float-body" id="qb-float-body">
+          <div class="qb-toolbar">
+            <label class="opt">Dialect
+              <select id="qb-dialect" aria-label="SQL dialect">
+                <option value="tsql">T-SQL (SQL Server)</option>
+                <option value="postgres">PostgreSQL</option>
+                <option value="db2">DB2</option>
+                <option value="sqlite">SQLite</option>
+              </select>
+            </label>
+            <label class="opt"><input type="checkbox" id="qb-distinct"> Distinct</label>
+            <label class="opt"><input type="checkbox" id="qb-only-used"> Only used tables</label>
+            <label class="opt">Rows
+              <select id="qb-limit" aria-label="Row limit">
+                <option value="0">All</option>
+                <option value="100">100</option>
+                <option value="1000">1000</option>
+              </select>
+            </label>
+            <label class="opt"><input type="checkbox" id="qb-comments" checked> Comments</label>
+            <button class="btn" id="btn-qb-teach" aria-pressed="false"
+                    title="Click two columns on the diagram to teach a join; the same table twice creates a self join">Teach join</button>
+            <button class="btn primary" id="btn-qb-copy">Copy SQL</button>
+          </div>
+          <div class="qb-picks" id="qb-picks"></div>
+          <pre id="qb-sql-out" aria-live="polite"></pre>
+          <div class="qb-plan-body" id="qb-plan-body" aria-live="polite"></div>
+        </div>
+        <button type="button" class="qb-resize" id="qb-resize"
+                aria-label="Resize query builder"
+                title="Drag to resize (arrow keys also work)"></button>
+      </section>
     </div>
     <div class="view" id="view-erd-mermaid" role="tabpanel" aria-labelledby="tab-erd-mermaid">
       <pre id="erd-mermaid-out">erDiagram</pre>
@@ -146,9 +190,11 @@
 <script src="dist/src/tokenizer.js"></script>
 <script src="dist/src/schema.js"></script>
 <script src="dist/src/erd.js"></script>
+<script src="dist/src/query.js"></script>
 <script src="dist/src/workspace.js"></script>
 <script src="dist/src/ui/large-input.js"></script>
 <script src="dist/src/ui/splitter.js"></script>
+<script src="dist/src/ui/erd-query.js"></script>
 <script src="dist/src/ui/erd-page.js"></script>
 </body>
 </html>
