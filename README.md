@@ -72,7 +72,9 @@ entities and foreign keys. Highlights:
   and any tables the declared graph cannot reach — each with an explicit
   resolution: teach the join by hand, add a `CROSS JOIN`, or leave the table
   out. **Teach join** defines a join by clicking two columns, including self
-  joins with a second table alias. The **Query** menu saves one query in this
+  joins with a second table alias. Aggregate any picked column (COUNT,
+  COUNT DISTINCT, SUM, AVG, MIN, MAX) and the remaining picks become the
+  `GROUP BY` list. The **Query** menu saves one query in this
   browser (explicit Save/Restore/Forget), exports and imports a versioned
   query file, and downloads the `.sql`. Joins are highlighted on the diagram,
   and the dialect-quoted SQL is ready to paste into a client such as DBeaver.

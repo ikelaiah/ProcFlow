@@ -1,4 +1,4 @@
-/* proc>flow v2.5.0 — ERD query-builder browser interaction suite.
+/* proc>flow v2.6.0 — ERD query-builder browser interaction suite.
    Drives erd.html in an iframe: query mode, on-card picking, join and problem
    cards, teaching by clicks, self joins, SQL options, highlighting, resize,
    Find, and the only-used filter. Publishes pass/fail on the page body so the
@@ -185,6 +185,37 @@
         (d.querySelector('#qb-sql-out .sql-kw')||{textContent:''}).textContent==='SELECT'&&
           !!d.querySelector('#qb-sql-out .sql-ident')&&
           !!d.querySelector('#qb-sql-out .sql-comment'));
+
+      /* ---- aggregates ---- */
+      var chipAggs=d.querySelectorAll('#qb-picks .qb-chip-agg');
+      record('chips expose an aggregate selector',chipAggs.length===2);
+      var targetAgg=chipAggs[1] as HTMLSelectElement;
+      targetAgg.value='count';
+      targetAgg.dispatchEvent(new Event('change',{bubbles:true}));
+      await wait(120);
+      record('aggregate renders a function and GROUP BY',
+        sql().indexOf('COUNT(orderheader.[PlacedAt]) AS count_orderheader_placedat')>=0&&
+          sql().indexOf('GROUP BY customer.[Email]')>=0,sql());
+      record('distinct is disabled and ignored with aggregates',
+        get('qb-distinct').disabled===true&&
+          sql().indexOf('SELECT DISTINCT')<0);
+      record('aggregate tip explains row multiplication',
+        (d.querySelector('#qb-plan-body .qb-tip')||{textContent:''})
+          .textContent.indexOf('Aggregates collapse grouped rows')>=0);
+      var againAgg=d.querySelectorAll('#qb-picks .qb-chip-agg')[1] as HTMLSelectElement;
+      againAgg.value='count-distinct';
+      againAgg.dispatchEvent(new Event('change',{bubbles:true}));
+      await wait(100);
+      record('count distinct renders COUNT(DISTINCT ...)',
+        sql().indexOf('COUNT(DISTINCT orderheader.[PlacedAt])')>=0,sql());
+      get('btn-qb-clear').click();
+      await wait(80);
+      record('clear resets aggregate selections',
+        d.querySelectorAll('#qb-picks .qb-chip-agg').length===0&&
+          get('qb-distinct').disabled===false);
+      pick('DBO.CUSTOMER','Email');
+      pick('DBO.ORDERHEADER','PlacedAt');
+      await wait(120);
 
       /* ---- resize ---- */
       var floatRect=get('qb-float').getBoundingClientRect();
@@ -397,6 +428,7 @@
     });
   });
 })();
+
 
 
 

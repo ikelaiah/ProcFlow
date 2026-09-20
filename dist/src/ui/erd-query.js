@@ -1,5 +1,5 @@
 "use strict";
-/* proc>flow v2.5.0 — ERD query-builder panel.
+/* proc>flow v2.6.0 — ERD query-builder panel.
    Query mode turns column rows on the diagram cards into checkboxes and shows
    a floating window with the SQL, the join plan, and any unjoinable picks.
    Join problems are never resolved silently: each one offers teach-the-join,
@@ -31,11 +31,15 @@
     var teaching = false;
     var teachFirst = null;
     var sorts = [];
+    var aggregates = {};
     var plan = null;
     var focusEntity = null;
     var manualSeq = 0;
     function keyOf(entityId, column) {
         return entityId + '|' + schemaNormColumn(column);
+    }
+    function hasAggregates() {
+        return Object.keys(aggregates).length > 0;
     }
     function splitValue(value) {
         var cut = String(value || '').indexOf('|');
@@ -156,6 +160,7 @@
                 return !(sort.entityId === entityId &&
                     schemaNormColumn(sort.column) === schemaNormColumn(column));
             });
+            delete aggregates[key];
         }
         refresh();
     }
@@ -197,7 +202,7 @@
                 return existing.entityId === entry.entityId &&
                     schemaNormColumn(existing.column) === schemaNormColumn(entry.column);
             })[0] || null;
-            picksEl.appendChild(qbViewChip(name, entry, index, sort));
+            picksEl.appendChild(qbViewChip(name, entry, index, sort, aggregates[keyOf(entry.entityId, entry.column)] || null));
         });
     }
     /* ===== join plan ===== */
@@ -269,6 +274,12 @@
                 planEl.appendChild(line);
             });
         }
+        if (hasAggregates()) {
+            var aggTip = document.createElement('p');
+            aggTip.className = 'qb-tip';
+            aggTip.textContent = 'Aggregates collapse grouped rows; SUM and AVG over a one-to-many join can multiply unless the detail rows are pre-aggregated.';
+            planEl.appendChild(aggTip);
+        }
         if (!distinct && plan.warnings.some(function (warning) {
             return warning.indexOf('repeat rows') >= 0;
         })) {
@@ -296,7 +307,8 @@
         var text = '';
         if (plan && plan.fromId) {
             text = queryPlanSQL(plan, { dialect: dialect, comments: withComments,
-                distinct: distinct, rowLimit: rowLimit, orderBy: sorts });
+                distinct: distinct, rowLimit: rowLimit, orderBy: sorts,
+                aggregates: aggregates });
         }
         if (!text) {
             sqlEl.textContent = '-- Pick columns on the diagram to generate SQL.';
@@ -361,6 +373,12 @@
             restoreBtn.disabled = !stored;
         if (forgetBtn)
             forgetBtn.disabled = !stored;
+        if (distinctEl) {
+            distinctEl.disabled = hasAggregates();
+            distinctEl.title = hasAggregates()
+                ? 'Distinct is redundant with GROUP BY; it is ignored while an aggregate is set.'
+                : 'Collapse duplicate rows';
+        }
         if (statusEl)
             statusEl.textContent = statusMessage();
         if (bodyEl)
@@ -468,6 +486,10 @@
             excluded[id] = 1;
             picks = picks.filter(function (entry) { return entry.entityId !== id; });
             sorts = sorts.filter(function (sort) { return sort.entityId !== id; });
+            Object.keys(aggregates).forEach(function (key) {
+                if (key.indexOf(id + '|') === 0)
+                    delete aggregates[key];
+            });
             manual = manual.filter(function (entry) {
                 return entry.leftId !== id && entry.rightId !== id;
             });
@@ -502,7 +524,8 @@
             joinTypes: joinTypes,
             pathChoices: pathChoices,
             options: { dialect: dialect, comments: withComments, distinct: distinct,
-                rowLimit: rowLimit, onlyUsed: onlyUsed, sorts: sorts }
+                rowLimit: rowLimit, onlyUsed: onlyUsed, sorts: sorts,
+                aggregates: aggregates }
         };
     }
     function setStoreStatus(text, warn) {
@@ -572,6 +595,7 @@
         rowLimit = state.options.rowLimit;
         onlyUsed = state.options.onlyUsed;
         sorts = querySavedSorts(state.options.sorts);
+        aggregates = queryCloneAggregates(state.options.aggregates);
         manual.forEach(function (entry) {
             var match = /^m(\d+)$/.exec(entry.id);
             if (match)
@@ -724,6 +748,13 @@
                     schemaNormColumn(entry.column) === schemaNormColumn(sort.column);
             });
         });
+        var nextAggregates = {};
+        Object.keys(aggregates).forEach(function (key) {
+            if (picks.some(function (entry) { return keyOf(entry.entityId, entry.column) === key; })) {
+                nextAggregates[key] = aggregates[key];
+            }
+        });
+        aggregates = nextAggregates;
         manual = manual.filter(function (entry) {
             return valid[entry.leftId] && valid[entry.rightId] &&
                 columnKeys[entry.leftId][schemaNormColumn(entry.leftColumn)] &&
@@ -969,6 +1000,7 @@
                 pathChoices = {};
                 drafts = {};
                 sorts = [];
+                aggregates = {};
                 refresh();
             });
         if (dragEl) {
@@ -1000,6 +1032,25 @@
                     if (entry && focusEntity)
                         focusEntity(entry.entityId);
                 }
+            });
+        if (picksEl)
+            picksEl.addEventListener('change', function (event) {
+                var target = event.target;
+                if (!target || !target.getAttribute)
+                    return;
+                if (target.getAttribute('data-action') !== 'aggregate')
+                    return;
+                var index = parseInt(target.getAttribute('data-index') || '', 10);
+                var entry = picks[index];
+                if (!entry)
+                    return;
+                var key = keyOf(entry.entityId, entry.column);
+                var value = target.value;
+                if (QUERY_AGGREGATE_FNS.indexOf(value) >= 0)
+                    aggregates[key] = value;
+                else
+                    delete aggregates[key];
+                refresh();
             });
         planEl.addEventListener('mouseover', function (event) {
             var target = event.target;

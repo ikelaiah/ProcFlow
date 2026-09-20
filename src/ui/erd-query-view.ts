@@ -1,4 +1,4 @@
-/* proc>flow v2.4.1 — ERD query-builder view builders.
+/* proc>flow v2.6.0 — ERD query-builder view builders.
    Pure DOM construction for the floating window: chips, join cards, problem
    cards, ambiguity choices, the teaching banner, and the learn list. These
    functions hold no state and attach no listeners; every interaction is wired
@@ -74,7 +74,8 @@ function qbViewTeachBanner(graph: QueryGraph,
 }
 
 function qbViewChip(entityName: string, entry: QueryColumnRef, index: number,
-                    sort: QuerySort | null): HTMLElement {
+                    sort: QuerySort | null,
+                    aggregate: QueryAggregateFn | null): HTMLElement {
   var chip=document.createElement('span');
   chip.className='qb-chip';
   var label=document.createElement('button');
@@ -84,6 +85,22 @@ function qbViewChip(entityName: string, entry: QueryColumnRef, index: number,
   label.title='Show '+entityName+' on the diagram';
   label.setAttribute('data-action','reveal');
   label.setAttribute('data-index',String(index));
+  var aggSelect=document.createElement('select');
+  aggSelect.className='qb-chip-agg';
+  aggSelect.setAttribute('data-action','aggregate');
+  aggSelect.setAttribute('data-index',String(index));
+  aggSelect.setAttribute('aria-label',
+    'Aggregate for '+entityName+'.'+entry.column);
+  aggSelect.title='Aggregate this column; every other picked column becomes the GROUP BY list';
+  [['','—'],['count','COUNT'],['count-distinct','COUNT DISTINCT'],
+   ['sum','SUM'],['avg','AVG'],['min','MIN'],['max','MAX']]
+    .forEach(function(option){
+      var item=document.createElement('option');
+      item.value=option[0];
+      item.textContent=option[1];
+      aggSelect.appendChild(item);
+    });
+  aggSelect.value=aggregate||'';
   var sortBtn=document.createElement('button');
   sortBtn.type='button';
   sortBtn.className='qb-chip-sort'+(sort?' active':'');
@@ -104,6 +121,7 @@ function qbViewChip(entityName: string, entry: QueryColumnRef, index: number,
   remove.setAttribute('data-action','remove');
   remove.setAttribute('data-index',String(index));
   chip.appendChild(label);
+  chip.appendChild(aggSelect);
   chip.appendChild(sortBtn);
   chip.appendChild(remove);
   return chip;
@@ -386,4 +404,5 @@ function qbViewLearn(education: string[]): HTMLElement | null {
   details.appendChild(list);
   return details;
 }
+
 

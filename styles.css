@@ -559,6 +559,13 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
   color:var(--ink-faint);cursor:pointer;padding:3px 6px;font-size:11px;line-height:1
 }
 .qb-chip-sort:hover,.qb-chip-sort.active{color:var(--marigold)}
+.qb-chip-agg{
+  border:0;border-left:1px solid var(--rule);background:transparent;
+  color:var(--ink-faint);cursor:pointer;padding:2px 4px;
+  font-family:var(--mono);font-size:10px;max-width:112px
+}
+.qb-chip-agg:hover{color:var(--marigold)}
+.qb-chip-agg:focus-visible{outline:2px solid var(--marigold);outline-offset:-2px}
 .qb-tip{margin:8px 0 0;color:var(--marigold);font-size:11.5px}.qb-tip-action{
   border:0;background:transparent;color:var(--marigold);cursor:pointer;
   font:inherit;text-decoration:underline;padding:0

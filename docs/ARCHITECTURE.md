@@ -36,7 +36,7 @@ The main boundaries are:
 - `src/schema.ts` and `src/erd.ts` — declared-constraint schema IR, ERD layout,
   and layout files for the ERD page.
 - `src/query.ts` — ERD query builder: join-graph pathfinding over declared
-  foreign keys and dialect-quoted SQL emission.
+  foreign keys, aggregates/GROUP BY, and dialect-quoted SQL emission.
 - `src/query-store.ts` — pure, versioned query files and saved-query
   serialization with schema-fingerprint pruning.
 - `src/ui/erd-page.ts` and `src/ui/erd-query.ts` — ERD interaction, query-mode

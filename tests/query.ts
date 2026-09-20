@@ -1,4 +1,4 @@
-/* proc>flow v2.5.0 — ERD query-builder fixtures.
+/* proc>flow v2.6.0 — ERD query-builder fixtures.
    Join graph construction from declared FKs only, shortest-path selection
    with equal-cost alternatives, bridge discovery, optional/reverse join
    policy, hand-taught joins, disconnected-selection problems, dialect
@@ -686,7 +686,8 @@
       pathChoices:{'DBO.APPUSER->DBO.ORDERHEADER':1},
       options:{dialect:'postgres',comments:false,distinct:true,rowLimit:100,
         onlyUsed:true,
-        sorts:[{entityId:'DBO.CUSTOMER',column:'Email',direction:'desc'}]}
+        sorts:[{entityId:'DBO.CUSTOMER',column:'Email',direction:'desc'}],
+        aggregates:{'DBO.CUSTOMER|EMAIL':'count'}}
     };
     var built=queryStateBuild(schema,storeInput);
     var builtJSON=queryStateToJSON(built);
@@ -720,7 +721,8 @@
       joinTypes:{good:'inner',bad:'sideways'},
       pathChoices:{'A->B':2,'C->D':'x'},
       options:{dialect:'oracle',comments:'yes',distinct:1,rowLimit:-5,
-        onlyUsed:'y',sorts:[{entityId:'A',column:'X',direction:'down'}]}
+        onlyUsed:'y',sorts:[{entityId:'A',column:'X',direction:'down'}],
+        aggregates:{good:'sum',bad:'median'}}
     }));
     record('v2.5.0 unreadable saved entries are ignored with one info diagnostic',
       !!messy.state&&
@@ -736,6 +738,8 @@
         messy.state.options.rowLimit===0&&
         messy.state.options.sorts.length===1&&
         messy.state.options.sorts[0].direction==='asc'&&
+        messy.state.options.aggregates.good==='sum'&&
+        !messy.state.options.aggregates.bad&&
         messy.diagnostics.length===1&&
         messy.diagnostics[0].code==='erd_query_entries_ignored'&&
         messy.diagnostics[0].severity==='info',
@@ -760,7 +764,9 @@
       options:{dialect:'tsql',comments:true,distinct:false,rowLimit:0,
         onlyUsed:false,
         sorts:[{entityId:'DBO.CUSTOMER',column:'Email',direction:'asc'},
-               {entityId:'DBO.CUSTOMER',column:'Legacy',direction:'asc'}]}
+               {entityId:'DBO.CUSTOMER',column:'Legacy',direction:'asc'}],
+        aggregates:{'DBO.CUSTOMER|EMAIL':'sum',
+                    'DBO.CUSTOMER|LEGACY':'count'}}
     });
     var pruned=queryStatePrune(stale,queryBuildGraph(schema));
     record('v2.5.0 stale references are pruned and reported, never applied silently',
@@ -772,7 +778,9 @@
         pruned.state.pathChoices['DBO.APPUSER->DBO.ORDERHEADER']===0&&
         !pruned.state.pathChoices['DBO.GONE->DBO.CUSTOMER']&&
         pruned.state.options.sorts.length===1&&
-        pruned.dropped.length===7,
+        pruned.state.options.aggregates['DBO.CUSTOMER|EMAIL']==='sum'&&
+        !pruned.state.options.aggregates['DBO.CUSTOMER|LEGACY']&&
+        pruned.dropped.length===8,
       pruned);
     var extraSchema=parseSchema(DDL+
       '\nCREATE TABLE dbo.ExtraTable (Id INT PRIMARY KEY);');
@@ -787,6 +795,17 @@
       queryFileBaseName(built)==='orders-by-customer'&&
         queryFileBaseName(noName)==='procflow-query-'+schemaFingerprint(schema),
       {named:queryFileBaseName(built),unnamed:queryFileBaseName(noName)});
+    var v1File=queryStateFromJSON(JSON.stringify({
+      format:'procflow-erd-query',version:1,fingerprint:'abc',
+      selections:[{entityId:'A',column:'X'}],
+      options:{dialect:'tsql',comments:true,distinct:false,rowLimit:0,
+        onlyUsed:false,sorts:[]}
+    }));
+    record('v2.6.0 version-1 query files migrate forward with empty aggregates',
+      !!v1File.state&&v1File.state.version===2&&
+        Object.keys(v1File.state.options.aggregates).length===0&&
+        v1File.diagnostics.length===0,
+      v1File);
     var wrote=writeErdQuery(builtJSON);
     var stored=hasStoredErdQuery();
     var storedParsed=queryStateFromJSON(readErdQuery());
@@ -803,7 +822,64 @@
     record('v2.5.0 stale references are pruned and reported, never applied silently',false,String(err&&err.stack||err));
     record('v2.5.0 the schema fingerprint is stable and changes with the schema',false,String(err&&err.stack||err));
     record('v2.5.0 export file names derive from the query name or fingerprint',false,String(err&&err.stack||err));
+    record('v2.6.0 version-1 query files migrate forward with empty aggregates',false,String(err&&err.stack||err));
     record('v2.5.0 opt-in browser storage round-trips and clears explicitly',false,String(err&&err.stack||err));
+  }
+
+  /* ---- v2.6.0 aggregates: GROUP BY and aggregate functions ---- */
+  try{
+    var aggSelections: QueryColumnRef[]=[
+      {entityId:'DBO.CUSTOMER',column:'Email'},
+      {entityId:'DBO.ORDERHEADER',column:'OrderId'}
+    ];
+    var aggPlan=planFor(schema,aggSelections);
+    var aggSql=queryPlanSQL(aggPlan,{dialect:'tsql',comments:false,
+      aggregates:{'DBO.ORDERHEADER|ORDERID':'count'}});
+    record('v2.6.0 aggregate columns render as functions and group the rest',
+      aggSql===('SELECT\n'+
+        '  customer.[Email],\n'+
+        '  COUNT(orderheader.[OrderId]) AS count_orderheader_orderid\n'+
+        'FROM [dbo].[Customer] AS customer\n'+
+        'LEFT JOIN [dbo].[OrderHeader] AS orderheader\n'+
+        '  ON customer.[CustomerId] = orderheader.[CustomerId]\n'+
+        'GROUP BY customer.[Email];'),
+      aggSql);
+    var allAgg=queryPlanSQL(aggPlan,{dialect:'tsql',comments:false,
+      aggregates:{'DBO.CUSTOMER|EMAIL':'count-distinct',
+        'DBO.ORDERHEADER|ORDERID':'sum'}});
+    record('v2.6.0 an all-aggregate selection omits GROUP BY',
+      allAgg.indexOf('GROUP BY')<0&&
+        allAgg.indexOf('COUNT(DISTINCT customer.[Email]) AS count_distinct_customer_email')>=0&&
+        allAgg.indexOf('SUM(orderheader.[OrderId]) AS sum_orderheader_orderid')>=0,
+      allAgg);
+    var orderedAgg=queryPlanSQL(aggPlan,{dialect:'tsql',comments:false,
+      aggregates:{'DBO.ORDERHEADER|ORDERID':'count'},
+      orderBy:[{entityId:'DBO.ORDERHEADER',column:'OrderId',direction:'desc'}]});
+    record('v2.6.0 ordering can use the aggregate expression',
+      orderedAgg.indexOf('ORDER BY COUNT(orderheader.[OrderId]) DESC;')>=0,
+      orderedAgg);
+    var suppressed=queryPlanSQL(aggPlan,{dialect:'tsql',comments:true,
+      distinct:true,aggregates:{'DBO.ORDERHEADER|ORDERID':'count'}});
+    record('v2.6.0 DISTINCT is suppressed and explained with aggregates',
+      suppressed.indexOf('SELECT DISTINCT')<0&&
+        suppressed.indexOf('Grouped by: dbo.Customer.Email.')>=0&&
+        suppressed.indexOf('Aggregates: COUNT(dbo.OrderHeader.OrderId).')>=0&&
+        suppressed.indexOf(
+          'Distinct: ignored because GROUP BY already collapses rows.')>=0,
+      suppressed);
+    var invalidAgg=queryPlanSQL(aggPlan,{dialect:'tsql',comments:false,
+      aggregates:{'DBO.ORDERHEADER|ORDERID':'median' as any}});
+    record('v2.6.0 unknown aggregate functions are ignored',
+      invalidAgg.indexOf('GROUP BY')<0&&
+        invalidAgg.indexOf('COUNT(')<0&&
+        invalidAgg.indexOf('orderheader.[OrderId]\n')>=0,
+      invalidAgg);
+  }catch(err){
+    record('v2.6.0 aggregate columns render as functions and group the rest',false,String(err&&err.stack||err));
+    record('v2.6.0 an all-aggregate selection omits GROUP BY',false,String(err&&err.stack||err));
+    record('v2.6.0 ordering can use the aggregate expression',false,String(err&&err.stack||err));
+    record('v2.6.0 DISTINCT is suppressed and explained with aggregates',false,String(err&&err.stack||err));
+    record('v2.6.0 unknown aggregate functions are ignored',false,String(err&&err.stack||err));
   }
 
   var passed=results.filter(function(result){ return result.pass; }).length;
@@ -811,5 +887,6 @@
   window.PROCFLOW_QUERY_RESULT={passed:passed,total:results.length};
   window.PROCFLOW_QUERY_PASS=passed===results.length;
 })();
+
 
 

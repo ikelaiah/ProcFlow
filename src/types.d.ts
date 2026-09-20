@@ -1175,7 +1175,13 @@ interface QuerySQLOptions {
   distinct?: boolean;
   rowLimit?: number;
   orderBy?: QuerySort[];
+  /* v2.6.0 aggregates: picked columns that render inside an aggregate
+     function, keyed entityId|COLUMN. Every other picked column becomes the
+     GROUP BY list. */
+  aggregates?: Record<string, QueryAggregateFn>;
 }
+
+type QueryAggregateFn = 'count' | 'count-distinct' | 'sum' | 'avg' | 'min' | 'max';
 
 interface QuerySort {
   entityId: string;
@@ -1193,6 +1199,8 @@ interface ErdQuerySavedOptions {
   rowLimit: number;
   onlyUsed: boolean;
   sorts: QuerySort[];
+  /* v2.6.0 (file version 2); absent in version-1 files. */
+  aggregates: Record<string, QueryAggregateFn>;
 }
 
 interface ErdQuerySavedState {
