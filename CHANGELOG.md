@@ -3,15 +3,19 @@
 All notable released ProcFlow changes are recorded here. Detailed verification
 evidence belongs in the canonical release note under `docs/releases/`.
 
-## Unreleased
+## v2.6.0 — Aggregates and grouping
 
-- Query builder aggregates: per-column **COUNT**, **COUNT DISTINCT**, **SUM**,
-  **AVG**, **MIN**, and **MAX** selectors. The remaining picked columns become
-  the `GROUP BY` list (omitted when every pick is aggregated), sorting can
-  target the aggregate expression, and `DISTINCT` is disabled and explained
-  while grouping.
-- Query files move to version 2 with backward-compatible migration from
-  version 1; aggregates are saved, exported, and pruned like other state.
+- Added per-column aggregate selectors: **COUNT**, **COUNT DISTINCT**, **SUM**,
+  **AVG**, **MIN**, and **MAX**. The remaining picked columns become the
+  `GROUP BY` list in pick order; `GROUP BY` is omitted when every pick is
+  aggregated.
+- Aggregate expressions get deterministic aliases, sorting an aggregated
+  column orders by the expression, and `DISTINCT` is disabled and explained
+  while grouping because `GROUP BY` already collapses rows.
+- Query files move to version 2; version-1 files migrate forward with empty
+  aggregates, and aggregates are saved, exported, restored, and pruned with
+  their picks. Newer file versions are rejected with a diagnostic.
+- Added a plan tip for one-to-many multiplication with `SUM`/`AVG`.
 - Documentation: ADR-003 and an aggregates section in `docs/QUERY_BUILDER.md`.
 
 ## v2.5.0 — Saved queries and file export
