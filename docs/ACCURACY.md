@@ -1,6 +1,6 @@
 # Accuracy and analysis contract
 
-ProcFlow v2.3.0 is the current released version. It is a deterministic
+ProcFlow v2.4.0 is the current released version. It is a deterministic
 heuristic analyser, not a database compiler, and does not execute SQL.
 Diagrams are investigation aids: verify material findings against the source
 and the target database.
@@ -32,11 +32,17 @@ SQL into a resolved dependency.
   synonym. Partial and conflicting matches stay external with diagnostics.
 - Shared or unresolved report datasets remain visible rather than being
   guessed.
+- Query-builder joins follow declared foreign-key evidence only. Tables the
+  declared graph cannot reach are reported with explicit resolutions (taught
+  join, opt-in `CROSS JOIN`, or exclusion); a cartesian product is never
+  silent, and the SQL header names any picked columns left out.
+- Taught joins and self-join aliases are labelled as not declared in the plan
+  and in the generated SQL; ProcFlow states that it cannot verify them.
 - Unsupported or malformed regions are retained as source spans and reported.
 
 ## Fixture evidence
 
-The current snapshot is [metrics-v2.3.0.json](metrics-v2.3.0.json). It covers
+The current snapshot is [metrics-v2.4.0.json](metrics-v2.4.0.json). It covers
 the historical golden and fuzz corpus, browser interaction, parity, layout,
 workspace, catalogue, column, column-flow, report, and report-graph suites.
 The v1.14 scale suite exercises 100 KB and 500 KB inputs, 100-object estates,

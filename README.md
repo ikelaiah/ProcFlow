@@ -42,7 +42,7 @@ connection, sign-in, or installation is required.
 
 ## Quick start
 
-1. Download the `v2.3.0` runtime ZIP from the [GitHub release](https://github.com/ikelaiah/ProcFlow/releases/tag/v2.3.0), or clone this repository.
+1. Download the `v2.4.0` runtime ZIP from the [GitHub release](https://github.com/ikelaiah/ProcFlow/releases/tag/v2.4.0), or clone this repository.
 2. Open `index.html` in a current Chromium, Firefox, or Edge browser.
 3. Paste SQL or import local files, select a dialect or **Auto**, and choose
    **Refresh**.
@@ -75,6 +75,15 @@ matches and jumps between them with Enter. The ERD page asserts declared
 constraints only; it never infers a relationship from query text, and
 unresolved references stay explicit.
 
+The ERD page also builds queries from that evidence. Toggle **Query builder**,
+tick columns on the table cards, and a floating window shows the generated
+`SELECT`, a join plan with INNER/LEFT controls and plain-language row notes,
+and any tables the declared graph cannot reach — each with an explicit
+resolution: teach the join by hand, add a `CROSS JOIN`, or leave the table out.
+Joins are highlighted on the diagram, the SQL is dialect-quoted and ready to
+paste into a client such as DBeaver, and **Teach join** lets you define a join
+by clicking two columns, including self joins with a second table alias.
+
 For development, see [Development](docs/DEVELOPMENT.md). For a simple served
 run, use `python -m http.server 8000` from the runtime directory and open
 `http://127.0.0.1:8000/`.
@@ -103,7 +112,7 @@ in the browser.
 
 ## Supported dialects
 
-ProcFlow v2.3.0 supports Microsoft T-SQL, IBM DB2 SQL PL, PostgreSQL
+ProcFlow v2.4.0 supports Microsoft T-SQL, IBM DB2 SQL PL, PostgreSQL
 PL/pgSQL, and SQLite. Detection is automatic but can be overridden. Vendor
 extensions outside these tested constructs may produce diagnostics or reduced
 coverage; see [Accuracy](docs/ACCURACY.md).

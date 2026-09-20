@@ -32,8 +32,22 @@ The main boundaries are:
 - `src/report.ts` — report/dataset import and graph construction.
 - `src/exporters.ts` — graph layout, Mermaid, SVG, draw.io, and narration.
 - `src/workspace.ts` — opt-in browser persistence and presentation filters.
+- `src/schema.ts` and `src/erd.ts` — declared-constraint schema IR, ERD layout,
+  and layout files for the ERD page.
+- `src/query.ts` — ERD query builder: join-graph pathfinding over declared
+  foreign keys and dialect-quoted SQL emission.
+- `src/ui/erd-page.ts` and `src/ui/erd-query.ts` — ERD interaction, query-mode
+  checkboxes and overlay highlighting, the join plan, and the floating SQL
+  window.
 - `src/ui/large-input.ts` and `src/app.ts` — browser interaction and the
   large-input responsiveness policy.
+
+The ERD query builder follows declared foreign-key evidence only. Picked
+columns that the declared graph cannot connect become explicit problems with
+three resolutions: teach the join by hand (labelled "not declared" in the plan
+and SQL), opt into a CROSS JOIN, or leave the columns out. It never silently
+produces a cartesian product, and it never drops a pick from the SQL without
+naming it in the provenance comment.
 
 ## Design invariants
 
