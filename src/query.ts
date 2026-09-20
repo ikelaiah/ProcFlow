@@ -1,4 +1,4 @@
-/* ===== v2.4.0 ERD query builder (picked columns → declared-FK joins → SQL) =====
+/* proc>flow v2.4.0 — ERD query builder (picked columns → declared-FK joins → SQL).
    Picked columns define a set of tables. The builder follows declared
    FOREIGN KEY constraints to connect those tables, preferring exact
    resolutions over name-matched ones, and emits a SELECT ready to paste into
@@ -32,11 +32,6 @@ var QUERY_DIALECT_LABELS: Record<QueryDialect, string> = {
    foreign keys: child = FK holder, parent = referenced key. External
    (unresolved) targets and objects without declared columns cannot be picked
    or joined; they are listed in `skipped` so the UI can explain why. */
-interface QueryDijkstraResult {
-  dist: Record<string, number>;
-  hops: Record<string, number>;
-}
-
 function queryBuildGraph(result: SchemaResult): QueryGraph {
   var graph: QueryGraph={nodes:{},order:[],edges:[],skipped:[]};
   var entities=(result&&result.entities)||[];
@@ -109,12 +104,16 @@ function queryOtherEnd(edge: QueryGraphEdge, nodeId: string): string | null {
    3, hand-taught join = 5. Ties keep declaration order, so the plan is
    reproducible. All shortest paths are enumerated up to a small cap so the
    UI can offer a choice when a selection is ambiguous. */
-function queryDijkstra(graph: QueryGraph, sourceId: string): QueryDijkstraResult {
-  var dist: Record<string, number>={}, hops: Record<string, number>={};
+interface QueryPathFrame {
+  node: string;
+  edgeIndex: number;
+}
+
+function queryDijkstra(graph: QueryGraph, sourceId: string): Record<string, number> {
+  var dist: Record<string, number>={};
   var done: StringSet={};
-  if(!graph.nodes[sourceId]) return {dist:dist,hops:hops};
+  if(!graph.nodes[sourceId]) return dist;
   dist[sourceId]=0;
-  hops[sourceId]=0;
   while(true){
     var node: string | null=null;
     graph.order.forEach(function(id){
@@ -128,46 +127,52 @@ function queryDijkstra(graph: QueryGraph, sourceId: string): QueryDijkstraResult
       var other=queryOtherEnd(edge,node);
       if(other===null) return;
       var step=dist[node]+edge.weight;
-      if(dist[other]===undefined||step<dist[other]||
-         (step===dist[other]&&hops[node]+1<hops[other])){
-        dist[other]=step;
-        hops[other]=hops[node]+1;
-      }
+      if(dist[other]===undefined||step<dist[other]) dist[other]=step;
     });
   }
-  return {dist:dist,hops:hops};
+  return dist;
 }
 
+/* Iterative backtracking: a path can span every table in an estate, and this
+   runs on the UI thread, so it must not consume the call stack. */
 function queryEnumeratePaths(graph: QueryGraph, fromId: string, toId: string,
                              dist: Record<string, number>,
                              maxPaths: number): QueryPath[] {
   var paths: QueryPath[]=[];
   if(!graph.nodes[fromId]||!graph.nodes[toId]) return paths;
   if(dist[fromId]!==0||dist[toId]===undefined) return paths;
-  var acc: QueryPathStep[]=[], visited: StringSet={};
+  var acc: QueryPathStep[]=[];
+  var visited: StringSet={};
   visited[toId]=1;
-  function walk(node: string): void {
-    if(paths.length>=maxPaths) return;
-    if(node===fromId){
+  var stack: QueryPathFrame[]=[{node:toId,edgeIndex:0}];
+  while(stack.length&&paths.length<maxPaths){
+    var frame=stack[stack.length-1];
+    if(frame.node===fromId){
       var steps=acc.slice().reverse();
       paths.push({steps:steps,cost:dist[toId],
         entityIds:steps.map(function(step){ return step.fromId; }).concat([toId])});
-      return;
+      stack.pop();
+      delete visited[frame.node];
+      if(stack.length) acc.pop();
+      continue;
     }
-    graph.nodes[node].edges.forEach(function(edge){
-      if(paths.length>=maxPaths) return;
-      var other=queryOtherEnd(edge,node);
-      if(other===null||visited[other]) return;
-      if(dist[other]===undefined||dist[other]+edge.weight!==dist[node]) return;
-      acc.push({edgeId:edge.id,fromId:other,toId:node,
-        reverse:edge.parentId===other});
-      visited[other]=1;
-      walk(other);
-      delete visited[other];
-      acc.pop();
-    });
+    var edges=graph.nodes[frame.node].edges;
+    if(frame.edgeIndex>=edges.length){
+      stack.pop();
+      delete visited[frame.node];
+      if(stack.length) acc.pop();
+      continue;
+    }
+    var edge=edges[frame.edgeIndex];
+    frame.edgeIndex++;
+    var other=queryOtherEnd(edge,frame.node);
+    if(other===null||visited[other]) continue;
+    if(dist[other]===undefined||dist[other]+edge.weight!==dist[frame.node]) continue;
+    acc.push({edgeId:edge.id,fromId:other,toId:frame.node,
+      reverse:edge.parentId===other});
+    visited[other]=1;
+    stack.push({node:other,edgeIndex:0});
   }
-  walk(toId);
   return paths;
 }
 
@@ -354,7 +359,7 @@ function queryBuildPlan(input: QueryBuildInput): QueryPlan {
     if(!graph.nodes[id]||used[id]) return;
     if(excluded[id]) return;
     var reachable=queryDijkstra(graph,id);
-    if(usedOrder.some(function(treeId){ return reachable.dist[treeId]!==undefined; })){
+    if(usedOrder.some(function(treeId){ return reachable[treeId]!==undefined; })){
       plan.warnings.push(queryNameOf(graph,id)+
         ' is connected by a declared key, so the CROSS JOIN request was ignored.');
       return;
@@ -377,13 +382,13 @@ function queryBuildPlan(input: QueryBuildInput): QueryPlan {
     var best: {entityId: string; treeId: string; treeIndex: number;
                cost: number; paths: QueryPath[]} | null=null;
     remaining.forEach(function(id){
-      var result=queryDijkstra(graph,id);
+      var dist=queryDijkstra(graph,id);
       usedOrder.forEach(function(treeId,index){
-        var cost=result.dist[treeId];
+        var cost=dist[treeId];
         if(cost===undefined) return;
         if(best===null||cost<best.cost||
            (cost===best.cost&&id===best.entityId&&index<best.treeIndex)){
-          var paths=queryEnumeratePaths(graph,id,treeId,result.dist,QUERY_MAX_PATHS);
+          var paths=queryEnumeratePaths(graph,id,treeId,dist,QUERY_MAX_PATHS);
           if(!paths.length) return;
           best={entityId:id,treeId:treeId,treeIndex:index,cost:cost,paths:paths};
         }

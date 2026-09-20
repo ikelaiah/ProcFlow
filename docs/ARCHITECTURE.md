@@ -47,7 +47,21 @@ columns that the declared graph cannot connect become explicit problems with
 three resolutions: teach the join by hand (labelled "not declared" in the plan
 and SQL), opt into a CROSS JOIN, or leave the columns out. It never silently
 produces a cartesian product, and it never drops a pick from the SQL without
-naming it in the provenance comment.
+naming it in the provenance comment. See
+[QUERY_BUILDER.md](QUERY_BUILDER.md) and
+[ADR-001](decisions/ADR-001-declared-evidence-query-builder.md).
+
+```text
+DDL -> schema IR -> query join graph -> join plan (paths, bridges, problems)
+                                            |-> SQL options -> dialect SQL
+                                            |-> decoration -> cards / overlay
+```
+
+`src/query.ts` is pure and DOM-free: graph construction, shortest-path
+selection, plan building, SQL emission, and the highlighting tokenizer.
+`src/ui/erd-query.ts` owns the panel state and events; `src/ui/erd-page.ts`
+consumes the decoration contract (`erdQueryPanelState`) to draw checkboxes,
+plan highlights, and problem rings.
 
 ## Design invariants
 
@@ -57,6 +71,8 @@ naming it in the provenance comment.
 4. Export ordering and layout are deterministic for the documented graph
    classes.
 5. Persistence is opt-in and local to the browser.
+6. Query-builder joins use declared foreign-key evidence only; unjoinable picks
+   stay explicit, and a cartesian product is never silent.
 
 The v1.14 layout implementation uses bounded, deterministic placement and an
 iterative graph traversal for cycle detection, avoiding a call-stack limit for

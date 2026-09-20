@@ -1,5 +1,5 @@
 "use strict";
-/* proc>flow v2.1.0 — ERD page controller.
+/* proc>flow v2.4.0 — ERD page controller.
    Parses schema DDL into the shared schema IR and draws an entity map of
    declared tables, views, and foreign keys. Declared constraints only: this
    page never infers a relationship from query text. */
@@ -1164,26 +1164,7 @@
     function copyMermaid() {
         var text = mermaidOut ? mermaidOut.textContent : '';
         var done = function () { flash($('btn-erd-copy'), 'Copied'); };
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text, done); });
-        }
-        else
-            fallbackCopy(text, done);
-    }
-    function fallbackCopy(text, done) {
-        var area = document.createElement('textarea');
-        area.value = text;
-        area.setAttribute('readonly', '');
-        area.style.position = 'absolute';
-        area.style.left = '-9999px';
-        document.body.appendChild(area);
-        area.select();
-        try {
-            document.execCommand('copy');
-            done();
-        }
-        catch (err) { /* clipboard unavailable */ }
-        document.body.removeChild(area);
+        copyText(text, done);
     }
     if (sql) {
         sql.value = '';
@@ -1265,7 +1246,9 @@
         selectEntity(selectedId);
         requestAnimationFrame(drawOverlay);
     });
-    document.addEventListener('procflow-query-changed', scheduleOverlay);
+    /* Query state changes are low-frequency and must be visible immediately;
+       animation frames can be starved in headless and off-screen contexts. */
+    document.addEventListener('procflow-query-changed', drawOverlay);
     if (findInput) {
         findInput.addEventListener('input', function () { findIndex = 0; applyFind(true); });
         findInput.addEventListener('keydown', function (event) {
@@ -1495,7 +1478,7 @@
         }, { passive: false });
     }
     document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape' && selectedId)
+        if (event.key === 'Escape' && selectedId && !queryTeachingNow())
             selectEntity(null);
     });
     if (typeof window.erdQueryPanelInit === 'function') {

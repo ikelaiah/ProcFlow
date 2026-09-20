@@ -14,11 +14,22 @@ iframe{position:absolute;width:1280px;height:800px;left:-10000px}
 <h1>proc&gt;flow Firefox smoke</h1>
 <p id="summary">Running…</p>
 <iframe id="app" src="../index.html"></iframe>
+<iframe id="erd" src="../erd.html"></iframe>
 <script>
 (function(){
-  var frame=document.getElementById('app');
-  frame.addEventListener('load',function(){
-    var w=frame.contentWindow,d=frame.contentDocument,checks=[];
+  var appFrame=document.getElementById('app'), erdFrame=document.getElementById('erd');
+  var checks=[], pending={app:false,erd:false};
+  function maybeFinish(){
+    if(!pending.app||!pending.erd) return;
+    var pass=checks.every(function(value){return value;});
+    document.body.className=pass?'pass':'fail';
+    document.getElementById('summary').textContent=(pass?'PASS':'FAIL')+' · '+
+      checks.filter(function(value){return value;}).length+'/'+checks.length+
+      ' critical paths';
+    document.title='proc>flow Firefox smoke '+(pass?'PASS':'FAIL');
+  }
+  appFrame.addEventListener('load',function(){
+    var w=appFrame.contentWindow,d=appFrame.contentDocument;
     function get(id){return d.getElementById(id);}
     checks.push(!!d.documentElement.getAttribute('data-procflow-ready'));
     get('sql').value='SELECT id FROM dbo.firefox_smoke_source;';
@@ -35,11 +46,26 @@ iframe{position:absolute;width:1280px;height:800px;left:-10000px}
     checks.push(typeof w.toDrawio==='function'&&typeof w.buildWorkspaceSnapshot==='function');
     setTimeout(function(){
       checks.push(!!d.querySelector('#stage svg'));
-      var pass=checks.every(function(value){return value;});
-      document.body.className=pass?'pass':'fail';
-      document.getElementById('summary').textContent=(pass?'PASS':'FAIL')+' · '+checks.filter(function(value){return value;}).length+'/'+checks.length+' critical paths';
-      document.title='proc>flow Firefox smoke '+(pass?'PASS':'FAIL');
+      pending.app=true;
+      maybeFinish();
     },1000);
+  });
+  erdFrame.addEventListener('load',function(){
+    var w=erdFrame.contentWindow,d=erdFrame.contentDocument;
+    checks.push(!!d.documentElement.getAttribute('data-procflow-ready'));
+    checks.push(typeof w.erdQueryPanelSetSchema==='function'&&
+      typeof w.queryBuildPlan==='function'&&
+      typeof w.toMermaidER==='function');
+    d.getElementById('btn-erd-sample').click();
+    var toggle=d.getElementById('btn-erd-query');
+    toggle.click();
+    var panel=!d.getElementById('qb-float').hidden;
+    var box=d.querySelector('#erd-cards input.qb-pick');
+    if(box) box.click();
+    checks.push(panel&&!!d.querySelector('#erd-cards input.qb-pick')&&
+      (d.getElementById('qb-sql-out').textContent||'').indexOf('SELECT')>=0);
+    pending.erd=true;
+    maybeFinish();
   });
 })();
 </script>

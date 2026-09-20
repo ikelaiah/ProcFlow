@@ -51,38 +51,31 @@ connection, sign-in, or installation is required.
 
 For schema DDL, open `erd.html`, paste or import `CREATE TABLE` / `ALTER TABLE`
 statements (T-SQL, PostgreSQL, DB2, or SQLite), and review the declared
-entities and foreign keys. Drag the canvas to pan, drag a table card to move it
-out of the way and declutter relationship lines, select a table to highlight
-its declared foreign keys and list each one with its column mapping and
-cardinality, and press **Clear** (or Escape) to deselect. A freshly parsed
-schema auto-arranges; edges anchor at the referenced column row and route
-orthogonally through card-free gutters, with crossings, direction (LR/TB/Auto),
-and spacing (Compact/Normal/Roomy) reported in the Layout menu. The **Layout**
-menu also arranges on demand (**Auto arrange**: referenced
-tables before referencing tables, views downstream of their `FROM`/`JOIN`
-sources), resets to declaration order, pins tables so Auto arrange keeps their
-position (**Unpin all** clears them), saves/restores the layout in this
-browser (opt-in), and exports/imports a versioned layout file keyed by a schema
-fingerprint. Zoom controls under
-the canvas (or **Fit**) frame the whole estate; with a table selected, **Fit**
-frames that table and its declared neighbours and the selection ring stays
-visible at estate zoom. On both the flowchart
-and ERD pages the divider between the editor and the diagram is draggable
-(double-click it to reset). Estates with hundreds of tables stay responsive:
-auto-draw pauses above the shared large-input threshold until **Refresh**,
-boxes switch to a compact summary automatically, and **Find** highlights
-matches and jumps between them with Enter. The ERD page asserts declared
-constraints only; it never infers a relationship from query text, and
-unresolved references stay explicit.
+entities and foreign keys. Highlights:
 
-The ERD page also builds queries from that evidence. Toggle **Query builder**,
-tick columns on the table cards, and a floating window shows the generated
-`SELECT`, a join plan with INNER/LEFT controls and plain-language row notes,
-and any tables the declared graph cannot reach — each with an explicit
-resolution: teach the join by hand, add a `CROSS JOIN`, or leave the table out.
-Joins are highlighted on the diagram, the SQL is dialect-quoted and ready to
-paste into a client such as DBeaver, and **Teach join** lets you define a join
-by clicking two columns, including self joins with a second table alias.
+- **Explore:** drag the canvas to pan, drag cards to declutter relationship
+  lines, and select a table to highlight and list its declared foreign keys
+  with column mappings and cardinality (**Clear** or Escape deselects).
+  **Find** highlights tables and columns and jumps between matches with Enter.
+- **Arrange:** a freshly parsed schema auto-arranges; edges anchor at the
+  referenced column row and route orthogonally through card-free gutters.
+  **Layout** offers Auto arrange, declaration order, LR/TB/Auto direction,
+  Compact/Normal/Roomy spacing, position pinning, opt-in save/restore in this
+  browser, and versioned layout files keyed by a schema fingerprint.
+- **Navigate large estates:** zoom controls or **Fit** frame the whole schema;
+  with a table selected, **Fit** frames it and its declared neighbours.
+  Auto-draw pauses above the shared large-input threshold until **Refresh**,
+  and large estates switch to compact boxes automatically.
+- **Query:** toggle **Query builder** to tick columns on the table cards. A
+  floating window (draggable, resizable, collapsible) shows the generated
+  `SELECT`, a join plan with INNER/LEFT controls and plain-language row notes,
+  and any tables the declared graph cannot reach — each with an explicit
+  resolution: teach the join by hand, add a `CROSS JOIN`, or leave the table
+  out. **Teach join** defines a join by clicking two columns, including self
+  joins with a second table alias. Joins are highlighted on the diagram, and
+  the dialect-quoted SQL is ready to paste into a client such as DBeaver.
+- **Honesty:** the ERD asserts declared constraints only. It never infers a
+  relationship from query text, and unresolved references stay explicit.
 
 For development, see [Development](docs/DEVELOPMENT.md). For a simple served
 run, use `python -m http.server 8000` from the runtime directory and open
@@ -108,6 +101,8 @@ in the browser.
 - declared entity relationships from DDL: tables, views, columns, primary,
   unique, and foreign keys (composite keys grouped), exported as Mermaid
   `erDiagram`;
+- a query builder that turns declared DDL evidence into dialect-quoted SQL,
+  with explicit resolutions for tables the declared keys cannot reach;
 - dynamic SQL as an explicit opaque step rather than an invented dependency.
 
 ## Supported dialects
@@ -140,7 +135,11 @@ suite, and hostile labels are escaped for diagram/XML output. Read the full
   status.
 - [v2 accuracy contract](docs/V2_ACCURACY_CONTRACT.md) — stable guarantees,
   semantics, compatibility, and qualification evidence.
-- [v2.3.0 release note](docs/releases/v2.3.0.md) — current release details.
+- [Query builder](docs/QUERY_BUILDER.md) — declared-evidence joins, taught and
+  self joins, SQL options, and limits.
+- [ADR-001](docs/decisions/ADR-001-declared-evidence-query-builder.md) — why
+  the query builder only uses declared keys.
+- [v2.4.0 release note](docs/releases/v2.4.0.md) — current release details.
 - [Roadmap](ROADMAP.md) — planned convergence work.
 
 ## Contributing
