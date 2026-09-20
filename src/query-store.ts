@@ -1,4 +1,4 @@
-/* proc>flow v2.5.0 — ERD query persistence (saved state and versioned query files).
+/* proc>flow v2.6.0 — ERD query persistence (saved state and versioned query files).
    Pure serialization and validation for the query builder. The browser store
    itself lives in src/workspace.ts (storage is opt-in and local-only); this
    module never touches the DOM or storage, so the file format is testable and
@@ -12,7 +12,10 @@
    - Serialization is deterministic: same state in, identical JSON out. */
 
 var QUERY_FILE_FORMAT = 'procflow-erd-query';
-var QUERY_FILE_VERSION = 1;
+/* Version 1 shipped without aggregates; version 2 adds them and still reads
+   version-1 files by defaulting the missing field. */
+var QUERY_FILE_VERSION = 2;
+var QUERY_FILE_MIN_VERSION = 1;
 var QUERY_NAME_MAX = 80;
 var QUERY_DIALECTS: QueryDialect[] = ['tsql','postgres','db2','sqlite'];
 
@@ -42,6 +45,17 @@ function queryClonePathChoices(value: Record<string, number>): Record<string, nu
   Object.keys(value).forEach(function(key){
     var entry=value[key];
     if(typeof entry==='number'&&isFinite(entry)&&entry>=0) out[key]=Math.floor(entry);
+  });
+  return out;
+}
+
+function queryCloneAggregates(
+    value: Record<string, QueryAggregateFn>): Record<string, QueryAggregateFn> {
+  var out: Record<string, QueryAggregateFn>={};
+  if(!value||typeof value!=='object') return out;
+  Object.keys(value).forEach(function(key){
+    var entry=value[key];
+    if(QUERY_AGGREGATE_FNS.indexOf(entry)>=0) out[key]=entry;
   });
   return out;
 }
@@ -86,7 +100,8 @@ function queryStateBuild(result: SchemaResult, input: ErdQueryStoreInput): ErdQu
       distinct:!!input.options.distinct,
       rowLimit:queryValidRowLimit(input.options.rowLimit),
       onlyUsed:!!input.options.onlyUsed,
-      sorts:querySavedSorts(input.options.sorts)
+      sorts:querySavedSorts(input.options.sorts),
+      aggregates:queryCloneAggregates(input.options.aggregates)
     }
   };
   if(name) state.name=name;
@@ -113,7 +128,8 @@ function queryStateFromJSON(text: string): ErdQueryStoreParseResult {
   if(!parsed||typeof parsed!=='object'||parsed.format!==QUERY_FILE_FORMAT){
     return fail('erd_query_format_error','File is not a ProcFlow query.');
   }
-  if(parsed.version!==QUERY_FILE_VERSION){
+  var fileVersion=typeof parsed.version==='number'?parsed.version:0;
+  if(fileVersion<QUERY_FILE_MIN_VERSION||fileVersion>QUERY_FILE_VERSION){
     return fail('erd_query_version_error',
       'Query file version '+String(parsed.version)+' is not supported.');
   }
@@ -196,9 +212,19 @@ function queryStateFromJSON(text: string): ErdQueryStoreParseResult {
     distinct:!!rawOptions.distinct,
     rowLimit:queryValidRowLimit(rawOptions.rowLimit),
     onlyUsed:!!rawOptions.onlyUsed,
-    sorts:querySavedSorts(Array.isArray(rawOptions.sorts)?rawOptions.sorts:[])
+    sorts:querySavedSorts(Array.isArray(rawOptions.sorts)?rawOptions.sorts:[]),
+    aggregates:queryCloneAggregates(rawOptions.aggregates)
   };
   if(rawOptions.sorts!==undefined&&!Array.isArray(rawOptions.sorts)) ignored++;
+  if(rawOptions.aggregates!==undefined){
+    if(!rawOptions.aggregates||typeof rawOptions.aggregates!=='object'||
+       Array.isArray(rawOptions.aggregates)){
+      ignored++;
+    } else {
+      ignored+=Object.keys(rawOptions.aggregates).length-
+        Object.keys(options.aggregates).length;
+    }
+  }
 
   var name=querySavedName(parsed.name);
   var state: ErdQuerySavedState={
@@ -270,6 +296,11 @@ function queryStatePrune(state: ErdQuerySavedState,
   selections.forEach(function(entry){
     picked[entry.entityId+'|'+schemaNormColumn(entry.column)]=1;
   });
+  var aggregates: Record<string, QueryAggregateFn>={};
+  Object.keys(state.options.aggregates||{}).forEach(function(key){
+    if(picked[key]) aggregates[key]=state.options.aggregates[key];
+    else dropped.push(key+' (aggregate, column not picked)');
+  });
   var sorts=state.options.sorts.filter(function(sort){
     if(picked[sort.entityId+'|'+schemaNormColumn(sort.column)]) return true;
     dropped.push(queryNameOf(graph,sort.entityId)+'.'+sort.column+
@@ -289,7 +320,7 @@ function queryStatePrune(state: ErdQuerySavedState,
   var options: ErdQuerySavedOptions={dialect:state.options.dialect,
     comments:state.options.comments,distinct:state.options.distinct,
     rowLimit:state.options.rowLimit,onlyUsed:state.options.onlyUsed,
-    sorts:sorts};
+    sorts:sorts,aggregates:aggregates};
   var pruned: ErdQuerySavedState={format:state.format,version:state.version,
     fingerprint:state.fingerprint,selections:selections,manual:manual,
     cross:cross,excluded:excluded,joinTypes:state.joinTypes,
@@ -305,3 +336,4 @@ function queryFileBaseName(state: ErdQuerySavedState): string {
     .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
   return slug||('procflow-query-'+state.fingerprint);
 }
+

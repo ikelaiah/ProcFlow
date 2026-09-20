@@ -1,5 +1,5 @@
 "use strict";
-/* proc>flow v2.4.1 — ERD query builder (picked columns → declared-FK joins → SQL).
+/* proc>flow v2.6.0 — ERD query builder (picked columns → declared-FK joins → SQL).
    Picked columns define a set of tables. The builder follows declared
    FOREIGN KEY constraints to connect those tables, preferring exact
    resolutions over name-matched ones, and emits a SELECT ready to paste into
@@ -18,7 +18,7 @@
    - Same schema + picks + options → identical plan and SQL. */
 var QUERY_MAX_PATHS = 8;
 var QUERY_MAX_STEPS = 512;
-var QUERY_VERSION = 'v2.5.0';
+var QUERY_VERSION = 'v2.6.0';
 var QUERY_DIALECT_LABELS = {
     tsql: 'T-SQL (SQL Server)',
     postgres: 'PostgreSQL',
@@ -680,6 +680,24 @@ function queryJoinCondition(join, dialect, aliasOf) {
     }
     return parts.join(' AND ') || '1 = 1';
 }
+/* ===== aggregates (v2.6.0) =====
+   Picked columns can render inside an aggregate function; every remaining
+   picked column becomes the GROUP BY list. COUNT(DISTINCT x) is the only
+   two-word form, and aggregate expressions always get a deterministic alias. */
+var QUERY_AGGREGATE_FNS = ['count', 'count-distinct', 'sum', 'avg', 'min', 'max'];
+function queryAggregateLabel(fn) {
+    return fn === 'count' ? 'COUNT' : fn === 'count-distinct' ? 'COUNT DISTINCT' :
+        fn === 'sum' ? 'SUM' : fn === 'avg' ? 'AVG' : fn === 'min' ? 'MIN' : 'MAX';
+}
+function queryAggregateExpr(fn, expression) {
+    return fn === 'count-distinct'
+        ? 'COUNT(DISTINCT ' + expression + ')'
+        : queryAggregateLabel(fn) + '(' + expression + ')';
+}
+function queryAggregateAlias(fn, tableAlias, column) {
+    var prefix = fn === 'count-distinct' ? 'count_distinct' : fn;
+    return prefix + '_' + queryColumnAlias(tableAlias, column);
+}
 function queryPlanSQL(plan, options) {
     if (!plan || !plan.fromId)
         return '';
@@ -725,6 +743,19 @@ function queryPlanSQL(plan, options) {
     }
     var selected = {};
     visible.forEach(function (sel) { selected[selectedKey(sel.entityId, sel.column)] = 1; });
+    var aggregates = {};
+    Object.keys((options && options.aggregates) || {}).forEach(function (rawKey) {
+        var cut = rawKey.indexOf('|');
+        if (cut < 0)
+            return;
+        var key = rawKey.slice(0, cut) + '|' + schemaNormColumn(rawKey.slice(cut + 1));
+        var fn = options.aggregates[rawKey];
+        if (selected[key] && QUERY_AGGREGATE_FNS.indexOf(fn) >= 0)
+            aggregates[key] = fn;
+    });
+    var hasAggregates = Object.keys(aggregates).length > 0;
+    var distinctRequested = !!(options && options.distinct);
+    distinct = distinctRequested && !hasAggregates;
     var sorts = [], seenSort = {};
     ((options && options.orderBy) || []).forEach(function (sort) {
         if (!sort || !sort.entityId || !sort.column)
@@ -742,13 +773,23 @@ function queryPlanSQL(plan, options) {
         counts[key] = (counts[key] || 0) + 1;
     });
     var seen = {}, items = [];
+    var groupParts = [];
     visible.forEach(function (sel) {
         var key = sel.entityId + '|' + schemaNormColumn(sel.column);
         if (seen[key])
             return;
         seen[key] = 1;
         var alias = selectionAlias(sel.entityId, sel.column);
-        var item = alias + '.' + queryQuoteIdent(sel.column, dialect);
+        var expression = alias + '.' + queryQuoteIdent(sel.column, dialect);
+        var fn = aggregates[key];
+        if (fn) {
+            items.push(queryAggregateExpr(fn, expression) + ' AS ' +
+                queryAggregateAlias(fn, alias, sel.column));
+            return;
+        }
+        if (hasAggregates)
+            groupParts.push(expression);
+        var item = expression;
         if (counts[schemaNormColumn(sel.column)] > 1) {
             item += ' AS ' + queryColumnAlias(alias, sel.column);
         }
@@ -784,11 +825,17 @@ function queryPlanSQL(plan, options) {
             lines.push('  ON ' + queryJoinCondition(join, dialect, aliasOf));
         }
     });
+    if (hasAggregates && groupParts.length) {
+        lines.push('GROUP BY ' + groupParts.join(', '));
+    }
     if (sorts.length) {
         var sortParts = sorts.map(function (sort) {
-            return selectionAlias(sort.entityId, sort.column) + '.' +
-                queryQuoteIdent(sort.column, dialect) +
-                (sort.direction === 'desc' ? ' DESC' : ' ASC');
+            var expression = selectionAlias(sort.entityId, sort.column) + '.' +
+                queryQuoteIdent(sort.column, dialect);
+            var fn = aggregates[selectedKey(sort.entityId, sort.column)];
+            if (fn)
+                expression = queryAggregateExpr(fn, expression);
+            return expression + (sort.direction === 'desc' ? ' DESC' : ' ASC');
         });
         lines.push('ORDER BY ' + sortParts.join(', '));
     }
@@ -815,6 +862,24 @@ function queryPlanSQL(plan, options) {
     header.push('Dialect: ' + QUERY_DIALECT_LABELS[dialect] + '.');
     if (distinct)
         header.push('Distinct: duplicate rows are collapsed.');
+    if (hasAggregates) {
+        var headerGroups = [], headerAggregates = [];
+        visible.forEach(function (sel) {
+            var key = selectedKey(sel.entityId, sel.column);
+            var fn = aggregates[key];
+            var name = queryNameOf(graph, sel.entityId) + '.' + sel.column;
+            if (fn)
+                headerAggregates.push(queryAggregateLabel(fn) + '(' + name + ')');
+            else
+                headerGroups.push(name);
+        });
+        header.push('Grouped by: ' +
+            (headerGroups.length ? headerGroups.join(', ') : '(all rows)') + '.');
+        header.push('Aggregates: ' + headerAggregates.join(', ') + '.');
+        if (distinctRequested) {
+            header.push('Distinct: ignored because GROUP BY already collapses rows.');
+        }
+    }
     if (rowLimit)
         header.push('Row cap: first ' + rowLimit + ' rows only.');
     if (sorts.length) {

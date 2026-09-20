@@ -57,7 +57,7 @@ function qbViewTeachBanner(graph, teachFirst) {
     banner.appendChild(cancel);
     return banner;
 }
-function qbViewChip(entityName, entry, index, sort) {
+function qbViewChip(entityName, entry, index, sort, aggregate) {
     var chip = document.createElement('span');
     chip.className = 'qb-chip';
     var label = document.createElement('button');
@@ -67,6 +67,21 @@ function qbViewChip(entityName, entry, index, sort) {
     label.title = 'Show ' + entityName + ' on the diagram';
     label.setAttribute('data-action', 'reveal');
     label.setAttribute('data-index', String(index));
+    var aggSelect = document.createElement('select');
+    aggSelect.className = 'qb-chip-agg';
+    aggSelect.setAttribute('data-action', 'aggregate');
+    aggSelect.setAttribute('data-index', String(index));
+    aggSelect.setAttribute('aria-label', 'Aggregate for ' + entityName + '.' + entry.column);
+    aggSelect.title = 'Aggregate this column; every other picked column becomes the GROUP BY list';
+    [['', '—'], ['count', 'COUNT'], ['count-distinct', 'COUNT DISTINCT'],
+        ['sum', 'SUM'], ['avg', 'AVG'], ['min', 'MIN'], ['max', 'MAX']]
+        .forEach(function (option) {
+        var item = document.createElement('option');
+        item.value = option[0];
+        item.textContent = option[1];
+        aggSelect.appendChild(item);
+    });
+    aggSelect.value = aggregate || '';
     var sortBtn = document.createElement('button');
     sortBtn.type = 'button';
     sortBtn.className = 'qb-chip-sort' + (sort ? ' active' : '');
@@ -87,6 +102,7 @@ function qbViewChip(entityName, entry, index, sort) {
     remove.setAttribute('data-action', 'remove');
     remove.setAttribute('data-index', String(index));
     chip.appendChild(label);
+    chip.appendChild(aggSelect);
     chip.appendChild(sortBtn);
     chip.appendChild(remove);
     return chip;
