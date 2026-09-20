@@ -3,16 +3,25 @@
 All notable released ProcFlow changes are recorded here. Detailed verification
 evidence belongs in the canonical release note under `docs/releases/`.
 
-## Unreleased
+## v2.5.0 — Saved queries and file export
 
-- Query persistence: save one query in this browser (explicit
-  Save/Restore/Forget), export and import versioned `procflow-erd-query`
-  files, and download the `.sql`. Restores prune stale references and report
-  schema drift instead of failing.
-- `src/query-store.ts` adds deterministic serialization, validation, and
-  fingerprint pruning; `schemaFingerprint` is shared with ERD layout files.
-- Documentation: ADR-002, a persistence section in `docs/QUERY_BUILDER.md`,
-  and ARCHITECTURE invariant 7.
+- Added query persistence: **Save to this browser**, **Restore saved**, and
+  **Forget saved** store one query locally with explicit actions only.
+- Added versioned query files: **Export query file** and **Import query file**
+  use the `procflow-erd-query` format with a schema fingerprint. Foreign,
+  future-version, and malformed files are rejected with diagnostics.
+- Restores prune references that no longer exist (tables, columns, taught
+  joins, sorts, cross/excluded ids, path choices) and report the drops and a
+  changed schema instead of failing.
+- Added **Download .sql**, which respects the Comments toggle; the optional
+  name field drives export filenames and falls back to the schema fingerprint.
+- Added `src/query-store.ts` (pure serialization, validation, and pruning);
+  `schemaFingerprint` is now shared by ERD layout and query files.
+- Documentation: ADR-002, a saving/exporting/restoring section in
+  `docs/QUERY_BUILDER.md`, and ARCHITECTURE invariant 7.
+- Test coverage: query-store golden records (round-trip, rejection, tolerance,
+  pruning, fingerprint, storage) and the ERD UI suite extended to 62 checks
+  (export/import/download, save/restore/forget, activation hint).
 
 ## v2.4.1 — Query builder hardening and release discipline
 

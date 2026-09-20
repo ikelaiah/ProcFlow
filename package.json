@@ -1,6 +1,6 @@
 {
   "name": "procflow",
-  "version": "2.4.1",
+  "version": "2.5.0",
   "private": true,
   "description": "Local-first SQL control-flow and dependency visualiser",
   "scripts": {
@@ -19,4 +19,5 @@
     "typescript": "5.9.3"
   }
 }
+
 
