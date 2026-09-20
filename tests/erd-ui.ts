@@ -19,6 +19,18 @@
   function wait(ms: number): Promise<void> {
     return new Promise(function(resolve){ setTimeout(resolve,ms); });
   }
+  /* Overlay drawing is animation-frame driven; poll for the expected state
+     instead of assuming a fixed delay. */
+  function until(check: () => boolean, timeoutMs: number): Promise<boolean> {
+    var deadline=Date.now()+timeoutMs;
+    return new Promise(function(resolve){
+      (function poll(){
+        if(check()){ resolve(true); return; }
+        if(Date.now()>=deadline){ resolve(false); return; }
+        setTimeout(poll,50);
+      })();
+    });
+  }
   function ready(d: Document): boolean {
     return d.documentElement.getAttribute('data-procflow-ready')==='true';
   }
@@ -97,7 +109,9 @@
       record('declared FK join is emitted',
         sql().indexOf('LEFT JOIN [dbo].[OrderHeader] AS orderheader')>=0,sql());
       record('plan edge is highlighted on the diagram',
-        d.querySelectorAll('#erd-overlay path[stroke-width="3"]').length>=1);
+        await until(function(){
+          return d.querySelectorAll('#erd-overlay path[stroke-width="3"]').length>=1;
+        },3000));
       record('join card shows condition and explanation',
         (function(){
           var card=d.querySelector('#qb-plan-body .qb-join');
@@ -109,6 +123,9 @@
       joinSelect.dispatchEvent(new Event('change',{bubbles:true}));
       record('join type switch applies INNER',
         sql().indexOf('INNER JOIN [dbo].[OrderHeader] AS orderheader')>=0,sql());
+      await until(function(){
+        return !!d.querySelector('#erd-overlay path[data-relationship]');
+      },3000);
       record('hovering a join card highlights its edge and endpoints',
         (function(){
           var card=d.querySelector('#qb-plan-body .qb-join[data-edge]') as HTMLElement;

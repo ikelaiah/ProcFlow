@@ -1246,7 +1246,9 @@
         selectEntity(selectedId);
         requestAnimationFrame(drawOverlay);
     });
-    document.addEventListener('procflow-query-changed', scheduleOverlay);
+    /* Query state changes are low-frequency and must be visible immediately;
+       animation frames can be starved in headless and off-screen contexts. */
+    document.addEventListener('procflow-query-changed', drawOverlay);
     if (findInput) {
         findInput.addEventListener('input', function () { findIndex = 0; applyFind(true); });
         findInput.addEventListener('keydown', function (event) {
