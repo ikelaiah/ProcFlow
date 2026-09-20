@@ -31,11 +31,14 @@ The main boundaries are:
 - `src/catalogue.ts` — explicit catalogue resolution.
 - `src/report.ts` — report/dataset import and graph construction.
 - `src/exporters.ts` — graph layout, Mermaid, SVG, draw.io, and narration.
-- `src/workspace.ts` — opt-in browser persistence and presentation filters.
+- `src/workspace.ts` — opt-in browser persistence (workspace snapshot, ERD
+  layout, and saved query) plus presentation filters.
 - `src/schema.ts` and `src/erd.ts` — declared-constraint schema IR, ERD layout,
   and layout files for the ERD page.
 - `src/query.ts` — ERD query builder: join-graph pathfinding over declared
   foreign keys and dialect-quoted SQL emission.
+- `src/query-store.ts` — pure, versioned query files and saved-query
+  serialization with schema-fingerprint pruning.
 - `src/ui/erd-page.ts` and `src/ui/erd-query.ts` — ERD interaction, query-mode
   checkboxes and overlay highlighting, the join plan, and the floating SQL
   window.
@@ -73,6 +76,8 @@ plan highlights, and problem rings.
 5. Persistence is opt-in and local to the browser.
 6. Query-builder joins use declared foreign-key evidence only; unjoinable picks
    stay explicit, and a cartesian product is never silent.
+7. Saved queries are explicit, versioned, and schema-fingerprinted; stale state
+   is pruned and reported, never silently applied.
 
 The v1.14 layout implementation uses bounded, deterministic placement and an
 iterative graph traversal for cycle detection, avoiding a call-stack limit for

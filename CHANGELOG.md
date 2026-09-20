@@ -3,6 +3,17 @@
 All notable released ProcFlow changes are recorded here. Detailed verification
 evidence belongs in the canonical release note under `docs/releases/`.
 
+## Unreleased
+
+- Query persistence: save one query in this browser (explicit
+  Save/Restore/Forget), export and import versioned `procflow-erd-query`
+  files, and download the `.sql`. Restores prune stale references and report
+  schema drift instead of failing.
+- `src/query-store.ts` adds deterministic serialization, validation, and
+  fingerprint pruning; `schemaFingerprint` is shared with ERD layout files.
+- Documentation: ADR-002, a persistence section in `docs/QUERY_BUILDER.md`,
+  and ARCHITECTURE invariant 7.
+
 ## v2.4.1 — Query builder hardening and release discipline
 
 - Hardened the query engine: shortest-path enumeration is iterative, so long

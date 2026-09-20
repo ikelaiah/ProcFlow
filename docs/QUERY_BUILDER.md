@@ -4,7 +4,9 @@ The query builder lives on `erd.html`. Toggle **Query builder**, tick columns
 on the table cards, and a floating window shows the SQL, the join plan, and
 anything the declared DDL cannot connect. This document explains how the plan
 is chosen, what is guaranteed, and what is deliberately out of scope. The
-decision record is [ADR-001](decisions/ADR-001-declared-evidence-query-builder.md).
+decision records are
+[ADR-001](decisions/ADR-001-declared-evidence-query-builder.md) and
+[ADR-002](decisions/ADR-002-query-persistence.md).
 
 ## The declared-evidence rule
 
@@ -109,20 +111,62 @@ tables are aliased (`customer_email`, `appuser_email`). Syntax highlighting is
 purely visual: the concatenated token text is byte-identical to the SQL, so
 Copy always copies the raw statement.
 
+## Saving, exporting, and restoring
+
+Picks and options are session state by default. The **Query** menu keeps them
+across reloads and moves them between machines, all locally:
+
+- **Save to this browser** stores one query under `procflow.erd.query`.
+  **Restore saved** brings it back; **Forget saved** removes it. Nothing is
+  stored automatically, matching the ERD layout and workspace rules.
+- **Export query file** writes a versioned JSON file. **Import query file**
+  reads one back.
+- **Download .sql** writes the statement as a file, respecting the Comments
+  toggle. The name field (optional) drives both filenames; without it, the
+  schema fingerprint is used.
+
+The file format is small and stable:
+
+```json
+{
+  "format": "procflow-erd-query",
+  "version": 1,
+  "fingerprint": "f971b08a",
+  "name": "orders by customer",
+  "selections": [{"entityId": "DBO.ORDERHEADER", "column": "OrderId"}],
+  "manual": [], "cross": [], "excluded": [],
+  "joinTypes": {}, "pathChoices": {},
+  "options": {"dialect": "tsql", "comments": true, "distinct": false,
+              "rowLimit": 0, "onlyUsed": false, "sorts": []}
+}
+```
+
+Restoring is never blocked by drift. References that no longer exist — tables,
+columns, taught joins, sorts, cross/excluded ids, path choices — are dropped
+and counted, and a changed schema is named in the status line ("Restored
+"orders by customer": 6 picks · dropped 2 stale entries · schema changed.").
+Foreign formats, future versions, and malformed JSON are rejected with a
+diagnostic instead. See
+[ADR-002](decisions/ADR-002-query-persistence.md) for why the store is one
+explicit slot per browser rather than an auto-saved library.
+
 ## What it never does
 
 - No inferred joins, ever. Column names are not evidence.
 - No silent cartesian products and no silent row caps.
 - No execution, validation, or connection to a database.
 - No multiple instances of the same table except the explicit self-join copy.
-- No persistence: picks and options are session state; only ERD layouts are
-  saved (opt-in).
+- No automatic storage: a query is saved only when you choose Save, and only
+  one saved query exists per browser. Layouts and queries are independent
+  keys, so forgetting one never drops the other.
 
 ## Verification
 
 The engine is covered by the golden query-builder suite in `tests/query.ts`
 (join graph, pathfinding and alternatives, bridges, policies, taught and self
 joins, disconnected selections, dialect quoting, options, highlighting
-round-trip, determinism, and a 1,000-table chain). The interaction layer is
-covered by `tests/erd-ui.html`. See
+round-trip, determinism, a 1,000-table chain, and query-store round-trip,
+rejection, pruning, fingerprint, and storage records). The interaction layer is
+covered by `tests/erd-ui.html` (query mode, picking, teaching, self joins,
+options, resize, Find, only-used filter, import, and browser save/restore). See
 [DEVELOPMENT.md](DEVELOPMENT.md) for how to run both.
