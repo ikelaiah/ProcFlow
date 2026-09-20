@@ -1396,6 +1396,11 @@ interface Window {
   readErdLayout(): string | null;
   hasStoredErdLayout(): boolean;
   clearErdLayout(): void;
+  /* v2.5.0 ERD query persistence (src/workspace.ts, opt-in only). */
+  writeErdQuery(text: string): boolean;
+  readErdQuery(): string | null;
+  hasStoredErdQuery(): boolean;
+  clearErdQuery(): void;
   clearWorkspace(): void;
   hasSavedWorkspace(): boolean;
   readWorkspace(): WorkspaceSnapshot | null;

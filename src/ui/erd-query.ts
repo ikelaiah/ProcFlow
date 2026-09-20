@@ -18,7 +18,9 @@
       statusEl=$('qb-status'), queryMenu=$('qb-query-menu'),
       nameEl=$('qb-query-name'), exportBtn=$('btn-qb-export'),
       importBtn=$('btn-qb-import'), downloadBtn=$('btn-qb-download'),
-      queryFileInput=$('qb-query-file'), storeStatusEl=$('qb-store-status');
+      queryFileInput=$('qb-query-file'), storeStatusEl=$('qb-store-status'),
+      saveBtn=$('btn-qb-save'), restoreBtn=$('btn-qb-restore'),
+      forgetBtn=$('btn-qb-forget');
   if(!planEl||!sqlEl||!floatEl||!toggleBtn) return;
 
   var active=false;
@@ -357,8 +359,12 @@
     renderCount();
     decorate();
     var hasQuery=!!(plan&&plan.fromId);
+    var stored=typeof hasStoredErdQuery==='function'&&hasStoredErdQuery();
     if(exportBtn) exportBtn.disabled=!hasQuery;
     if(downloadBtn) downloadBtn.disabled=!hasQuery;
+    if(saveBtn) saveBtn.disabled=!hasQuery;
+    if(restoreBtn) restoreBtn.disabled=!stored;
+    if(forgetBtn) forgetBtn.disabled=!stored;
     if(statusEl) statusEl.textContent=statusMessage();
     if(bodyEl) bodyEl.scrollTop=scrollTop;
     document.dispatchEvent(new CustomEvent('procflow-query-changed'));
@@ -578,6 +584,32 @@
     refresh();
   }
 
+  /* Shared restore path for query files and the browser store. */
+  function applyLoadedState(state: ErdQuerySavedState, verb: string): void {
+    var stale=!!(schema&&state.fingerprint!==schemaFingerprint(schema));
+    var pruned=graph
+      ?queryStatePrune(state,graph)
+      :{state:state,dropped:[] as string[]};
+    applySavedState(pruned.state);
+    var parts: string[]=[
+      pruned.state.selections.length+' pick'+
+        (pruned.state.selections.length===1?'':'s')
+    ];
+    if(pruned.state.manual.length){
+      parts.push(pruned.state.manual.length+' taught join'+
+        (pruned.state.manual.length===1?'':'s'));
+    }
+    var message=verb+(pruned.state.name?' "'+pruned.state.name+'"':'')+
+      ': '+parts.join(', ');
+    if(pruned.dropped.length){
+      message+=' · dropped '+pruned.dropped.length+' stale entr'+
+        (pruned.dropped.length===1?'y':'ies');
+    }
+    if(stale) message+=' · schema changed';
+    setStoreStatus(message+'.',stale||pruned.dropped.length>0);
+    closeQueryMenu();
+  }
+
   function importQueryFile(file: File): void {
     file.text().then(function(text){
       var parsed=queryStateFromJSON(text);
@@ -587,29 +619,42 @@
           :'Query file is unreadable.',true);
         return;
       }
-      var stale=!!(schema&&parsed.state.fingerprint!==schemaFingerprint(schema));
-      var pruned=graph
-        ?queryStatePrune(parsed.state,graph)
-        :{state:parsed.state,dropped:[] as string[]};
-      applySavedState(pruned.state);
-      var parts: string[]=[
-        pruned.state.selections.length+' pick'+
-          (pruned.state.selections.length===1?'':'s')
-      ];
-      if(pruned.state.manual.length){
-        parts.push(pruned.state.manual.length+' taught join'+
-          (pruned.state.manual.length===1?'':'s'));
-      }
-      var message='Imported'+(pruned.state.name?' "'+pruned.state.name+'"':'')+
-        ': '+parts.join(', ');
-      if(pruned.dropped.length){
-        message+=' · dropped '+pruned.dropped.length+' stale entr'+
-          (pruned.dropped.length===1?'y':'ies');
-      }
-      if(stale) message+=' · schema changed';
-      setStoreStatus(message+'.',stale||pruned.dropped.length>0);
-      closeQueryMenu();
+      applyLoadedState(parsed.state,'Imported');
     });
+  }
+
+  function saveQueryToBrowser(): void {
+    if(!schema) return;
+    var state=queryStateBuild(schema,currentStoreInput());
+    var saved=writeErdQuery(queryStateToJSON(state));
+    setStoreStatus(saved
+      ?'Query saved to this browser.'
+      :'Could not save the query in this browser.',!saved);
+    closeQueryMenu();
+    refresh();
+  }
+
+  function restoreQueryFromBrowser(): void {
+    var raw=readErdQuery();
+    if(!raw){
+      setStoreStatus('No saved query in this browser.',true);
+      return;
+    }
+    var parsed=queryStateFromJSON(raw);
+    if(!parsed.state){
+      setStoreStatus(parsed.diagnostics[0]
+        ?parsed.diagnostics[0].message
+        :'Saved query is unreadable.',true);
+      return;
+    }
+    applyLoadedState(parsed.state,'Restored');
+  }
+
+  function forgetQuery(): void {
+    clearErdQuery();
+    setStoreStatus('Saved query forgotten.');
+    closeQueryMenu();
+    refresh();
   }
 
   /* ===== mode ===== */
@@ -634,6 +679,10 @@
     }
     document.dispatchEvent(new CustomEvent('procflow-query-mode',{detail:{active:on}}));
     refresh();
+    if(on&&!picks.length&&typeof hasStoredErdQuery==='function'&&
+       hasStoredErdQuery()){
+      setStoreStatus('A saved query exists in this browser — use Query → Restore saved.');
+    }
   }
 
   /* ===== schema changes ===== */
@@ -853,6 +902,9 @@
       setActive(!active);
     });
     if(copyBtn) copyBtn.addEventListener('click',copySql);
+    if(saveBtn) saveBtn.addEventListener('click',saveQueryToBrowser);
+    if(restoreBtn) restoreBtn.addEventListener('click',restoreQueryFromBrowser);
+    if(forgetBtn) forgetBtn.addEventListener('click',forgetQuery);
     if(exportBtn) exportBtn.addEventListener('click',exportQueryFile);
     if(downloadBtn) downloadBtn.addEventListener('click',downloadSql);
     if(importBtn&&queryFileInput){

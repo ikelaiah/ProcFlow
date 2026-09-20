@@ -8,7 +8,7 @@
     if (typeof document === 'undefined')
         return;
     var $ = function (id) { return document.getElementById(id); };
-    var floatEl = $('qb-float'), bodyEl = $('qb-float-body'), planEl = $('qb-plan-body'), picksEl = $('qb-picks'), summaryEl = $('qb-summary'), sqlEl = $('qb-sql-out'), dialectEl = $('qb-dialect'), commentsEl = $('qb-comments'), copyBtn = $('btn-qb-copy'), clearBtn = $('btn-qb-clear'), toggleBtn = $('btn-erd-query'), countEl = $('erd-query-count'), closeBtn = $('btn-qb-close'), collapseBtn = $('btn-qb-collapse'), dragEl = $('qb-drag'), resizeEl = $('qb-resize'), distinctEl = $('qb-distinct'), limitEl = $('qb-limit'), onlyUsedEl = $('qb-only-used'), teachBtn = $('btn-qb-teach'), statusEl = $('qb-status'), queryMenu = $('qb-query-menu'), nameEl = $('qb-query-name'), exportBtn = $('btn-qb-export'), importBtn = $('btn-qb-import'), downloadBtn = $('btn-qb-download'), queryFileInput = $('qb-query-file'), storeStatusEl = $('qb-store-status');
+    var floatEl = $('qb-float'), bodyEl = $('qb-float-body'), planEl = $('qb-plan-body'), picksEl = $('qb-picks'), summaryEl = $('qb-summary'), sqlEl = $('qb-sql-out'), dialectEl = $('qb-dialect'), commentsEl = $('qb-comments'), copyBtn = $('btn-qb-copy'), clearBtn = $('btn-qb-clear'), toggleBtn = $('btn-erd-query'), countEl = $('erd-query-count'), closeBtn = $('btn-qb-close'), collapseBtn = $('btn-qb-collapse'), dragEl = $('qb-drag'), resizeEl = $('qb-resize'), distinctEl = $('qb-distinct'), limitEl = $('qb-limit'), onlyUsedEl = $('qb-only-used'), teachBtn = $('btn-qb-teach'), statusEl = $('qb-status'), queryMenu = $('qb-query-menu'), nameEl = $('qb-query-name'), exportBtn = $('btn-qb-export'), importBtn = $('btn-qb-import'), downloadBtn = $('btn-qb-download'), queryFileInput = $('qb-query-file'), storeStatusEl = $('qb-store-status'), saveBtn = $('btn-qb-save'), restoreBtn = $('btn-qb-restore'), forgetBtn = $('btn-qb-forget');
     if (!planEl || !sqlEl || !floatEl || !toggleBtn)
         return;
     var active = false;
@@ -350,10 +350,17 @@
         renderCount();
         decorate();
         var hasQuery = !!(plan && plan.fromId);
+        var stored = typeof hasStoredErdQuery === 'function' && hasStoredErdQuery();
         if (exportBtn)
             exportBtn.disabled = !hasQuery;
         if (downloadBtn)
             downloadBtn.disabled = !hasQuery;
+        if (saveBtn)
+            saveBtn.disabled = !hasQuery;
+        if (restoreBtn)
+            restoreBtn.disabled = !stored;
+        if (forgetBtn)
+            forgetBtn.disabled = !stored;
         if (statusEl)
             statusEl.textContent = statusMessage();
         if (bodyEl)
@@ -588,6 +595,32 @@
             onlyUsedEl.checked = onlyUsed;
         refresh();
     }
+    /* Shared restore path for query files and the browser store. */
+    function applyLoadedState(state, verb) {
+        var stale = !!(schema && state.fingerprint !== schemaFingerprint(schema));
+        var pruned = graph
+            ? queryStatePrune(state, graph)
+            : { state: state, dropped: [] };
+        applySavedState(pruned.state);
+        var parts = [
+            pruned.state.selections.length + ' pick' +
+                (pruned.state.selections.length === 1 ? '' : 's')
+        ];
+        if (pruned.state.manual.length) {
+            parts.push(pruned.state.manual.length + ' taught join' +
+                (pruned.state.manual.length === 1 ? '' : 's'));
+        }
+        var message = verb + (pruned.state.name ? ' "' + pruned.state.name + '"' : '') +
+            ': ' + parts.join(', ');
+        if (pruned.dropped.length) {
+            message += ' · dropped ' + pruned.dropped.length + ' stale entr' +
+                (pruned.dropped.length === 1 ? 'y' : 'ies');
+        }
+        if (stale)
+            message += ' · schema changed';
+        setStoreStatus(message + '.', stale || pruned.dropped.length > 0);
+        closeQueryMenu();
+    }
     function importQueryFile(file) {
         file.text().then(function (text) {
             var parsed = queryStateFromJSON(text);
@@ -597,30 +630,40 @@
                     : 'Query file is unreadable.', true);
                 return;
             }
-            var stale = !!(schema && parsed.state.fingerprint !== schemaFingerprint(schema));
-            var pruned = graph
-                ? queryStatePrune(parsed.state, graph)
-                : { state: parsed.state, dropped: [] };
-            applySavedState(pruned.state);
-            var parts = [
-                pruned.state.selections.length + ' pick' +
-                    (pruned.state.selections.length === 1 ? '' : 's')
-            ];
-            if (pruned.state.manual.length) {
-                parts.push(pruned.state.manual.length + ' taught join' +
-                    (pruned.state.manual.length === 1 ? '' : 's'));
-            }
-            var message = 'Imported' + (pruned.state.name ? ' "' + pruned.state.name + '"' : '') +
-                ': ' + parts.join(', ');
-            if (pruned.dropped.length) {
-                message += ' · dropped ' + pruned.dropped.length + ' stale entr' +
-                    (pruned.dropped.length === 1 ? 'y' : 'ies');
-            }
-            if (stale)
-                message += ' · schema changed';
-            setStoreStatus(message + '.', stale || pruned.dropped.length > 0);
-            closeQueryMenu();
+            applyLoadedState(parsed.state, 'Imported');
         });
+    }
+    function saveQueryToBrowser() {
+        if (!schema)
+            return;
+        var state = queryStateBuild(schema, currentStoreInput());
+        var saved = writeErdQuery(queryStateToJSON(state));
+        setStoreStatus(saved
+            ? 'Query saved to this browser.'
+            : 'Could not save the query in this browser.', !saved);
+        closeQueryMenu();
+        refresh();
+    }
+    function restoreQueryFromBrowser() {
+        var raw = readErdQuery();
+        if (!raw) {
+            setStoreStatus('No saved query in this browser.', true);
+            return;
+        }
+        var parsed = queryStateFromJSON(raw);
+        if (!parsed.state) {
+            setStoreStatus(parsed.diagnostics[0]
+                ? parsed.diagnostics[0].message
+                : 'Saved query is unreadable.', true);
+            return;
+        }
+        applyLoadedState(parsed.state, 'Restored');
+    }
+    function forgetQuery() {
+        clearErdQuery();
+        setStoreStatus('Saved query forgotten.');
+        closeQueryMenu();
+        refresh();
     }
     /* ===== mode ===== */
     function setActive(on) {
@@ -647,6 +690,10 @@
         }
         document.dispatchEvent(new CustomEvent('procflow-query-mode', { detail: { active: on } }));
         refresh();
+        if (on && !picks.length && typeof hasStoredErdQuery === 'function' &&
+            hasStoredErdQuery()) {
+            setStoreStatus('A saved query exists in this browser — use Query → Restore saved.');
+        }
     }
     /* ===== schema changes ===== */
     function setSchema(result) {
@@ -892,6 +939,12 @@
         });
         if (copyBtn)
             copyBtn.addEventListener('click', copySql);
+        if (saveBtn)
+            saveBtn.addEventListener('click', saveQueryToBrowser);
+        if (restoreBtn)
+            restoreBtn.addEventListener('click', restoreQueryFromBrowser);
+        if (forgetBtn)
+            forgetBtn.addEventListener('click', forgetQuery);
         if (exportBtn)
             exportBtn.addEventListener('click', exportQueryFile);
         if (downloadBtn)

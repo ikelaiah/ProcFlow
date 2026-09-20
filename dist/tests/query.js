@@ -682,6 +682,13 @@
         delete noName.name;
         record('v2.5.0 export file names derive from the query name or fingerprint', queryFileBaseName(built) === 'orders-by-customer' &&
             queryFileBaseName(noName) === 'procflow-query-' + schemaFingerprint(schema), { named: queryFileBaseName(built), unnamed: queryFileBaseName(noName) });
+        var wrote = writeErdQuery(builtJSON);
+        var stored = hasStoredErdQuery();
+        var storedParsed = queryStateFromJSON(readErdQuery());
+        clearErdQuery();
+        record('v2.5.0 opt-in browser storage round-trips and clears explicitly', wrote && stored && !!storedParsed.state &&
+            queryStateToJSON(storedParsed.state) === builtJSON &&
+            !hasStoredErdQuery() && readErdQuery() === null, { wrote: wrote, stored: stored });
     }
     catch (err) {
         record('v2.5.0 saved query round-trips deterministically', false, String(err && err.stack || err));
@@ -690,6 +697,7 @@
         record('v2.5.0 stale references are pruned and reported, never applied silently', false, String(err && err.stack || err));
         record('v2.5.0 the schema fingerprint is stable and changes with the schema', false, String(err && err.stack || err));
         record('v2.5.0 export file names derive from the query name or fingerprint', false, String(err && err.stack || err));
+        record('v2.5.0 opt-in browser storage round-trips and clears explicitly', false, String(err && err.stack || err));
     }
     var passed = results.filter(function (result) { return result.pass; }).length;
     window.PROCFLOW_QUERY_DETAIL = results;

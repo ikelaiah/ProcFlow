@@ -182,6 +182,41 @@ function clearErdLayout() {
     }
     catch (e) { }
 }
+/* v2.5.0 — ERD query persistence. Same opt-in rule again: one saved query per
+   browser, explicit Save/Restore/Forget only, under its own key. Serialization
+   and validation live in src/query-store.ts; this module owns storage. */
+var ERD_QUERY_STORAGE_KEY = 'procflow.erd.query';
+function writeErdQuery(text) {
+    try {
+        window.localStorage.setItem(ERD_QUERY_STORAGE_KEY, text);
+        return true;
+    }
+    catch (e) {
+        return false;
+    }
+}
+function readErdQuery() {
+    try {
+        return window.localStorage.getItem(ERD_QUERY_STORAGE_KEY);
+    }
+    catch (e) {
+        return null;
+    }
+}
+function hasStoredErdQuery() {
+    try {
+        return !!window.localStorage.getItem(ERD_QUERY_STORAGE_KEY);
+    }
+    catch (e) {
+        return false;
+    }
+}
+function clearErdQuery() {
+    try {
+        window.localStorage.removeItem(ERD_QUERY_STORAGE_KEY);
+    }
+    catch (e) { }
+}
 function hasSavedWorkspace() {
     try {
         return !!window.localStorage.getItem(WORKSPACE_STORAGE_KEY);

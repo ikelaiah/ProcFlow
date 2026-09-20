@@ -336,6 +336,46 @@
         (get('qb-store-status').textContent||'').indexOf('schema changed')>=0,
         get('qb-store-status').textContent);
 
+      /* ---- browser save, restore, forget ---- */
+      get('btn-qb-clear').click();
+      pick('DBO.CUSTOMER','Email');
+      pick('DBO.ORDERHEADER','PlacedAt');
+      await wait(120);
+      get('btn-qb-save').click();
+      record('saving to the browser reports success',
+        (get('qb-store-status').textContent||'').indexOf('saved to this browser')>=0,
+        get('qb-store-status').textContent);
+      get('btn-qb-clear').click();
+      record('restore becomes available after saving',
+        get('btn-qb-restore').disabled===false);
+      get('btn-qb-restore').click();
+      await until(function(){
+        return d.querySelectorAll('#qb-picks .qb-chip').length===2&&
+          sql().indexOf('JOIN "dbo"."OrderHeader" AS orderheader')>=0;
+      },3000);
+      record('restoring brings back picks and SQL',
+        (get('qb-store-status').textContent||'').indexOf('Restored')>=0&&
+          d.querySelectorAll('#qb-picks .qb-chip').length===2,
+        get('qb-store-status').textContent);
+      get('btn-qb-forget').click();
+      record('forget clears the saved query',
+        (get('qb-store-status').textContent||'').indexOf('forgotten')>=0&&
+          get('btn-qb-restore').disabled===true,
+        get('qb-store-status').textContent);
+      get('btn-qb-save').click();
+      get('btn-qb-clear').click();
+      get('btn-qb-close').click();
+      get('btn-erd-query').click();
+      await wait(250);
+      record('activation hints at a saved query',
+        (get('qb-store-status').textContent||'').indexOf('Restore saved')>=0,
+        get('qb-store-status').textContent);
+      get('btn-qb-restore').click();
+      await until(function(){
+        return d.querySelectorAll('#qb-picks .qb-chip').length===2;
+      },3000);
+      get('btn-qb-forget').click();
+
       /* ---- close and reopen ---- */
       get('btn-qb-close').click();
       await wait(200);
