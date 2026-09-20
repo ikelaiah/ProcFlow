@@ -1,5 +1,5 @@
 "use strict";
-/* proc>flow v2.4.1 — ERD query-builder panel.
+/* proc>flow v2.5.0 — ERD query-builder panel.
    Query mode turns column rows on the diagram cards into checkboxes and shows
    a floating window with the SQL, the join plan, and any unjoinable picks.
    Join problems are never resolved silently: each one offers teach-the-join,
@@ -8,7 +8,7 @@
     if (typeof document === 'undefined')
         return;
     var $ = function (id) { return document.getElementById(id); };
-    var floatEl = $('qb-float'), bodyEl = $('qb-float-body'), planEl = $('qb-plan-body'), picksEl = $('qb-picks'), summaryEl = $('qb-summary'), sqlEl = $('qb-sql-out'), dialectEl = $('qb-dialect'), commentsEl = $('qb-comments'), copyBtn = $('btn-qb-copy'), clearBtn = $('btn-qb-clear'), toggleBtn = $('btn-erd-query'), countEl = $('erd-query-count'), closeBtn = $('btn-qb-close'), collapseBtn = $('btn-qb-collapse'), dragEl = $('qb-drag'), resizeEl = $('qb-resize'), distinctEl = $('qb-distinct'), limitEl = $('qb-limit'), onlyUsedEl = $('qb-only-used'), teachBtn = $('btn-qb-teach'), statusEl = $('qb-status');
+    var floatEl = $('qb-float'), bodyEl = $('qb-float-body'), planEl = $('qb-plan-body'), picksEl = $('qb-picks'), summaryEl = $('qb-summary'), sqlEl = $('qb-sql-out'), dialectEl = $('qb-dialect'), commentsEl = $('qb-comments'), copyBtn = $('btn-qb-copy'), clearBtn = $('btn-qb-clear'), toggleBtn = $('btn-erd-query'), countEl = $('erd-query-count'), closeBtn = $('btn-qb-close'), collapseBtn = $('btn-qb-collapse'), dragEl = $('qb-drag'), resizeEl = $('qb-resize'), distinctEl = $('qb-distinct'), limitEl = $('qb-limit'), onlyUsedEl = $('qb-only-used'), teachBtn = $('btn-qb-teach'), statusEl = $('qb-status'), queryMenu = $('qb-query-menu'), nameEl = $('qb-query-name'), exportBtn = $('btn-qb-export'), importBtn = $('btn-qb-import'), downloadBtn = $('btn-qb-download'), queryFileInput = $('qb-query-file'), storeStatusEl = $('qb-store-status');
     if (!planEl || !sqlEl || !floatEl || !toggleBtn)
         return;
     var active = false;
@@ -349,6 +349,11 @@
         renderSql();
         renderCount();
         decorate();
+        var hasQuery = !!(plan && plan.fromId);
+        if (exportBtn)
+            exportBtn.disabled = !hasQuery;
+        if (downloadBtn)
+            downloadBtn.disabled = !hasQuery;
         if (statusEl)
             statusEl.textContent = statusMessage();
         if (bodyEl)
@@ -476,6 +481,146 @@
             setTimeout(function () { copyBtn.textContent = old; }, 1400);
         };
         copyText(text, done);
+    }
+    /* ===== query files =====
+       Export, import, and download use the pure store in src/query-store.ts;
+       browser storage arrives separately and stays in src/workspace.ts. */
+    function currentStoreInput() {
+        return {
+            name: nameEl ? String(nameEl.value || '') : '',
+            selections: picks,
+            manual: manual,
+            cross: Object.keys(cross),
+            excluded: Object.keys(excluded),
+            joinTypes: joinTypes,
+            pathChoices: pathChoices,
+            options: { dialect: dialect, comments: withComments, distinct: distinct,
+                rowLimit: rowLimit, onlyUsed: onlyUsed, sorts: sorts }
+        };
+    }
+    function setStoreStatus(text, warn) {
+        if (!storeStatusEl)
+            return;
+        storeStatusEl.textContent = text;
+        storeStatusEl.classList.toggle('has', !!warn);
+    }
+    function closeQueryMenu() {
+        if (queryMenu)
+            queryMenu.open = false;
+    }
+    function downloadText(filename, text, type) {
+        var blob = new Blob([text], { type: type });
+        var url = URL.createObjectURL(blob);
+        var anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = filename;
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    }
+    function exportQueryFile() {
+        if (!schema)
+            return;
+        var state = queryStateBuild(schema, currentStoreInput());
+        var base = queryFileBaseName(state);
+        downloadText(base + '.json', queryStateToJSON(state), 'application/json');
+        setStoreStatus('Exported ' + base + '.json.');
+        closeQueryMenu();
+    }
+    function downloadSql() {
+        var text = sqlEl.textContent || '';
+        if (!text || text.indexOf('-- Pick') === 0)
+            return;
+        var base = schema ? queryFileBaseName(queryStateBuild(schema, currentStoreInput()))
+            : 'procflow-query';
+        downloadText(base + '.sql', text, 'text/plain');
+        setStoreStatus('Downloaded ' + base + '.sql.');
+        closeQueryMenu();
+    }
+    /* Restoring never blocks: stale references are pruned and reported. */
+    function applySavedState(state) {
+        picks = state.selections.map(function (entry) {
+            return { entityId: entry.entityId, column: entry.column };
+        });
+        manual = state.manual.map(function (entry) {
+            var join = { id: entry.id, leftId: entry.leftId,
+                leftColumn: entry.leftColumn, rightId: entry.rightId,
+                rightColumn: entry.rightColumn };
+            if (entry.predicate)
+                join.predicate = entry.predicate;
+            if (entry.selfColumns)
+                join.selfColumns = entry.selfColumns.slice();
+            return join;
+        });
+        cross = {};
+        state.cross.forEach(function (id) { cross[id] = 1; });
+        excluded = {};
+        state.excluded.forEach(function (id) { excluded[id] = 1; });
+        joinTypes = queryCloneJoinTypes(state.joinTypes);
+        pathChoices = queryClonePathChoices(state.pathChoices);
+        dialect = state.options.dialect;
+        withComments = state.options.comments;
+        distinct = state.options.distinct;
+        rowLimit = state.options.rowLimit;
+        onlyUsed = state.options.onlyUsed;
+        sorts = querySavedSorts(state.options.sorts);
+        manual.forEach(function (entry) {
+            var match = /^m(\d+)$/.exec(entry.id);
+            if (match)
+                manualSeq = Math.max(manualSeq, parseInt(match[1], 10));
+        });
+        teaching = false;
+        teachFirst = null;
+        if (teachBtn)
+            teachBtn.setAttribute('aria-pressed', 'false');
+        if (nameEl)
+            nameEl.value = state.name || '';
+        if (dialectEl)
+            dialectEl.value = dialect;
+        if (commentsEl)
+            commentsEl.checked = withComments;
+        if (distinctEl)
+            distinctEl.checked = distinct;
+        if (limitEl)
+            limitEl.value = String(rowLimit);
+        if (onlyUsedEl)
+            onlyUsedEl.checked = onlyUsed;
+        refresh();
+    }
+    function importQueryFile(file) {
+        file.text().then(function (text) {
+            var parsed = queryStateFromJSON(text);
+            if (!parsed.state) {
+                setStoreStatus(parsed.diagnostics[0]
+                    ? parsed.diagnostics[0].message
+                    : 'Query file is unreadable.', true);
+                return;
+            }
+            var stale = !!(schema && parsed.state.fingerprint !== schemaFingerprint(schema));
+            var pruned = graph
+                ? queryStatePrune(parsed.state, graph)
+                : { state: parsed.state, dropped: [] };
+            applySavedState(pruned.state);
+            var parts = [
+                pruned.state.selections.length + ' pick' +
+                    (pruned.state.selections.length === 1 ? '' : 's')
+            ];
+            if (pruned.state.manual.length) {
+                parts.push(pruned.state.manual.length + ' taught join' +
+                    (pruned.state.manual.length === 1 ? '' : 's'));
+            }
+            var message = 'Imported' + (pruned.state.name ? ' "' + pruned.state.name + '"' : '') +
+                ': ' + parts.join(', ');
+            if (pruned.dropped.length) {
+                message += ' · dropped ' + pruned.dropped.length + ' stale entr' +
+                    (pruned.dropped.length === 1 ? 'y' : 'ies');
+            }
+            if (stale)
+                message += ' · schema changed';
+            setStoreStatus(message + '.', stale || pruned.dropped.length > 0);
+            closeQueryMenu();
+        });
     }
     /* ===== mode ===== */
     function setActive(on) {
@@ -747,6 +892,20 @@
         });
         if (copyBtn)
             copyBtn.addEventListener('click', copySql);
+        if (exportBtn)
+            exportBtn.addEventListener('click', exportQueryFile);
+        if (downloadBtn)
+            downloadBtn.addEventListener('click', downloadSql);
+        if (importBtn && queryFileInput) {
+            importBtn.addEventListener('click', function () { queryFileInput.click(); });
+        }
+        if (queryFileInput)
+            queryFileInput.addEventListener('change', function () {
+                var files = Array.prototype.slice.call(queryFileInput.files || []);
+                if (files.length)
+                    importQueryFile(files[0]);
+                queryFileInput.value = '';
+            });
         if (clearBtn)
             clearBtn.addEventListener('click', function () {
                 picks = [];

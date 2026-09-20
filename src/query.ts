@@ -18,7 +18,7 @@
 
 var QUERY_MAX_PATHS = 8;
 var QUERY_MAX_STEPS = 512;
-var QUERY_VERSION = 'v2.4.0';
+var QUERY_VERSION = 'v2.5.0';
 
 var QUERY_DIALECT_LABELS: Record<QueryDialect, string> = {
   tsql: 'T-SQL (SQL Server)',

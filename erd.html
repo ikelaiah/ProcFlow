@@ -169,12 +169,26 @@
             <label class="opt"><input type="checkbox" id="qb-comments" checked> Comments</label>
             <button class="btn" id="btn-qb-teach" aria-pressed="false"
                     title="Click two columns on the diagram to teach a join; the same table twice creates a self join">Teach join</button>
+            <details class="command-menu" id="qb-query-menu">
+              <summary class="btn">Query</summary>
+              <div class="command-menu-panel export-actions" aria-label="Query file actions">
+                <label class="opt qb-name">Name
+                  <input type="text" id="qb-query-name" placeholder="orders by customer"
+                         maxlength="80" spellcheck="false" aria-label="Query name for exports">
+                </label>
+                <button class="menu-action" id="btn-qb-export">Export query file</button>
+                <button class="menu-action" id="btn-qb-import">Import query file</button>
+                <button class="menu-action" id="btn-qb-download">Download .sql</button>
+                <p class="ws-note" id="qb-store-status">Picks are session state; export to keep them.</p>
+              </div>
+            </details>
             <button class="btn primary" id="btn-qb-copy">Copy SQL</button>
           </div>
           <div class="qb-picks" id="qb-picks"></div>
           <p class="qb-status" id="qb-status" role="status" aria-live="polite"></p>
           <pre id="qb-sql-out"></pre>
           <div class="qb-plan-body" id="qb-plan-body"></div>
+          <input type="file" id="qb-query-file" accept=".json,application/json" hidden>
         </div>
         <button type="button" class="qb-resize" id="qb-resize"
                 aria-label="Resize query builder"
@@ -193,6 +207,7 @@
 <script src="dist/src/schema.js"></script>
 <script src="dist/src/erd.js"></script>
 <script src="dist/src/query.js"></script>
+<script src="dist/src/query-store.js"></script>
 <script src="dist/src/workspace.js"></script>
 <script src="dist/src/ui/large-input.js"></script>
 <script src="dist/src/ui/splitter.js"></script>
