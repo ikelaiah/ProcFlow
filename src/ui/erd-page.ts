@@ -1,4 +1,4 @@
-/* proc>flow v2.1.0 — ERD page controller.
+/* proc>flow v2.4.0 — ERD page controller.
    Parses schema DDL into the shared schema IR and draws an entity map of
    declared tables, views, and foreign keys. Declared constraints only: this
    page never infers a relationship from query text. */
@@ -1142,18 +1142,7 @@
   function copyMermaid(): void {
     var text=mermaidOut?mermaidOut.textContent:'';
     var done=function(): void { flash($('btn-erd-copy'),'Copied'); };
-    if(navigator.clipboard&&navigator.clipboard.writeText){
-      navigator.clipboard.writeText(text).then(done,function(){ fallbackCopy(text,done); });
-    } else fallbackCopy(text,done);
-  }
-
-  function fallbackCopy(text: string, done: () => void): void {
-    var area=document.createElement('textarea');
-    area.value=text; area.setAttribute('readonly','');
-    area.style.position='absolute'; area.style.left='-9999px';
-    document.body.appendChild(area); area.select();
-    try { document.execCommand('copy'); done(); } catch(err){ /* clipboard unavailable */ }
-    document.body.removeChild(area);
+    copyText(text,done);
   }
 
   if(sql){
@@ -1391,7 +1380,7 @@
     },{passive:false});
   }
   document.addEventListener('keydown',function(event: KeyboardEvent){
-    if(event.key==='Escape'&&selectedId) selectEntity(null);
+    if(event.key==='Escape'&&selectedId&&!queryTeachingNow()) selectEntity(null);
   });
 
   if(typeof window.erdQueryPanelInit==='function'){

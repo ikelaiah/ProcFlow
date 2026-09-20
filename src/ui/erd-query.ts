@@ -14,7 +14,8 @@
       countEl=$('erd-query-count'), closeBtn=$('btn-qb-close'),
       collapseBtn=$('btn-qb-collapse'), dragEl=$('qb-drag'),
       resizeEl=$('qb-resize'), distinctEl=$('qb-distinct'), limitEl=$('qb-limit'),
-      onlyUsedEl=$('qb-only-used'), teachBtn=$('btn-qb-teach');
+      onlyUsedEl=$('qb-only-used'), teachBtn=$('btn-qb-teach'),
+      statusEl=$('qb-status');
   if(!planEl||!sqlEl||!floatEl||!toggleBtn) return;
 
   var active=false;
@@ -28,9 +29,6 @@
   var excluded: StringSet={};
   var joinTypes: Record<string, QueryJoinType>={};
   var pathChoices: Record<string, number>={};
-  interface QbDraft {
-    left: string; right: string; predicate: string; usePredicate: boolean;
-  }
   var drafts: Record<string, QbDraft>={};
   var dialect: QueryDialect='tsql';
   var withComments=true;
@@ -198,255 +196,15 @@
     picks.forEach(function(entry,index){
       var entity=entityById[entry.entityId];
       var name=entity?entity.name:entry.entityId;
-      var chip=document.createElement('span');
-      chip.className='qb-chip';
-      var label=document.createElement('button');
-      label.type='button';
-      label.className='qb-chip-name';
-      label.textContent=name+'.'+entry.column;
-      label.title='Show '+name+' on the diagram';
-      label.setAttribute('data-action','reveal');
-      label.setAttribute('data-index',String(index));
-      var remove=document.createElement('button');
-      remove.type='button';
-      remove.className='qb-chip-x';
-      remove.textContent='×';
-      remove.setAttribute('aria-label','Remove '+name+'.'+entry.column);
-      remove.setAttribute('data-action','remove');
-      remove.setAttribute('data-index',String(index));
       var sort=sorts.filter(function(existing){
         return existing.entityId===entry.entityId&&
           schemaNormColumn(existing.column)===schemaNormColumn(entry.column);
-      })[0];
-      var sortBtn=document.createElement('button');
-      sortBtn.type='button';
-      sortBtn.className='qb-chip-sort'+(sort?' active':'');
-      sortBtn.textContent=sort?(sort.direction==='asc'?'↑':'↓'):'⇅';
-      sortBtn.title=sort
-        ?(sort.direction==='asc'
-          ?'Sorted ascending — click for descending'
-          :'Sorted descending — click to clear')
-        :'Sort by this column';
-      sortBtn.setAttribute('aria-label',sortBtn.title);
-      sortBtn.setAttribute('data-action','sort');
-      sortBtn.setAttribute('data-index',String(index));
-      chip.appendChild(label);
-      chip.appendChild(sortBtn);
-      chip.appendChild(remove);
-      picksEl.appendChild(chip);
+      })[0]||null;
+      picksEl.appendChild(qbViewChip(name,entry,index,sort));
     });
   }
 
   /* ===== join plan ===== */
-  function joinConditionText(join: QueryJoin): string {
-    if(join.kind==='cross') return 'every row × every row';
-    if(join.predicate) return join.predicate;
-    var attachName=plan?queryNameOf(plan.graph,join.attachToId):join.attachToId;
-    var targetName=plan?queryNameOf(plan.graph,join.entityId):join.entityId;
-    var parts: string[]=[];
-    var count=Math.min(join.leftColumns.length,join.rightColumns.length);
-    for(var i=0;i<count;i++){
-      parts.push(attachName+'.'+join.leftColumns[i]+' = '+
-        targetName+'.'+join.rightColumns[i]);
-    }
-    return parts.join(' AND ');
-  }
-
-  function tag(text: string, className?: string): HTMLElement {
-    var tagEl=document.createElement('span');
-    tagEl.className='qb-tag'+(className?' '+className:'');
-    tagEl.textContent=text;
-    return tagEl;
-  }
-
-  function showButton(entityId: string): HTMLElement {
-    var button=document.createElement('button');
-    button.type='button';
-    button.className='btn quiet';
-    button.textContent='Show';
-    button.setAttribute('data-action','focus');
-    button.setAttribute('data-entity',entityId);
-    button.title='Show this table on the diagram';
-    return button;
-  }
-
-  function renderEmptyPlan(): void {
-    var box=document.createElement('div');
-    box.className='qb-empty';
-    var title=document.createElement('h4');
-    title.textContent='Pick columns on the diagram';
-    var line=document.createElement('p');
-    line.textContent='Every table card now shows a checkbox per column. ProcFlow follows declared FOREIGN KEY constraints to work out the joins while you pick.';
-    var steps=document.createElement('ol');
-    steps.className='qb-steps';
-    ['Tick the columns you need.',
-     'Watch the highlighted edges and the join plan below.',
-     'Copy the SQL into your database client.'].forEach(function(text){
-      var item=document.createElement('li');
-      item.textContent=text;
-      steps.appendChild(item);
-    });
-    var hint=document.createElement('p');
-    hint.className='qb-hint';
-    hint.textContent='No foreign key between two tables? ProcFlow says so and lets you teach the join. It never invents one.';
-    box.appendChild(title);
-    box.appendChild(line);
-    box.appendChild(steps);
-    box.appendChild(hint);
-    planEl.appendChild(box);
-  }
-
-  function renderAmbiguities(): void {
-    if(!plan) return;
-    plan.ambiguities.forEach(function(ambiguity){
-      var card=document.createElement('div');
-      card.className='qb-join';
-      var head=document.createElement('div');
-      head.className='qb-join-head';
-      var title=document.createElement('strong');
-      title.className='qb-join-title';
-      title.textContent='Two declared paths reach '+queryNameOf(plan.graph,ambiguity.fromId);
-      head.appendChild(title);
-      head.appendChild(tag('choose a path','qb-tag-heuristic'));
-      card.appendChild(head);
-      var list=document.createElement('ul');
-      list.className='qb-choices';
-      var choiceKey=ambiguity.fromId+'=>'+ambiguity.toId;
-      ambiguity.paths.forEach(function(path,index){
-        var item=document.createElement('li');
-        var label=document.createElement('label');
-        var radio=document.createElement('input');
-        radio.type='radio';
-        radio.name='qb-ambiguity-'+choiceKey;
-        radio.checked=index===ambiguity.chosenIndex;
-        radio.setAttribute('data-role','path-choice');
-        radio.setAttribute('data-key',choiceKey);
-        radio.value=String(index);
-        var text=document.createElement('span');
-        text.textContent=ambiguity.summaries[index];
-        label.appendChild(radio);
-        label.appendChild(text);
-        item.appendChild(label);
-        list.appendChild(item);
-      });
-      card.appendChild(list);
-      var note=document.createElement('p');
-      note.className='qb-join-note';
-      note.textContent='These joins mean different things. The first declared constraint is used until you pick another path.';
-      card.appendChild(note);
-      planEl.appendChild(card);
-    });
-  }
-
-  function renderJoins(): void {
-    if(!plan) return;
-    plan.joins.forEach(function(join){
-      var card=document.createElement('div');
-      card.className='qb-join';
-      card.setAttribute('data-edge',join.edgeId||'');
-      card.setAttribute('data-attach',join.attachToId);
-      card.setAttribute('data-entity',join.entityId);
-      var head=document.createElement('div');
-      head.className='qb-join-head';
-      if(join.kind==='cross'){
-        head.appendChild(tag('cross join','qb-tag-cross'));
-      } else {
-        var select=document.createElement('select');
-        select.setAttribute('data-role','join-type');
-        select.setAttribute('data-join',join.id);
-        select.setAttribute('aria-label','Join type');
-        [['inner','INNER JOIN'],['left','LEFT JOIN']].forEach(function(option){
-          var item=document.createElement('option');
-          item.value=option[0];
-          item.textContent=option[1];
-          select.appendChild(item);
-        });
-        select.value=join.joinType;
-        head.appendChild(select);
-      }
-      var title=document.createElement('span');
-      title.className='qb-join-title';
-      title.textContent=queryNameOf(plan.graph,join.attachToId)+' → '+
-        queryNameOf(plan.graph,join.entityId);
-      head.appendChild(title);
-      if(join.bridge) head.appendChild(tag('bridge','qb-tag-bridge'));
-      if(join.kind==='manual') head.appendChild(tag('taught · not declared','qb-tag-manual'));
-      if(join.kind==='declared'&&join.resolution==='heuristic'){
-        head.appendChild(tag('name-matched FK','qb-tag-heuristic'));
-      }
-      head.appendChild(showButton(join.entityId));
-      card.appendChild(head);
-      var condition=document.createElement('p');
-      condition.className='qb-join-cond';
-      condition.textContent=joinConditionText(join);
-      card.appendChild(condition);
-      var note=document.createElement('p');
-      note.className='qb-join-note';
-      note.textContent=join.explanation;
-      card.appendChild(note);
-      if(join.selfJoin){
-        var pickedColumns=picks.filter(function(entry){
-          return entry.entityId===join.entityId;
-        });
-        if(pickedColumns.length){
-          var copyBox=document.createElement('div');
-          copyBox.className='qb-copy';
-          var copyLabel=document.createElement('p');
-          copyLabel.className='qb-copy-label';
-          copyLabel.textContent='Read from the second copy:';
-          copyBox.appendChild(copyLabel);
-          var copyList=document.createElement('ul');
-          copyList.className='qb-copy-list';
-          pickedColumns.forEach(function(entry){
-            var item=document.createElement('li');
-            var label=document.createElement('label');
-            var box=document.createElement('input');
-            box.type='checkbox';
-            box.checked=(join.copyColumns||[]).some(function(name){
-              return schemaNormColumn(name)===schemaNormColumn(entry.column);
-            });
-            box.setAttribute('data-role','copy-column');
-            box.setAttribute('data-join',join.manualId||'');
-            box.setAttribute('data-column',entry.column);
-            var text=document.createElement('span');
-            text.textContent=entry.column;
-            label.appendChild(box);
-            label.appendChild(text);
-            item.appendChild(label);
-            copyList.appendChild(item);
-          });
-          copyBox.appendChild(copyList);
-          card.appendChild(copyBox);
-          if(!join.copyColumns||!join.copyColumns.length){
-            var hint=document.createElement('p');
-            hint.className='qb-join-note';
-            hint.textContent='All picked columns currently come from the first copy.';
-            card.appendChild(hint);
-          }
-        }
-      }
-      planEl.appendChild(card);
-    });
-  }
-
-  function columnOptions(): DocumentFragment {
-    var frag=document.createDocumentFragment();
-    if(!graph) return frag;
-    graph.order.forEach(function(id){
-      var node=graph.nodes[id];
-      var group=document.createElement('optgroup');
-      group.label=node.name;
-      node.columns.forEach(function(column){
-        var option=document.createElement('option');
-        option.value=id+'|'+column;
-        option.textContent=column;
-        group.appendChild(option);
-      });
-      frag.appendChild(group);
-    });
-    return frag;
-  }
-
   function draftFor(problem: QueryProblem): QbDraft {
     var key=problem.entityIds[0];
     if(!drafts[key]){
@@ -470,113 +228,9 @@
   function renderProblems(): void {
     if(!plan) return;
     plan.problems.forEach(function(problem){
-      var key=problem.entityIds[0];
-      var draft=draftFor(problem);
-      var card=document.createElement('div');
-      card.className='qb-problem';
-      var title=document.createElement('h4');
-      title.textContent=problem.title;
-      var message=document.createElement('p');
-      message.textContent=problem.message;
-      var education=document.createElement('p');
-      education.textContent=problem.education;
-      card.appendChild(title);
-      card.appendChild(message);
-      card.appendChild(education);
-      var row=document.createElement('div');
-      row.className='qb-resolve';
-      var left=document.createElement('select');
-      left.setAttribute('data-role','teach-left');
-      left.setAttribute('data-problem',key);
-      left.setAttribute('aria-label','Table and column on the left');
-      left.appendChild(columnOptions());
-      left.value=draft.left;
-      var equals=document.createElement('span');
-      equals.textContent='=';
-      var right=document.createElement('select');
-      right.setAttribute('data-role','teach-right');
-      right.setAttribute('data-problem',key);
-      right.setAttribute('aria-label','Table and column on the right');
-      right.appendChild(columnOptions());
-      right.value=draft.right;
-      var teach=document.createElement('button');
-      teach.type='button';
-      teach.className='btn primary';
-      teach.textContent='Add taught join';
-      teach.setAttribute('data-action','teach');
-      teach.setAttribute('data-problem',key);
-      row.appendChild(left);
-      row.appendChild(equals);
-      row.appendChild(right);
-      row.appendChild(teach);
-      card.appendChild(row);
-      var predicateToggle=document.createElement('label');
-      predicateToggle.className='opt';
-      var predicateBox=document.createElement('input');
-      predicateBox.type='checkbox';
-      predicateBox.checked=!!draft.usePredicate;
-      predicateBox.setAttribute('data-role','use-predicate');
-      predicateBox.setAttribute('data-problem',key);
-      var predicateText=document.createElement('span');
-      predicateText.textContent='Use a typed predicate instead';
-      predicateToggle.appendChild(predicateBox);
-      predicateToggle.appendChild(predicateText);
-      card.appendChild(predicateToggle);
-      if(draft.usePredicate){
-        var predicate=document.createElement('input');
-        predicate.type='text';
-        predicate.className='qb-predicate';
-        predicate.placeholder='e.g. a.CustomerId = b.CustomerId';
-        predicate.value=draft.predicate;
-        predicate.setAttribute('data-role','predicate');
-        predicate.setAttribute('data-problem',key);
-        predicate.setAttribute('aria-label','Join predicate');
-        card.appendChild(predicate);
-      }
-      var actions=document.createElement('div');
-      actions.className='qb-resolve';
-      if(!teaching){
-        var teachClick=document.createElement('button');
-        teachClick.type='button';
-        teachClick.className='btn';
-        teachClick.textContent='Teach by clicking columns';
-        teachClick.setAttribute('data-action','teach-click');
-        actions.appendChild(teachClick);
-      }
-      var crossBtn=document.createElement('button');
-      crossBtn.type='button';
-      crossBtn.className='btn';
-      crossBtn.textContent='Every combination (CROSS JOIN)';
-      crossBtn.setAttribute('data-action','cross');
-      crossBtn.setAttribute('data-problem',key);
-      var leaveBtn=document.createElement('button');
-      leaveBtn.type='button';
-      leaveBtn.className='btn quiet';
-      leaveBtn.textContent='Leave these columns out';
-      leaveBtn.setAttribute('data-action','exclude');
-      leaveBtn.setAttribute('data-problem',key);
-      actions.appendChild(crossBtn);
-      actions.appendChild(leaveBtn);
-      card.appendChild(actions);
-      planEl.appendChild(card);
+      planEl.appendChild(qbViewProblemCard(plan.graph,problem,
+        draftFor(problem),teaching));
     });
-  }
-
-  function renderLearn(): void {
-    if(!plan||!plan.education.length) return;
-    var details=document.createElement('details');
-    details.className='qb-learn';
-    var summary=document.createElement('summary');
-    summary.textContent='How these joins were chosen';
-    details.appendChild(summary);
-    var list=document.createElement('ul');
-    plan.education.forEach(function(line){
-      var item=document.createElement('li');
-      item.textContent=line;
-      list.appendChild(item);
-    });
-    details.appendChild(list);
-    planEl.appendChild(details);
   }
 
   function renderSummary(): void {
@@ -599,28 +253,18 @@
   function renderPlanBody(): void {
     planEl.textContent='';
     if(!plan||!plan.fromId){
-      renderEmptyPlan();
+      planEl.appendChild(qbViewEmptyPlan());
       return;
     }
     if(teaching){
-      var banner=document.createElement('div');
-      banner.className='qb-teach-banner';
-      var bannerText=document.createElement('span');
-      bannerText.textContent=teachFirst
-        ?'First column set ('+queryNameOf(plan.graph,teachFirst.entityId)+'.'+
-          teachFirst.column+'). Click the matching column on the other table — or on the same table for a self join.'
-        :'Click the first column of the join condition on the diagram.';
-      var bannerCancel=document.createElement('button');
-      bannerCancel.type='button';
-      bannerCancel.className='qb-tip-action';
-      bannerCancel.textContent='Cancel';
-      bannerCancel.setAttribute('data-action','cancel-teach');
-      banner.appendChild(bannerText);
-      banner.appendChild(bannerCancel);
-      planEl.appendChild(banner);
+      planEl.appendChild(qbViewTeachBanner(plan.graph,teachFirst));
     }
-    renderAmbiguities();
-    renderJoins();
+    plan.ambiguities.forEach(function(ambiguity){
+      planEl.appendChild(qbViewAmbiguityCard(plan.graph,ambiguity));
+    });
+    plan.joins.forEach(function(join){
+      planEl.appendChild(qbViewJoinCard(plan.graph,join,picks));
+    });
     renderProblems();
     if(plan.warnings.length){
       plan.warnings.forEach(function(warning){
@@ -646,7 +290,8 @@
       tip.appendChild(tipAction);
       planEl.appendChild(tip);
     }
-    renderLearn();
+    var learn=qbViewLearn(plan.education);
+    if(learn) planEl.appendChild(learn);
   }
 
   var QUERY_SQL_TOKEN_CLASSES: Record<string, string>={keyword:'sql-kw',
@@ -708,8 +353,26 @@
     renderSql();
     renderCount();
     decorate();
+    if(statusEl) statusEl.textContent=statusMessage();
     if(bodyEl) bodyEl.scrollTop=scrollTop;
     document.dispatchEvent(new CustomEvent('procflow-query-changed'));
+  }
+
+  /* Live regions re-announce their whole subtree, so the panel publishes one
+     concise sentence instead of the SQL and join cards. */
+  function statusMessage(): string {
+    if(!active) return '';
+    if(teaching) return 'Teaching a join. Click a column on the diagram.';
+    if(!plan||!plan.fromId) return 'No columns picked.';
+    var parts: string[]=[
+      plan.usedIds.length+' table'+(plan.usedIds.length===1?'':'s'),
+      plan.joins.length+' join'+(plan.joins.length===1?'':'s')
+    ];
+    if(plan.problems.length){
+      parts.push(plan.problems.length+
+        (plan.problems.length===1?' table needs a join':' tables need a join'));
+    }
+    return 'SQL updated: '+parts.join(', ')+'.';
   }
 
   /* ===== actions ===== */
@@ -788,6 +451,7 @@
     problem.entityIds.forEach(function(id){
       excluded[id]=1;
       picks=picks.filter(function(entry){ return entry.entityId!==id; });
+      sorts=sorts.filter(function(sort){ return sort.entityId!==id; });
       manual=manual.filter(function(entry){
         return entry.leftId!==id&&entry.rightId!==id;
       });
@@ -806,21 +470,7 @@
       copyBtn.textContent='Copied';
       setTimeout(function(){ copyBtn.textContent=old; },1400);
     };
-    if(navigator.clipboard&&navigator.clipboard.writeText){
-      navigator.clipboard.writeText(text).then(done,function(){ fallbackCopy(text,done); });
-    } else fallbackCopy(text,done);
-  }
-
-  function fallbackCopy(text: string, done: () => void): void {
-    var area=document.createElement('textarea');
-    area.value=text;
-    area.setAttribute('readonly','');
-    area.style.position='absolute';
-    area.style.left='-9999px';
-    document.body.appendChild(area);
-    area.select();
-    try { document.execCommand('copy'); done(); } catch(err){ /* clipboard unavailable */ }
-    document.body.removeChild(area);
+    copyText(text,done);
   }
 
   /* ===== mode ===== */
@@ -1052,7 +702,16 @@
       else startTeaching();
     });
     document.addEventListener('keydown',function(event: KeyboardEvent){
-      if(event.key==='Escape'&&teaching) cancelTeaching();
+      if(event.key==='Escape'){
+        if(teaching) cancelTeaching();
+        return;
+      }
+      if(event.key!=='q'&&event.key!=='Q') return;
+      if(event.ctrlKey||event.metaKey||event.altKey) return;
+      var target=event.target as HTMLElement;
+      if(target&&(target.tagName==='INPUT'||target.tagName==='TEXTAREA'||
+         target.tagName==='SELECT'||target.isContentEditable)) return;
+      setActive(!active);
     });
     if(copyBtn) copyBtn.addEventListener('click',copySql);
     if(clearBtn) clearBtn.addEventListener('click',function(){

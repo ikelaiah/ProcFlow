@@ -136,9 +136,10 @@
         <span class="erd-zoom-val" id="erd-zoom-val">100%</span>
       </div>
       <aside class="erd-inspector" id="erd-inspector" hidden aria-live="polite"></aside>
-      <section class="qb-float" id="qb-float" hidden aria-label="Query builder">
+      <section class="qb-float" id="qb-float" hidden role="dialog"
+               aria-labelledby="qb-title">
         <header class="qb-float-head" id="qb-drag">
-          <h3>Query builder</h3>
+          <h3 id="qb-title">Query builder</h3>
           <span class="qb-plan-summary" id="qb-summary" aria-live="polite"></span>
           <button class="btn quiet" id="btn-qb-clear">Clear</button>
           <button class="qb-icon" id="btn-qb-collapse" aria-label="Collapse query builder"
@@ -171,8 +172,9 @@
             <button class="btn primary" id="btn-qb-copy">Copy SQL</button>
           </div>
           <div class="qb-picks" id="qb-picks"></div>
-          <pre id="qb-sql-out" aria-live="polite"></pre>
-          <div class="qb-plan-body" id="qb-plan-body" aria-live="polite"></div>
+          <p class="qb-status" id="qb-status" role="status" aria-live="polite"></p>
+          <pre id="qb-sql-out"></pre>
+          <div class="qb-plan-body" id="qb-plan-body"></div>
         </div>
         <button type="button" class="qb-resize" id="qb-resize"
                 aria-label="Resize query builder"
@@ -194,6 +196,8 @@
 <script src="dist/src/workspace.js"></script>
 <script src="dist/src/ui/large-input.js"></script>
 <script src="dist/src/ui/splitter.js"></script>
+<script src="dist/src/ui/clipboard.js"></script>
+<script src="dist/src/ui/erd-query-view.js"></script>
 <script src="dist/src/ui/erd-query.js"></script>
 <script src="dist/src/ui/erd-page.js"></script>
 </body>

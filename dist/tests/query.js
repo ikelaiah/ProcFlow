@@ -543,6 +543,40 @@
         record('v2.4.0 a self join on an unpicked table is ignored with a warning', false, String(err && err.stack || err));
         record('v2.4.0 only the first self join per table is applied', false, String(err && err.stack || err));
     }
+    /* ---- v2.4.0 query-engine scale: a 1,000-table declared chain ---- */
+    try {
+        var chainLines = [];
+        for (var chainIndex = 1; chainIndex <= 1000; chainIndex++) {
+            chainLines.push('CREATE TABLE app.t' + chainIndex + ' (', '  id INT NOT NULL,', '  name VARCHAR(20),');
+            if (chainIndex > 1) {
+                chainLines.push('  ref_id INT NULL,', '  CONSTRAINT fk_qs' + chainIndex + ' FOREIGN KEY (ref_id) REFERENCES app.t' +
+                    (chainIndex - 1) + ' (id),');
+            }
+            chainLines.push('  CONSTRAINT pk_qs' + chainIndex + ' PRIMARY KEY (id)', ');');
+        }
+        var chainSchema = parseSchema(chainLines.join('\n'));
+        record('v2.4.0 the 1,000-table scale fixture parses', chainSchema.stats.tables === 1000 && chainSchema.stats.relationships === 999, chainSchema.stats);
+        var chainSelections = [
+            { entityId: 'APP.T1000', column: 'name' },
+            { entityId: 'APP.T1', column: 'name' }
+        ];
+        var chainPlan = planFor(chainSchema, chainSelections);
+        record('v2.4.0 longest-path plans resolve without stack overflow', chainPlan.problems.length === 0 &&
+            chainPlan.usedIds.length === 1000 &&
+            chainPlan.joins.length === 999 &&
+            chainPlan.bridges.length === 998 &&
+            chainPlan.joins.every(function (join) { return join.joinType === 'left'; }), { used: chainPlan.usedIds.length, joins: chainPlan.joins.length,
+            bridges: chainPlan.bridges.length });
+        var chainPlanAgain = planFor(chainSchema, chainSelections);
+        record('v2.4.0 the 1,000-table plan is deterministic', JSON.stringify(chainPlan) === JSON.stringify(chainPlanAgain) &&
+            queryPlanSQL(chainPlan, { dialect: 'tsql', comments: false }) ===
+                queryPlanSQL(chainPlanAgain, { dialect: 'tsql', comments: false }), { joins: chainPlan.joins.length });
+    }
+    catch (err) {
+        record('v2.4.0 the 1,000-table scale fixture parses', false, String(err && err.stack || err));
+        record('v2.4.0 longest-path plans resolve without stack overflow', false, String(err && err.stack || err));
+        record('v2.4.0 the 1,000-table plan is deterministic', false, String(err && err.stack || err));
+    }
     var passed = results.filter(function (result) { return result.pass; }).length;
     window.PROCFLOW_QUERY_DETAIL = results;
     window.PROCFLOW_QUERY_RESULT = { passed: passed, total: results.length };
