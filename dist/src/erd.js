@@ -1,5 +1,5 @@
 "use strict";
-/* ===== v2.1.0 ERD export (declared constraints only) =====
+/* ===== v2.5.0 ERD export (declared constraints only) =====
    Renders the schema IR as a Mermaid `erDiagram`. Relationships are derived
    only from declared FOREIGN KEY constraints; the exporter never infers an
    edge. Sanitized identifiers keep Mermaid syntax valid while `%%` provenance
@@ -135,15 +135,7 @@ function toMermaidER(result) {
    bounded barycenter crossing reduction. Cycles and self-references are
    broken deterministically (first unassigned node by declaration order). */
 function erdLayoutFingerprint(result) {
-    var text = result.entities.map(function (entity) {
-        return entity.id + '|' + entity.kind;
-    }).sort().join(';');
-    var hash = 2166136261;
-    for (var i = 0; i < text.length; i++) {
-        hash ^= text.charCodeAt(i);
-        hash = Math.imul(hash, 16777619);
-    }
-    return ('0000000' + ((hash >>> 0).toString(16))).slice(-8);
+    return schemaFingerprint(result);
 }
 function erdResolvedSourceId(result, norm) {
     for (var i = 0; i < result.entities.length; i++) {

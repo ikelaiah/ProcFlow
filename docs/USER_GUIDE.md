@@ -61,6 +61,13 @@ suspends compact boxes, and hides the selection inspector while you build.
 Press **Q** to toggle query mode from the keyboard, and Escape to cancel
 teaching.
 
+The **Query** menu keeps the work. **Save to this browser** / **Restore saved**
+/ **Forget saved** store one query locally, and nothing is stored until you
+choose Save. **Export query file** and **Import query file** move a versioned
+JSON file, and **Download .sql** writes the statement as a file. Restoring
+prunes references that no longer exist and reports what it dropped; a changed
+schema never blocks a restore.
+
 Full semantics — join policy, taught and self joins, SQL options, and what the
 builder never does — are in [Query builder](QUERY_BUILDER.md).
 

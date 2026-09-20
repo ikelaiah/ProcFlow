@@ -1,4 +1,4 @@
-/* ===== v1.8.0 Usable local workspace (README post-v1.0.0 item 7) =====
+/* ===== v2.5.0 Usable local workspace (README post-v1.0.0 item 7) =====
    Optional local workspace persistence and dependency filtering.
 
    Persistence is opt-in: nothing is ever written to storage automatically.
@@ -184,6 +184,32 @@ function clearErdLayout(): void {
   try { window.localStorage.removeItem(ERD_LAYOUT_STORAGE_KEY); } catch(e){}
 }
 
+/* v2.5.0 — ERD query persistence. Same opt-in rule again: one saved query per
+   browser, explicit Save/Restore/Forget only, under its own key. Serialization
+   and validation live in src/query-store.ts; this module owns storage. */
+var ERD_QUERY_STORAGE_KEY = 'procflow.erd.query';
+
+function writeErdQuery(text: string): boolean {
+  try {
+    window.localStorage.setItem(ERD_QUERY_STORAGE_KEY,text);
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
+function readErdQuery(): string | null {
+  try { return window.localStorage.getItem(ERD_QUERY_STORAGE_KEY); } catch(e){ return null; }
+}
+
+function hasStoredErdQuery(): boolean {
+  try { return !!window.localStorage.getItem(ERD_QUERY_STORAGE_KEY); } catch(e){ return false; }
+}
+
+function clearErdQuery(): void {
+  try { window.localStorage.removeItem(ERD_QUERY_STORAGE_KEY); } catch(e){}
+}
+
 function hasSavedWorkspace(): boolean {
   try { return !!window.localStorage.getItem(WORKSPACE_STORAGE_KEY); } catch(e){ return false; }
 }
@@ -289,3 +315,4 @@ function filterDependencyGraph(graph: Graph, filter?: WorkspaceFilter): Graph {
      filter never changes what the analysis reports, only what the view draws. */
   return {nodes:nodes, edges:edges, stats:graph.stats};
 }
+

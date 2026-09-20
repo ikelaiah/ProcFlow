@@ -1183,6 +1183,54 @@ interface QuerySort {
   direction: 'asc' | 'desc';
 }
 
+/* v2.5.0 — ERD query persistence. One saved query per browser plus versioned
+   query files, keyed by a schema fingerprint. Stale references are pruned
+   against the current schema and reported, never silently applied. */
+interface ErdQuerySavedOptions {
+  dialect: QueryDialect;
+  comments: boolean;
+  distinct: boolean;
+  rowLimit: number;
+  onlyUsed: boolean;
+  sorts: QuerySort[];
+}
+
+interface ErdQuerySavedState {
+  format: string;
+  version: number;
+  fingerprint: string;
+  name?: string;
+  selections: QueryColumnRef[];
+  manual: QueryManualJoin[];
+  cross: string[];
+  excluded: string[];
+  joinTypes: Record<string, QueryJoinType>;
+  pathChoices: Record<string, number>;
+  options: ErdQuerySavedOptions;
+}
+
+/* The panel's live state handed to the store for serialization. */
+interface ErdQueryStoreInput {
+  name?: string;
+  selections: QueryColumnRef[];
+  manual: QueryManualJoin[];
+  cross: string[];
+  excluded: string[];
+  joinTypes: Record<string, QueryJoinType>;
+  pathChoices: Record<string, number>;
+  options: ErdQuerySavedOptions;
+}
+
+interface ErdQueryStoreParseResult {
+  state: ErdQuerySavedState | null;
+  diagnostics: Diagnostic[];
+}
+
+interface ErdQueryPruneResult {
+  state: ErdQuerySavedState;
+  dropped: string[];
+}
+
 /* Generated-SQL highlighting tokens. The panel renders them as spans; the
    concatenated text is always byte-identical to the emitted SQL. */
 type QuerySqlTokenKind = 'plain' | 'keyword' | 'comment' | 'string' | 'ident' | 'number' | 'punct';
@@ -1348,6 +1396,11 @@ interface Window {
   readErdLayout(): string | null;
   hasStoredErdLayout(): boolean;
   clearErdLayout(): void;
+  /* v2.5.0 ERD query persistence (src/workspace.ts, opt-in only). */
+  writeErdQuery(text: string): boolean;
+  readErdQuery(): string | null;
+  hasStoredErdQuery(): boolean;
+  clearErdQuery(): void;
   clearWorkspace(): void;
   hasSavedWorkspace(): boolean;
   readWorkspace(): WorkspaceSnapshot | null;

@@ -1,5 +1,5 @@
 "use strict";
-/* proc>flow v2.4.1 — ERD query-builder browser interaction suite.
+/* proc>flow v2.5.0 — ERD query-builder browser interaction suite.
    Drives erd.html in an iframe: query mode, on-card picking, join and problem
    cards, teaching by clicks, self joins, SQL options, highlighting, resize,
    Find, and the only-used filter. Publishes pass/fail on the page body so the
@@ -85,6 +85,11 @@
             record('query mode suspends compact boxes', get('erd-compact').disabled === true);
             record('empty state explains picking', sql().indexOf('Pick columns on the diagram') >= 0);
             record('empty mode announces a concise status', (get('qb-status').textContent || '').indexOf('No columns picked') >= 0);
+            record('query file menu is available', !!get('qb-query-menu') && !!get('qb-query-name') &&
+                !!get('btn-qb-export') && !!get('btn-qb-import') &&
+                !!get('btn-qb-download'));
+            record('export and download are disabled with no picks', get('btn-qb-export').disabled === true &&
+                get('btn-qb-download').disabled === true);
             d.dispatchEvent(new KeyboardEvent('keydown', { key: 'q', bubbles: true }));
             record('Q toggles query mode off', get('qb-float').hidden === true);
             d.dispatchEvent(new KeyboardEvent('keydown', { key: 'q', bubbles: true }));
@@ -95,6 +100,22 @@
             await wait(150);
             record('single-table SQL is generated', sql().indexOf('FROM [dbo].[Customer] AS customer;') >= 0, sql());
             record('status line summarizes the plan', (get('qb-status').textContent || '').indexOf('SQL updated') >= 0);
+            record('export and download enable with picks', get('btn-qb-export').disabled === false &&
+                get('btn-qb-download').disabled === false);
+            /* Anchor clicks are stubbed: a real download would block headless. */
+            var downloadNames = [];
+            var realAnchorClick = body.HTMLAnchorElement.prototype.click;
+            body.HTMLAnchorElement.prototype.click = function () {
+                downloadNames.push(this.download);
+            };
+            get('btn-qb-export').click();
+            record('export reports the file name', (get('qb-store-status').textContent || '').indexOf('Exported') >= 0, get('qb-store-status').textContent);
+            get('btn-qb-download').click();
+            body.HTMLAnchorElement.prototype.click = realAnchorClick;
+            record('export and sql download produce named files', downloadNames.length === 2 &&
+                downloadNames[0].indexOf('.json') >= 0 &&
+                downloadNames[1].indexOf('.sql') >= 0, downloadNames);
+            record('sql download reports the file name', (get('qb-store-status').textContent || '').indexOf('.sql') >= 0, get('qb-store-status').textContent);
             record('picked row and card badge update', !!d.querySelector('#erd-cards .erd-card[data-entity-id="DBO.CUSTOMER"] li.qb-picked') &&
                 (d.querySelector('#erd-cards .erd-card[data-entity-id="DBO.CUSTOMER"] .erd-qbcount') ||
                     { textContent: '' }).textContent === '1 picked');
@@ -233,6 +254,63 @@
             onlyUsedBox.checked = false;
             onlyUsedBox.dispatchEvent(new Event('change'));
             record('only-used filter restores tables', !!productCard && productCard.offsetParent !== null);
+            /* ---- query file import ---- */
+            var importPayload = JSON.stringify({
+                format: 'procflow-erd-query', version: 1, fingerprint: 'stale-hash',
+                name: 'imported smoke',
+                selections: [
+                    { entityId: 'DBO.CUSTOMER', column: 'Email' },
+                    { entityId: 'DBO.ORDERHEADER', column: 'PlacedAt' }
+                ],
+                manual: [], cross: [], excluded: [], joinTypes: {}, pathChoices: {},
+                options: { dialect: 'postgres', comments: true, distinct: true, rowLimit: 0,
+                    onlyUsed: false, sorts: [] }
+            });
+            var importFile = new File([importPayload], 'query.json', { type: 'application/json' });
+            var transfer = new DataTransfer();
+            transfer.items.add(importFile);
+            var fileInput = get('qb-query-file');
+            fileInput.files = transfer.files;
+            fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+            await until(function () {
+                return get('qb-query-name').value === 'imported smoke';
+            }, 3000);
+            record('importing a query file applies picks and options', get('qb-query-name').value === 'imported smoke' &&
+                get('qb-dialect').value === 'postgres' &&
+                sql().indexOf('"dbo"."Customer"') >= 0 &&
+                sql().indexOf('SELECT DISTINCT') >= 0 &&
+                sql().indexOf('TOP') < 0 && sql().indexOf('LIMIT') < 0, sql());
+            record('importing a stale file reports pruning and schema change', (get('qb-store-status').textContent || '').indexOf('schema changed') >= 0, get('qb-store-status').textContent);
+            /* ---- browser save, restore, forget ---- */
+            get('btn-qb-clear').click();
+            pick('DBO.CUSTOMER', 'Email');
+            pick('DBO.ORDERHEADER', 'PlacedAt');
+            await wait(120);
+            get('btn-qb-save').click();
+            record('saving to the browser reports success', (get('qb-store-status').textContent || '').indexOf('saved to this browser') >= 0, get('qb-store-status').textContent);
+            get('btn-qb-clear').click();
+            record('restore becomes available after saving', get('btn-qb-restore').disabled === false);
+            get('btn-qb-restore').click();
+            await until(function () {
+                return d.querySelectorAll('#qb-picks .qb-chip').length === 2 &&
+                    sql().indexOf('JOIN "dbo"."OrderHeader" AS orderheader') >= 0;
+            }, 3000);
+            record('restoring brings back picks and SQL', (get('qb-store-status').textContent || '').indexOf('Restored') >= 0 &&
+                d.querySelectorAll('#qb-picks .qb-chip').length === 2, get('qb-store-status').textContent);
+            get('btn-qb-forget').click();
+            record('forget clears the saved query', (get('qb-store-status').textContent || '').indexOf('forgotten') >= 0 &&
+                get('btn-qb-restore').disabled === true, get('qb-store-status').textContent);
+            get('btn-qb-save').click();
+            get('btn-qb-clear').click();
+            get('btn-qb-close').click();
+            get('btn-erd-query').click();
+            await wait(250);
+            record('activation hints at a saved query', (get('qb-store-status').textContent || '').indexOf('Restore saved') >= 0, get('qb-store-status').textContent);
+            get('btn-qb-restore').click();
+            await until(function () {
+                return d.querySelectorAll('#qb-picks .qb-chip').length === 2;
+            }, 3000);
+            get('btn-qb-forget').click();
             /* ---- close and reopen ---- */
             get('btn-qb-close').click();
             await wait(200);

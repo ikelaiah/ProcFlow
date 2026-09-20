@@ -534,6 +534,13 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
   display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 10px;
   border-bottom:1px solid var(--rule-soft);background:var(--panel);flex:0 0 auto
 }
+.qb-name{display:block;padding:7px 8px;white-space:normal}
+.qb-name input{
+  width:100%;margin-top:4px;padding:6px 7px;border:1px solid var(--rule);
+  border-radius:3px;background:#11222d;color:var(--ink);
+  font-family:var(--mono);font-size:11.5px
+}
+.menu-action:disabled{opacity:.45;cursor:default}
 .qb-picks{display:flex;flex-wrap:wrap;gap:5px;padding:8px 10px 0;flex:0 0 auto}
 .qb-chip{display:inline-flex;align-items:center;border:1px solid var(--rule);
   border-radius:999px;background:#18252e;overflow:hidden}
@@ -552,8 +559,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
   color:var(--ink-faint);cursor:pointer;padding:3px 6px;font-size:11px;line-height:1
 }
 .qb-chip-sort:hover,.qb-chip-sort.active{color:var(--marigold)}
-.qb-tip{margin:8px 0 0;color:var(--marigold);font-size:11.5px}
-.qb-tip-action{
+.qb-tip{margin:8px 0 0;color:var(--marigold);font-size:11.5px}.qb-tip-action{
   border:0;background:transparent;color:var(--marigold);cursor:pointer;
   font:inherit;text-decoration:underline;padding:0
 }

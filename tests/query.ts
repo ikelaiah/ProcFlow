@@ -1,4 +1,4 @@
-/* proc>flow v2.4.1 — ERD query-builder fixtures.
+/* proc>flow v2.5.0 — ERD query-builder fixtures.
    Join graph construction from declared FKs only, shortest-path selection
    with equal-cost alternatives, bridge discovery, optional/reverse join
    policy, hand-taught joins, disconnected-selection problems, dialect
@@ -669,9 +669,147 @@
     record('v2.4.0 the 1,000-table plan is deterministic',false,String(err&&err.stack||err));
   }
 
+  /* ---- v2.5.0 query persistence: saved state and versioned query files ---- */
+  try{
+    var storeInput: ErdQueryStoreInput={
+      name:'  Orders by customer  ',
+      selections:[
+        {entityId:'DBO.ORDERHEADER',column:'PlacedAt'},
+        {entityId:'DBO.CUSTOMER',column:'Email'}
+      ],
+      manual:[{id:'m1',leftId:'DBO.AUDITLOG',leftColumn:'EntityId',
+        rightId:'DBO.CUSTOMER',rightColumn:'CustomerId',
+        predicate:'customer.[CustomerId] = auditlog.[EntityId]'}],
+      cross:['DBO.EXTRA'],
+      excluded:['DBO.NOTE'],
+      joinTypes:{'rel:1':'left'},
+      pathChoices:{'DBO.APPUSER->DBO.ORDERHEADER':1},
+      options:{dialect:'postgres',comments:false,distinct:true,rowLimit:100,
+        onlyUsed:true,
+        sorts:[{entityId:'DBO.CUSTOMER',column:'Email',direction:'desc'}]}
+    };
+    var built=queryStateBuild(schema,storeInput);
+    var builtJSON=queryStateToJSON(built);
+    var parsedStore=queryStateFromJSON(builtJSON);
+    record('v2.5.0 saved query round-trips deterministically',
+      !!parsedStore.state&&
+        parsedStore.diagnostics.length===0&&
+        queryStateToJSON(parsedStore.state)===builtJSON&&
+        built.name==='Orders by customer'&&
+        built.fingerprint===schemaFingerprint(schema)&&
+        queryStateToJSON(queryStateBuild(schema,storeInput))===builtJSON,
+      builtJSON);
+    var badJSON=queryStateFromJSON('not json');
+    var badFormat=queryStateFromJSON('{"format":"other","version":1}');
+    var badVersion=queryStateFromJSON(
+      '{"format":"procflow-erd-query","version":9}');
+    record('v2.5.0 foreign, future, and malformed query files are rejected',
+      !badJSON.state&&
+        badJSON.diagnostics[0].code==='erd_query_parse_error'&&
+        !badFormat.state&&
+        badFormat.diagnostics[0].code==='erd_query_format_error'&&
+        !badVersion.state&&
+        badVersion.diagnostics[0].code==='erd_query_version_error',
+      {badJSON:badJSON,badFormat:badFormat,badVersion:badVersion});
+    var messy=queryStateFromJSON(JSON.stringify({
+      format:'procflow-erd-query',version:1,fingerprint:'abc',
+      selections:[{entityId:'A',column:'X'},{entityId:7},{column:'Y'},null],
+      manual:[{id:'m',leftId:'A'}],
+      cross:['ok',42],
+      excluded:'nope',
+      joinTypes:{good:'inner',bad:'sideways'},
+      pathChoices:{'A->B':2,'C->D':'x'},
+      options:{dialect:'oracle',comments:'yes',distinct:1,rowLimit:-5,
+        onlyUsed:'y',sorts:[{entityId:'A',column:'X',direction:'down'}]}
+    }));
+    record('v2.5.0 unreadable saved entries are ignored with one info diagnostic',
+      !!messy.state&&
+        messy.state.selections.length===1&&
+        messy.state.manual.length===0&&
+        messy.state.cross.join(',')==='ok'&&
+        messy.state.excluded.length===0&&
+        messy.state.joinTypes.good==='inner'&&!messy.state.joinTypes.bad&&
+        messy.state.pathChoices['A->B']===2&&!messy.state.pathChoices['C->D']&&
+        messy.state.options.dialect==='tsql'&&
+        messy.state.options.comments===true&&
+        messy.state.options.distinct===true&&
+        messy.state.options.rowLimit===0&&
+        messy.state.options.sorts.length===1&&
+        messy.state.options.sorts[0].direction==='asc'&&
+        messy.diagnostics.length===1&&
+        messy.diagnostics[0].code==='erd_query_entries_ignored'&&
+        messy.diagnostics[0].severity==='info',
+      messy);
+    var stale=queryStateBuild(schema,{
+      selections:[
+        {entityId:'DBO.CUSTOMER',column:'Email'},
+        {entityId:'DBO.CUSTOMER',column:'Legacy'},
+        {entityId:'DBO.GONE',column:'X'}
+      ],
+      manual:[
+        {id:'m1',leftId:'DBO.GONE',leftColumn:'X',
+         rightId:'DBO.CUSTOMER',rightColumn:'Email'},
+        {id:'m2',leftId:'DBO.AUDITLOG',leftColumn:'EntityId',
+         rightId:'DBO.CUSTOMER',rightColumn:'CustomerId'}
+      ],
+      cross:['DBO.GONE','DBO.EXTRA'],
+      excluded:['DBO.GONE'],
+      joinTypes:{},
+      pathChoices:{'DBO.GONE->DBO.CUSTOMER':1,
+        'DBO.APPUSER->DBO.ORDERHEADER':0},
+      options:{dialect:'tsql',comments:true,distinct:false,rowLimit:0,
+        onlyUsed:false,
+        sorts:[{entityId:'DBO.CUSTOMER',column:'Email',direction:'asc'},
+               {entityId:'DBO.CUSTOMER',column:'Legacy',direction:'asc'}]}
+    });
+    var pruned=queryStatePrune(stale,queryBuildGraph(schema));
+    record('v2.5.0 stale references are pruned and reported, never applied silently',
+      pruned.state.selections.length===1&&
+        pruned.state.selections[0].column==='Email'&&
+        pruned.state.manual.length===1&&pruned.state.manual[0].id==='m2'&&
+        pruned.state.cross.join(',')==='DBO.EXTRA'&&
+        pruned.state.excluded.length===0&&
+        pruned.state.pathChoices['DBO.APPUSER->DBO.ORDERHEADER']===0&&
+        !pruned.state.pathChoices['DBO.GONE->DBO.CUSTOMER']&&
+        pruned.state.options.sorts.length===1&&
+        pruned.dropped.length===7,
+      pruned);
+    var extraSchema=parseSchema(DDL+
+      '\nCREATE TABLE dbo.ExtraTable (Id INT PRIMARY KEY);');
+    record('v2.5.0 the schema fingerprint is stable and changes with the schema',
+      schemaFingerprint(schema)===schemaFingerprint(parseSchema(DDL))&&
+        schemaFingerprint(schema)!==schemaFingerprint(extraSchema)&&
+        schemaFingerprint(schema)===erdLayoutFingerprint(schema),
+      {base:schemaFingerprint(schema),changed:schemaFingerprint(extraSchema)});
+    var noName=parsedStore.state;
+    delete noName.name;
+    record('v2.5.0 export file names derive from the query name or fingerprint',
+      queryFileBaseName(built)==='orders-by-customer'&&
+        queryFileBaseName(noName)==='procflow-query-'+schemaFingerprint(schema),
+      {named:queryFileBaseName(built),unnamed:queryFileBaseName(noName)});
+    var wrote=writeErdQuery(builtJSON);
+    var stored=hasStoredErdQuery();
+    var storedParsed=queryStateFromJSON(readErdQuery());
+    clearErdQuery();
+    record('v2.5.0 opt-in browser storage round-trips and clears explicitly',
+      wrote&&stored&&!!storedParsed.state&&
+        queryStateToJSON(storedParsed.state)===builtJSON&&
+        !hasStoredErdQuery()&&readErdQuery()===null,
+      {wrote:wrote,stored:stored});
+  }catch(err){
+    record('v2.5.0 saved query round-trips deterministically',false,String(err&&err.stack||err));
+    record('v2.5.0 foreign, future, and malformed query files are rejected',false,String(err&&err.stack||err));
+    record('v2.5.0 unreadable saved entries are ignored with one info diagnostic',false,String(err&&err.stack||err));
+    record('v2.5.0 stale references are pruned and reported, never applied silently',false,String(err&&err.stack||err));
+    record('v2.5.0 the schema fingerprint is stable and changes with the schema',false,String(err&&err.stack||err));
+    record('v2.5.0 export file names derive from the query name or fingerprint',false,String(err&&err.stack||err));
+    record('v2.5.0 opt-in browser storage round-trips and clears explicitly',false,String(err&&err.stack||err));
+  }
+
   var passed=results.filter(function(result){ return result.pass; }).length;
   window.PROCFLOW_QUERY_DETAIL=results;
   window.PROCFLOW_QUERY_RESULT={passed:passed,total:results.length};
   window.PROCFLOW_QUERY_PASS=passed===results.length;
 })();
+
 

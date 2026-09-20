@@ -72,8 +72,10 @@ entities and foreign keys. Highlights:
   and any tables the declared graph cannot reach — each with an explicit
   resolution: teach the join by hand, add a `CROSS JOIN`, or leave the table
   out. **Teach join** defines a join by clicking two columns, including self
-  joins with a second table alias. Joins are highlighted on the diagram, and
-  the dialect-quoted SQL is ready to paste into a client such as DBeaver.
+  joins with a second table alias. The **Query** menu saves one query in this
+  browser (explicit Save/Restore/Forget), exports and imports a versioned
+  query file, and downloads the `.sql`. Joins are highlighted on the diagram,
+  and the dialect-quoted SQL is ready to paste into a client such as DBeaver.
 - **Honesty:** the ERD asserts declared constraints only. It never infers a
   relationship from query text, and unresolved references stay explicit.
 
@@ -139,6 +141,8 @@ suite, and hostile labels are escaped for diagram/XML output. Read the full
   self joins, SQL options, and limits.
 - [ADR-001](docs/decisions/ADR-001-declared-evidence-query-builder.md) — why
   the query builder only uses declared keys.
+- [ADR-002](docs/decisions/ADR-002-query-persistence.md) — why saved queries
+  are explicit, versioned, and fingerprint-pruned.
 - [v2.4.1 release note](docs/releases/v2.4.1.md) — current release details.
 - [Roadmap](ROADMAP.md) — planned convergence work.
 
