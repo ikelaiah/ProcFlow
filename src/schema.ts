@@ -1,4 +1,4 @@
-/* ===== v2.1.0 ERD / schema foundation (DDL → declared constraint model) =====
+/* ===== v2.5.0 ERD / schema foundation (DDL → declared constraint model) =====
    Parses CREATE TABLE / CREATE VIEW / CREATE [UNIQUE] INDEX / ALTER TABLE
    across T-SQL, PostgreSQL, DB2, and SQLite into a conservative schema IR for
    the ERD page.
@@ -89,6 +89,21 @@ function schemaNormName(parts: string[]): string {
 
 function schemaNormColumn(name: string): string {
   return String(name||'').toUpperCase();
+}
+
+/* v2.5.0 — stable FNV-1a hash of the declared entity set, shared by ERD layout
+   files and query files so a stale payload can be detected without blocking a
+   load. Pure and deterministic: entity ids and kinds only. */
+function schemaFingerprint(result: SchemaResult): string {
+  var text=((result&&result.entities)||[]).map(function(entity){
+    return entity.id+'|'+entity.kind;
+  }).sort().join(';');
+  var hash=2166136261;
+  for(var i=0;i<text.length;i++){
+    hash^=text.charCodeAt(i);
+    hash=Math.imul(hash,16777619);
+  }
+  return ('0000000'+((hash>>>0).toString(16))).slice(-8);
 }
 
 function schemaIssue(ctx: SchemaCtx, severity: DiagnosticSeverity, code: string,
@@ -877,3 +892,4 @@ function parseSchema(text: string): SchemaResult {
   result.stats=schemaStats(result);
   return result;
 }
+
