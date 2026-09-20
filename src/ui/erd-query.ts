@@ -1,4 +1,4 @@
-/* proc>flow v2.4.0 — ERD query-builder panel.
+/* proc>flow v2.4.1 — ERD query-builder panel.
    Query mode turns column rows on the diagram cards into checkboxes and shows
    a floating window with the SQL, the join plan, and any unjoinable picks.
    Join problems are never resolved silently: each one offers teach-the-join,
@@ -851,3 +851,4 @@
   window.erdQueryPanelTogglePick=togglePick;
   window.erdQueryPanelTeachColumn=teachColumn;
 })();
+

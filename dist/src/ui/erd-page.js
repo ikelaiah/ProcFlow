@@ -1,5 +1,5 @@
 "use strict";
-/* proc>flow v2.4.0 — ERD page controller.
+/* proc>flow v2.4.1 — ERD page controller.
    Parses schema DDL into the shared schema IR and draws an entity map of
    declared tables, views, and foreign keys. Declared constraints only: this
    page never infers a relationship from query text. */

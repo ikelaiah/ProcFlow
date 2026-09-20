@@ -43,7 +43,7 @@ match `package.json`.
 
 ## Current release
 
-[v2.4.0 — Query builder on the ERD](releases/v2.4.0.md)
+[v2.4.1 — Query builder hardening and release discipline](releases/v2.4.1.md)
 
 ## Historical releases
 
@@ -51,3 +51,4 @@ The previous release notes and implementation notes remain in this directory,
 including [v2.3.0](releases/v2.3.0.md) and
 [v1.14.0](releases/v1.14.0.md), so old verification claims can be traced
 without rewriting history.
+
