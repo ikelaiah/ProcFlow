@@ -79,7 +79,7 @@ plan highlights, and problem rings.
 7. Saved queries are explicit, versioned, and schema-fingerprinted; stale state
    is pruned and reported, never silently applied.
 
-The v1.14 layout implementation uses bounded, deterministic placement and an
+The layout implementation uses bounded, deterministic placement and an
 iterative graph traversal for cycle detection, avoiding a call-stack limit for
 large linear or cyclic graphs. Layout is a usability guarantee for the tested
 graph classes, not a claim that every arbitrary graph has crossing-free edges.

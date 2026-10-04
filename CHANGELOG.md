@@ -3,6 +3,35 @@
 All notable released ProcFlow changes are recorded here. Detailed verification
 evidence belongs in the canonical release note under `docs/releases/`.
 
+## v2.7.0 — Maintainability pass
+
+- Extracted `src/token-utils.ts` (shared token/AST helpers) and
+  `src/dialects-state.ts` (PL/pgSQL and T-SQL transaction rules) from
+  `src/ir.ts`; the analysis modules now form a one-way dependency chain
+  (`token-utils` ← `lineage` ← `columns` ← `columnflow`), with no cycles.
+- Moved bundled demo SQL out of `src/app.ts` into `src/samples.ts`.
+- Unified duplicated logic: one CTE splitter (`splitCTEs`, now carrying
+  column lists and body spans) and one shared dependency/report filter kernel
+  (`graphNarrowByFocus`, `graphFilteredClone`).
+- `toMermaid` no longer mutates the input graph; added regression tests for
+  the non-mutation guarantee and for Mermaid's `securityLevel:'strict'`.
+- Deleted dead helpers (`workspaceExportText`, `defaultWorkspaceFilter`, a
+  no-op branch in column flow).
+- Added `npm test` (`scripts/test-all.mjs`) — runs golden, fuzz, ui, erd-ui,
+  and security suites against a local static server with one command — and
+  fixed a load-order race in the UI suites where the off-screen iframe could
+  finish loading before the test script attached its listener.
+- Adopted Biome (`npm run lint`) and wired it into CI alongside typecheck.
+- Fixed `npm run metrics` on Windows: Chromium emits CRLF in `--dump-dom`, so
+  the snapshot comparison now normalises line endings.
+- UI: tablists support arrow-key navigation (ARIA tabs pattern) and the app
+  follows `prefers-color-scheme: light` with a legible light palette.
+- Docs: corrected the stale trust-model version and port, indexed ADR-003 and
+  all canonical release notes, and moved 33 superseded `RELEASE_NOTE_*`,
+  `PR_NOTE_*`, and historical planning documents to `docs/archive/` with an
+  archive README. `ROADMAP.md`, `tasks/`, and `BENCHMARKS.md` are marked as
+  historical where they are no longer current.
+
 ## v2.6.0 — Aggregates and grouping
 
 - Added per-column aggregate selectors: **COUNT**, **COUNT DISTINCT**, **SUM**,
@@ -147,5 +176,5 @@ evidence belongs in the canonical release note under `docs/releases/`.
 - Preserved unique sequential DB2 `SESSION.` temporary-table data flow.
 
 See [the v1.14.1 release note](docs/releases/v1.14.1.md) and the
-[accuracy audit](docs/ACCURACY_GAPS.md) for the reproductions and verification
+[accuracy audit](docs/archive/ACCURACY_GAPS.md) for the reproductions and verification
 record.

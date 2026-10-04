@@ -69,6 +69,18 @@
         mermaid: reportMermaid });
     record('source and diagnostic strings remain plain data', hostileSql.indexOf(payloads[0]) >= 0 &&
         analysed.diagnostics.every(function (d) { return typeof d.message === 'string'; }), { sourcePreserved: hostileSql.indexOf(payloads[0]) >= 0 });
+    /* toMermaid must not mutate the caller's graph: the same Graph is reused for
+       draw.io, exports, and later renders. An io node that defaults its class
+       during Mermaid emission previously leaked back into the shared model. */
+    var mutationGraph = analyse('CREATE PROCEDURE dbo.m AS\nBEGIN\n  SELECT 1;\nEND', { dialect: 'tsql', mode: 'auto', group: false, sources: true }).graph;
+    var ioBefore = mutationGraph.nodes.map(function (n) {
+        return n.id + ':' + String(n.cls) + ':' + n.shape;
+    }).join('|');
+    toMermaid(mutationGraph, 'TD');
+    var ioAfter = mutationGraph.nodes.map(function (n) {
+        return n.id + ':' + String(n.cls) + ':' + n.shape;
+    }).join('|');
+    record('toMermaid does not mutate the input graph', ioBefore === ioAfter, { before: ioBefore, after: ioAfter });
     function finish(extra) {
         if (extra)
             record(extra.name, extra.pass, extra.detail);

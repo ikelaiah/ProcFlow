@@ -22,7 +22,7 @@ connection, sign-in, or installation is required.
 > database compiler. Treat diagrams as investigation aids and verify important
 > findings against the source SQL and target database.
 
-> **Trust model:** ProcFlow v2.3.0 asserts semantic relationships only where
+> **Trust model:** ProcFlow v2.7.0 asserts semantic relationships only where
 > static evidence supports them. Dynamic and ambiguous regions stay explicit.
 > See [Accuracy](docs/ACCURACY.md) and the [v2 accuracy contract](docs/V2_ACCURACY_CONTRACT.md).
 
@@ -42,7 +42,7 @@ connection, sign-in, or installation is required.
 
 ## Quick start
 
-1. Download the `v2.6.0` runtime ZIP from the [GitHub release](https://github.com/ikelaiah/ProcFlow/releases/tag/v2.6.0), or clone this repository.
+1. Download the `v2.7.0` runtime ZIP from the [GitHub release](https://github.com/ikelaiah/ProcFlow/releases/tag/v2.7.0), or clone this repository.
 2. Open `index.html` in a current Chromium, Firefox, or Edge browser.
 3. Paste SQL or import local files, select a dialect or **Auto**, and choose
    **Refresh**.
@@ -111,7 +111,7 @@ in the browser.
 
 ## Supported dialects
 
-ProcFlow v2.6.0 supports Microsoft T-SQL, IBM DB2 SQL PL, PostgreSQL
+ProcFlow v2.7.0 supports Microsoft T-SQL, IBM DB2 SQL PL, PostgreSQL
 PL/pgSQL, and SQLite. Detection is automatic but can be overridden. Vendor
 extensions outside these tested constructs may produce diagnostics or reduced
 coverage; see [Accuracy](docs/ACCURACY.md).
@@ -145,7 +145,9 @@ suite, and hostile labels are escaped for diagram/XML output. Read the full
   the query builder only uses declared keys.
 - [ADR-002](docs/decisions/ADR-002-query-persistence.md) — why saved queries
   are explicit, versioned, and fingerprint-pruned.
-- [v2.6.0 release note](docs/releases/v2.6.0.md) — current release details.
+- [ADR-003](docs/decisions/ADR-003-aggregates-derive-group-by.md) — why
+  aggregates derive their `GROUP BY` from the remaining picks.
+- [v2.7.0 release note](docs/releases/v2.7.0.md) — current release details.
 - [Roadmap](ROADMAP.md) — planned convergence work.
 
 ## Contributing

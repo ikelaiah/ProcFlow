@@ -1,0 +1,116 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true
+	},
+	"files": {
+		"includes": [
+			"src/**/*.ts",
+			"tests/**/*.ts",
+			"scripts/**/*.mjs",
+			"*.html",
+			"styles.css"
+		],
+		"ignoreUnknown": true
+	},
+  "formatter": {
+    "enabled": false
+  },
+  "assist": {
+    "enabled": false
+  },
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"preset": "recommended",
+      "correctness": {
+        "noInnerDeclarations": "off",
+        "noUnusedVariables": "off",
+        "noUnusedFunctionParameters": "off"
+      },
+      "suspicious": {
+        "noExplicitAny": "off",
+        "noAssignInExpressions": "off",
+        "noRedeclare": "error",
+        "noImplicitAnyLet": "off",
+        "noThenProperty": "off",
+        "noGlobalIsFinite": "error",
+        "noGlobalIsNan": "error"
+      },
+			"complexity": {
+				"noForEach": "off",
+				"noBannedTypes": "off",
+				"useArrowFunction": "off",
+				"useOptionalChain": "off",
+				"useLiteralKeys": "off",
+				"noUselessUndefinedInitialization": "off"
+			},
+			"style": {
+				"noNonNullAssertion": "off",
+				"useTemplate": "off",
+				"noDescendingSpecificity": "off"
+			}
+		}
+	},
+	"javascript": {
+		"globals": [
+			"window",
+			"document",
+			"localStorage",
+			"DOMParser",
+			"requestAnimationFrame",
+			"cancelAnimationFrame",
+			"setTimeout",
+			"clearTimeout",
+			"setInterval",
+			"clearInterval",
+			"mermaid",
+			"navigator",
+			"ClipboardItem",
+			"URL",
+			"Blob",
+			"FileReader",
+			"Event",
+			"KeyboardEvent",
+			"MouseEvent",
+			"HTMLElement",
+			"HTMLIFrameElement",
+			"HTMLInputElement",
+			"Element",
+			"Node",
+			"SVGElement"
+		]
+	},
+	"overrides": [
+    {
+      "includes": ["tests/**/*.ts", "src/types.d.ts"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedVariables": "off"
+          },
+          "suspicious": {
+            "noRedeclare": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["*.html", "styles.css"],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "useButtonType": "off",
+            "useSemanticElements": "off",
+            "useAriaPropsForRole": "off"
+          },
+          "complexity": {
+            "noImportantStyles": "off"
+          }
+        }
+      }
+    }
+	]
+}

@@ -2,10 +2,12 @@
 
 ## Convention
 
-Each release has one canonical note at `docs/releases/vX.Y.Z.md`. Historical
-`RELEASE_NOTE_*` and `PR_NOTE_*` files are retained for provenance; new release
-notes do not duplicate them. The root README links the current release and
-points here and to `CHANGELOG.md` for the history.
+Each release since v1.14.0 has one canonical note at `docs/releases/vX.Y.Z.md`.
+Earlier releases (v1.0–v1.13) predate that convention; their duplicate
+`RELEASE_NOTE_*` / `PR_NOTE_*` files, plus historical planning and audit
+documents, are archived under [`docs/archive/`](archive/) for provenance. New
+release notes never duplicate the archive. The root README links the current
+release and points here and to `CHANGELOG.md` for the history.
 
 ## Release flow
 
@@ -43,14 +45,25 @@ match `package.json`.
 
 ## Current release
 
-[v2.6.0 — Aggregates and grouping](releases/v2.6.0.md)
+[v2.7.0 — Maintainability pass](releases/v2.7.0.md)
 
 ## Historical releases
 
-The previous release notes and implementation notes remain in this directory,
-including [v2.3.0](releases/v2.3.0.md) and
-[v1.14.0](releases/v1.14.0.md), so old verification claims can be traced
-without rewriting history.
+Canonical notes, newest first:
+
+- [v2.6.0](releases/v2.6.0.md)
+- [v2.5.0](releases/v2.5.0.md)
+- [v2.4.0](releases/v2.4.0.md)
+- [v2.3.0](releases/v2.3.0.md)
+- [v2.2.0](releases/v2.2.0.md)
+- [v2.1.0](releases/v2.1.0.md)
+- [v2.0.0](releases/v2.0.0.md)
+- [v1.14.1](releases/v1.14.1.md)
+- [v1.14.0](releases/v1.14.0.md)
+
+Pre-v1.14.0 release and implementation notes are archived in
+[`docs/archive/`](archive/). Historical verification claims stay traceable
+there without cluttering the current documentation.
 
 
 

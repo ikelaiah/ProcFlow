@@ -13,7 +13,7 @@ var CATALOGUE_KINDS: StringSet = S(['TABLE','VIEW','PROC','PROCEDURE','FUNCTION'
 
 function normalizeCatalogueName(name: unknown): string {
   return String(name==null?'':name)
-    .replace(/[\[\]"]/g,'').replace(/`/g,'')
+    .replace(/[[\]"]/g,'').replace(/`/g,'')
     .trim().toUpperCase().replace(/\s+/g,' ');
 }
 

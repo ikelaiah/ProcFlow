@@ -1,5 +1,11 @@
 # proc>flow Roadmap — Diagram Accuracy
 
+> **Historical.** This roadmap records the v1.x/v2.0 accuracy-convergence
+> workstreams, all of which shipped. It predates the ERD, query builder, and
+> aggregate features (v2.1–v2.6) and is not the current plan. See
+> [CHANGELOG.md](CHANGELOG.md) and [docs/RELEASES.md](docs/RELEASES.md) for
+> what shipped.
+
 This roadmap has one goal: **diagrams that accurately represent the logic flow
 of the SQL they are given.** Because ProcFlow is a heuristic, browser-only
 parser, accuracy is pursued on three fronts:

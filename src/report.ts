@@ -460,41 +460,12 @@ function filterReportGraph(graph: Graph, filter?: ReportGraphFilter): Graph {
     keep[n.id]=1;
   });
 
-  var focus=String(f.focus||'').trim().toUpperCase();
+  var focus=String(f.focus||'').trim();
   if(focus){
-    var matched: Record<string, 1|undefined>={};
-    var neighbour: Record<string, 1|undefined>={};
-    graph.nodes.forEach(function(n){
-      if(keep[n.id]&&(String(n.text||'').toUpperCase().indexOf(focus)>=0||
-         String(n.objectId||'').toUpperCase().indexOf(focus)>=0))
-        matched[n.id]=1;
-    });
-    if(focus&&!Object.keys(matched).length)
-      return {nodes:[],edges:[],stats:graph.stats,empty:true};
-    graph.edges.forEach(function(e){
-      if(matched[e.from]) neighbour[e.to]=1;
-      if(matched[e.to]) neighbour[e.from]=1;
-    });
-    var narrowed: Record<string, 1|undefined>={};
-    graph.nodes.forEach(function(n){
-      if(keep[n.id]&&(matched[n.id]||neighbour[n.id])) narrowed[n.id]=1;
-    });
+    var narrowed=graphNarrowByFocus(graph,keep,focus);
+    if(!narrowed) return {nodes:[],edges:[],stats:graph.stats,empty:true};
     keep=narrowed;
   }
 
-  var nodes=(graph.nodes||[]).filter(function(n){
-    return keep[n.id]===1;
-  }).map(function(n){
-    var c: any={};
-    for(var k in n) c[k]=n[k];
-    return c;
-  });
-  var edges=(graph.edges||[]).filter(function(e){
-    return keep[e.from]===1&&keep[e.to]===1;
-  }).map(function(e){
-    var c: any={};
-    for(var k in e) c[k]=e[k];
-    return c;
-  });
-  return {nodes:nodes,edges:edges,stats:graph.stats};
+  return graphFilteredClone(graph,keep);
 }

@@ -98,7 +98,10 @@ if (!existsSync(metricsPage)) {
       fail("metrics page produced no output (is dist/ built?)", output);
       process.exit(1);
     }
-    const generated = `${match[1].trim()}\n`;
+    /* Chromium emits platform line endings in --dump-dom. The snapshot is
+       checked in with LF (.gitattributes), so normalize here; otherwise the
+       currency check fails on Windows even though the numbers match. */
+    const generated = `${match[1].trim().replace(/\r\n?/g, "\n")}\n`;
     const expected = existsSync(snapshotFile) ? readFileSync(snapshotFile, "utf8") : null;
 
     if (writeMode) {

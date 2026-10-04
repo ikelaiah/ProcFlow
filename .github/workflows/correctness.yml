@@ -31,6 +31,7 @@ jobs:
       - name: Install and compile TypeScript
         run: |
           npm ci
+          npm run lint
           npm run typecheck
           npm run build
 
@@ -112,49 +113,8 @@ jobs:
             exit 1
           fi
 
-      - name: Start static test server
-        shell: bash
-        run: |
-          python3 -m http.server 8000 --bind 127.0.0.1 > /tmp/procflow-http.log 2>&1 &
-          echo $! > /tmp/procflow-http.pid
-          for attempt in {1..20}; do
-            if curl --fail --silent http://127.0.0.1:8000/tests/index.html > /dev/null; then
-              exit 0
-            fi
-            sleep 0.25
-          done
-          cat /tmp/procflow-http.log
-          exit 1
-
-      - name: Run golden, fuzz, and UI suites
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          run_suite() {
-            local name="$1"
-            local url="$2"
-            local output="/tmp/procflow-${name}.html"
-            "$CHROME_PATH" \
-              --headless=new \
-              --no-sandbox \
-              --disable-gpu \
-              --virtual-time-budget=20000 \
-              --dump-dom "$url" > "$output"
-            if ! grep --quiet '<body class="pass">' "$output"; then
-              echo "${name} suite failed:"
-              cat "$output"
-              exit 1
-            fi
-            grep -Eo '<p id="(summary|security-summary)">[^<]*' "$output" |
-              sed -E 's/<p id="(summary|security-summary)">/'"${name}"': /'
-          }
-
-          run_suite golden http://127.0.0.1:8000/tests/index.html
-          run_suite fuzz http://127.0.0.1:8000/tests/fuzz.html
-          run_suite ui http://127.0.0.1:8000/tests/ui.html
-          run_suite erd-ui http://127.0.0.1:8000/tests/erd-ui.html
-          run_suite security http://127.0.0.1:8000/tests/security.html
+      - name: Run browser suites (golden, fuzz, ui, erd-ui, security)
+        run: npm test
 
       - name: Verify fixture-corpus metric snapshot is current
         shell: bash
@@ -166,11 +126,3 @@ jobs:
 
       - name: Build and smoke-test runtime package
         run: npm run package:smoke
-
-      - name: Stop static test server
-        if: always()
-        shell: bash
-        run: |
-          if [ -f /tmp/procflow-http.pid ]; then
-            kill "$(cat /tmp/procflow-http.pid)" 2>/dev/null || true
-          fi

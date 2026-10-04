@@ -1,8 +1,14 @@
-﻿/* proc>flow: query and CTE lineage */
+﻿/* proc>flow v2.7.0 — query and CTE lineage.
+   Owns splitCTEs, refsIn, statementFacts, and the query/object graph builders.
+   Depends only on tokenizer, catalogue, and token-utils — never on ir.ts — so
+   the analysis leaf modules form a one-way dependency chain. */
 /* ---------- query structure (CTE lineage) ---------- */
 /* Tabular functions that act as table-valued sources in a FROM clause. */
 var TABULAR_FUNCS: StringSet = S(['UNNEST','XMLTABLE','JSON_TABLE','GENERATE_SERIES']);
 
+/* Split a leading WITH clause into its CTE definitions. Retains any explicit
+   column list (`WITH r(n) AS …` → colToks=[n]) and each body's source span so
+   both lineage and column flow can share one splitter. */
 function splitCTEs(toks: Token[]): CteSplit {
   var res: CteSplit={ctes:[], finalStart:0};
   if(!toks.length) return res;
@@ -13,11 +19,14 @@ function splitCTEs(toks: Token[]): CteSplit {
     var nameTok=toks[i];
     if(!nameTok||nameTok.type!=='word') break;
     var name=nameTok.v; i++;
+    var colToks: Token[]=[];
     if(toks[i]&&toks[i].v==='('){                 /* optional column list */
       var d0=0;
       while(i<toks.length){
-        if(toks[i].v==='(') d0++;
-        else if(toks[i].v===')'){ d0--; if(d0===0){ i++; break; } }
+        var tk=toks[i];
+        if(tk.v==='(') d0++;
+        else if(tk.v===')'){ d0--; if(d0===0){ i++; break; } }
+        else if(d0===1) colToks.push(tk);
         i++;
       }
     }
@@ -31,7 +40,8 @@ function splitCTEs(toks: Token[]): CteSplit {
       else if(toks[i].v===')'){ d--; if(d===0){ i++; break; } }
       i++;
     }
-    res.ctes.push({name:name, body:toks.slice(start+1, i-1)});
+    var body=toks.slice(start+1, i-1);
+    res.ctes.push({name:name, body:body, colToks:colToks, bodySpan:spanOfTokens(body)});
     if(toks[i]&&toks[i].v===','){ i++; continue; }
     break;
   }
@@ -132,6 +142,62 @@ function refsIn(toks: Token[]): QueryReferenceInfo {
   }
   return {refs:refs, structuredRefs:structuredRefs,
           joins:joins, unions:unions, subs:subs, filtered:filtered, agg:agg};
+}
+
+/* Classify a single statement's token list: which objects it reads, writes,
+   calls, whether it returns a result set, and whether it is dynamic. Lives
+   here (beside splitCTEs/refsIn, which it uses) so column-flow and the graph
+   builder can share it without depending on ir.ts. */
+function statementFacts(toks: Token[], dynamic?: boolean){
+  toks=toks||[];
+  var split=splitCTEs(toks), cteNames=split.ctes.map(function(c){return c.name.toUpperCase();});
+  var work=split.ctes.length?toks.slice(split.finalStart):toks;
+  var head=work[0]?work[0].u:'';
+  var reads=refsIn(toks).refs.filter(function(r){return cteNames.indexOf(r.toUpperCase())<0;});
+  var writes=[], calls=[];
+  toks=work;
+  /* DB2 PREPARE ... FROM accepts a statement expression/host variable, not a
+     database object. The generic FROM reader must not turn it into a read. */
+  if(head==='PREPARE') reads=[];
+  var i=1;
+  if(head==='INSERT'||head==='REPLACE'){
+    while(toks[i]&&['INTO','OR','IGNORE','REPLACE'].indexOf(toks[i].u)>=0) i++;
+    if(toks[i]) writes.push(qname(toks,i));
+  } else if(head==='UPDATE'){
+    if(toks[i]&&toks[i].u==='TOP'){
+      i++; if(toks[i]&&toks[i].v==='('){ while(toks[i]&&toks[i].v!==')') i++; i++; }
+      else i++;
+    }
+    if(toks[i]) writes.push(qname(toks,i));
+  } else if(head==='DELETE'){
+    if(toks[i]&&toks[i].u==='FROM') i++;
+    if(toks[i]) writes.push(qname(toks,i));
+  } else if(head==='MERGE'){
+    if(toks[i]&&toks[i].u==='INTO') i++;
+    if(toks[i]) writes.push(qname(toks,i));
+  } else if(head==='TRUNCATE'){
+    if(toks[i]&&toks[i].u==='TABLE') i++;
+    if(toks[i]) writes.push(qname(toks,i));
+  } else if(head==='SELECT'){
+    var depth=0;
+    for(var si=1;si<toks.length;si++){
+      if(toks[si].v==='(') depth++;
+      else if(toks[si].v===')') depth--;
+      else if(depth===0&&toks[si].u==='INTO'&&toks[si+1]&&
+              toks[si+1].v.charAt(0)!=='@'){
+        writes.push(qname(toks,si+1)); break;
+      }
+    }
+  } else if(head==='CREATE'&&toks[i]&&toks[i].u==='TABLE'&&toks[i+1]){
+    writes.push(qname(toks,i+1));
+  }
+  if(['EXEC','EXECUTE','CALL','PERFORM'].indexOf(head)>=0&&!dynamic){
+    if(toks[i]&&toks[i].v.charAt(0)==='@'&&toks[i+1]&&toks[i+1].v==='=') i+=2;
+    if(toks[i]) calls.push(qname(toks,i));
+  }
+  var resultSet=head==='SELECT'&&!toks.some(function(t){ return t.u==='INTO'; });
+  return {reads:uniqueNames(reads), writes:uniqueNames(writes), calls:uniqueNames(calls),
+          resultSet:resultSet, dynamic:!!dynamic};
 }
 
 function buildQueryGraph(stmtToks: Token[], header: SqlHeader, opts?: AnalyseOptions): Graph {

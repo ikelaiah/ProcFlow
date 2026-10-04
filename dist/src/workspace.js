@@ -242,14 +242,7 @@ function clearWorkspace() {
     catch (e) { }
     WORKSPACE_LAST_ERROR = null;
 }
-function workspaceExportText() {
-    var snap = readWorkspace();
-    return snap ? serializeWorkspace(snap) : '';
-}
 /* ===== v1.8.0 dependency filtering (presentation-only) ===== */
-function defaultWorkspaceFilter() {
-    return { reads: true, writes: true, calls: true, external: true, temp: true, focus: '' };
-}
 /* Derive a filtered view of the dependency graph. Never mutates the input:
    the returned object contains fresh node/edge arrays (shallow-cloned nodes),
    so toggling a filter cannot change the underlying estate graph or any later
@@ -275,40 +268,14 @@ function filterDependencyGraph(graph, filter) {
             return;
         keep[n.id] = 1;
     });
-    var focus = String(f.focus || '').trim().toUpperCase();
+    var focus = String(f.focus || '').trim();
     if (focus) {
-        var matched = {};
-        var neighbour = {};
-        graph.nodes.forEach(function (n) {
-            if (keep[n.id] && (String(n.text || '').toUpperCase().indexOf(focus) >= 0 ||
-                String(n.objectId || '').toUpperCase().indexOf(focus) >= 0))
-                matched[n.id] = 1;
-        });
-        if (focus && !Object.keys(matched).length) {
-            /* A focus that matches nothing shows no neighbourhood. */
+        var narrowed = graphNarrowByFocus(graph, keep, focus);
+        /* A focus that matches nothing shows no neighbourhood. */
+        if (!narrowed)
             return { nodes: [], edges: [], stats: graph.stats, empty: true };
-        }
-        graph.edges.forEach(function (e) {
-            if (matched[e.from])
-                neighbour[e.to] = 1;
-            if (matched[e.to])
-                neighbour[e.from] = 1;
-        });
-        var narrowed = {};
-        graph.nodes.forEach(function (n) {
-            if (keep[n.id] && (matched[n.id] || neighbour[n.id]))
-                narrowed[n.id] = 1;
-        });
         keep = narrowed;
     }
-    var nodes = (graph.nodes || []).filter(function (n) {
-        return keep[n.id] === 1;
-    }).map(function (n) {
-        var c = {};
-        for (var k in n)
-            c[k] = n[k];
-        return c;
-    });
     function edgePass(e) {
         if (e.kind === 'data')
             return !!f.writes;
@@ -318,16 +285,8 @@ function filterDependencyGraph(graph, filter) {
             return !!f.reads;
         return true;
     }
-    var edges = (graph.edges || []).filter(function (e) {
-        return keep[e.from] === 1 && keep[e.to] === 1 && edgePass(e);
-    }).map(function (e) {
-        var c = {};
-        for (var k in e)
-            c[k] = e[k];
-        return c;
-    });
     /* Stats are presentation-independent: keep the original estate stats so a
        filter never changes what the analysis reports, only what the view draws. */
-    return { nodes: nodes, edges: edges, stats: graph.stats };
+    return graphFilteredClone(graph, keep, edgePass);
 }
 //# sourceMappingURL=workspace.js.map

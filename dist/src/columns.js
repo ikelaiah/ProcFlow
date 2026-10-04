@@ -31,73 +31,6 @@ var COL_REF_SKIP = S(['SELECT', 'WHERE', 'GROUP', 'HAVING', 'ORDER', 'LIMIT',
     'DOUBLE', 'PRECISION', 'CHAR', 'NCHAR', 'VARCHAR', 'NVARCHAR', 'TEXT', 'CLOB', 'DATE',
     'DATETIME', 'DATETIME2', 'SMALLDATETIME', 'TIMESTAMP', 'TIME', 'BOOLEAN', 'BOOL', 'BIT',
     'BINARY', 'VARBINARY', 'BYTEA', 'UUID', 'GUID', 'MONEY', 'SMALLMONEY', 'JSON', 'XML', 'BLOB']);
-/* CTE split that retains the explicit column list so CTE scopes can carry
-   provable columns (`WITH r(n) AS …` → r has exactly [n]). */
-function splitCtesColumn(toks) {
-    var res = { ctes: [], finalStart: 0 };
-    if (!toks.length || toks[0].u !== 'WITH')
-        return res;
-    var i = 1;
-    if (toks[i] && toks[i].u === 'RECURSIVE') {
-        res.recursive = true;
-        i++;
-    }
-    while (i < toks.length) {
-        var nameTok = toks[i];
-        if (!nameTok || nameTok.type !== 'word')
-            break;
-        var name = nameTok.v;
-        i++;
-        var colToks = [];
-        if (toks[i] && toks[i].v === '(') {
-            var d0 = 0;
-            while (i < toks.length) {
-                var tk = toks[i];
-                if (tk.v === '(')
-                    d0++;
-                else if (tk.v === ')') {
-                    d0--;
-                    if (d0 === 0) {
-                        i++;
-                        break;
-                    }
-                }
-                else if (d0 === 1)
-                    colToks.push(tk);
-                i++;
-            }
-        }
-        if (!(toks[i] && toks[i].u === 'AS'))
-            break;
-        i++;
-        while (toks[i] && ['MATERIALIZED', 'NOT'].indexOf(toks[i].u) >= 0)
-            i++;
-        if (!(toks[i] && toks[i].v === '('))
-            break;
-        var start = i, d = 0;
-        while (i < toks.length) {
-            if (toks[i].v === '(')
-                d++;
-            else if (toks[i].v === ')') {
-                d--;
-                if (d === 0) {
-                    i++;
-                    break;
-                }
-            }
-            i++;
-        }
-        var body = toks.slice(start + 1, i - 1);
-        res.ctes.push({ name: name, colToks: colToks, body: body, bodySpan: spanOfTokens(body) });
-        if (toks[i] && toks[i].v === ',') {
-            i++;
-            continue;
-        }
-        break;
-    }
-    res.finalStart = i;
-    return res;
-}
 function colNamesOf(toks) {
     var out = [];
     for (var i = 0; i < toks.length; i++) {
@@ -788,7 +721,7 @@ function colAnalyseToks(toks, ctx) {
         return null;
     if (ctx.depth > 8)
         return null;
-    var split = splitCtesColumn(toks);
+    var split = splitCTEs(toks);
     var diagnostics = [];
     var references = [];
     var wildcards = [];

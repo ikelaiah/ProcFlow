@@ -1058,4 +1058,7 @@
   document.body.className=passed===results.length?'pass':'fail';
   document.getElementById('summary').textContent=passed+'/'+results.length+' tests passed';
   document.getElementById('results').textContent=JSON.stringify(results,null,2);
+  /* Named result for scripts/test-all.mjs, which reads this instead of
+     scraping the DOM. */
+  (window as any).PROCFLOW_GOLDEN_PASS=passed===results.length;
 })();

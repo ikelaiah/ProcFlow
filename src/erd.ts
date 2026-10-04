@@ -585,7 +585,7 @@ function erdLayoutFromJSON(text: string): ErdLayoutParseResult {
   Object.keys(parsed.positions).forEach(function(id){
     var value=parsed.positions[id];
     if(value&&typeof value.x==='number'&&typeof value.y==='number'&&
-       isFinite(value.x)&&isFinite(value.y)){
+       Number.isFinite(value.x)&&Number.isFinite(value.y)){
       positions[id]={x:value.x,y:value.y};
     }
   });

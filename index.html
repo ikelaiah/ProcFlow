@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -141,7 +141,7 @@
         </details>
         <details class="command-menu" id="catalogue-menu">
           <summary class="btn">Catalogue</summary>
-          <div class="command-menu-panel settings-panel catalogue-panel" aria-label="Catalogue metadata import and object resolution">
+          <div class="command-menu-panel settings-panel catalogue-panel" aria-label="Catalogue metadata import and object resolution" role="group">
             <p class="ws-note">Paste or import table/view/column metadata so
             unresolved object references resolve to their exact identity
             instead of an external label.</p>
@@ -161,7 +161,7 @@
         </details>
         <details class="command-menu" id="report-menu">
           <summary class="btn">Reports</summary>
-          <div class="command-menu-panel settings-panel report-panel" aria-label="SSRS/RDL report definition import">
+          <div class="command-menu-panel settings-panel report-panel" aria-label="SSRS/RDL report definition import" role="group">
             <p class="ws-note">Paste or import an SSRS/RDL report definition so
             its datasets link to their SQL analysis. Embedded, shared, and
             unresolved datasets are distinguished, and each embedded dataset's
@@ -187,7 +187,7 @@
         </details>
         <details class="command-menu" id="export-menu">
           <summary class="btn">Export</summary>
-          <div class="command-menu-panel export-actions" aria-label="Copy and export diagram">
+          <div class="command-menu-panel export-actions" aria-label="Copy and export diagram" role="group">
             <button class="menu-action" id="btn-copy">Copy Mermaid</button>
             <button class="menu-action" id="btn-narrate">Copy narration prompt</button>
             <button class="menu-action" id="btn-svg">Save SVG</button>
@@ -196,7 +196,7 @@
         </details>
         <details class="command-menu" id="workspace-menu">
           <summary class="btn">Workspace</summary>
-          <div class="command-menu-panel workspace-actions" aria-label="Workspace persistence and transfer">
+          <div class="command-menu-panel workspace-actions" aria-label="Workspace persistence and transfer" role="group">
             <p class="ws-note" id="ws-status"></p>
             <input id="ws-file-input" type="file" accept=".json,application/json" hidden>
             <button class="menu-action" id="btn-ws-save">Save to this browser</button>
@@ -208,7 +208,7 @@
         </details>
         <details class="command-menu" id="filter-menu" style="display:none">
           <summary class="btn">Filter dependencies</summary>
-          <div class="command-menu-panel settings-panel filter-panel" aria-label="Dependency graph filters (presentation only)">
+          <div class="command-menu-panel settings-panel filter-panel" aria-label="Dependency graph filters (presentation only)" role="group">
             <p class="ws-note">Filters affect the dependency view only; the analysis graph is unchanged.</p>
             <label class="opt" id="lbl-f-reads"><input type="checkbox" id="f-r" checked> Reads</label>
             <label class="opt" id="lbl-f-writes"><input type="checkbox" id="f-w" checked> Writes</label>
@@ -223,7 +223,7 @@
         </details>
         <details class="command-menu" id="report-filter-menu" style="display:none">
           <summary class="btn">Filter report</summary>
-          <div class="command-menu-panel settings-panel filter-panel" aria-label="Report dependency graph filters (presentation only)">
+          <div class="command-menu-panel settings-panel filter-panel" aria-label="Report dependency graph filters (presentation only)" role="group">
             <p class="ws-note">Filters affect the report view only; the analysis graph is unchanged.</p>
             <label class="opt"><input type="checkbox" id="rf-cols" checked> Columns</label>
             <label class="opt"><input type="checkbox" id="rf-embedded" checked> Embedded datasets</label>
@@ -261,6 +261,8 @@
 <script src="dist/src/tokenizer.js"></script>
 <script src="dist/src/catalogue.js"></script>
 <script src="dist/src/dialects.js"></script>
+<script src="dist/src/token-utils.js"></script>
+<script src="dist/src/dialects-state.js"></script>
 <script src="dist/src/lineage.js"></script>
 <script src="dist/src/ir.js"></script>
 <script src="dist/src/columns.js"></script>
@@ -271,6 +273,7 @@
 <script src="dist/src/analysis/confidence.js"></script>
 <script src="dist/src/ui/large-input.js"></script>
 <script src="dist/src/ui/splitter.js"></script>
+<script src="dist/src/samples.js"></script>
 <script src="dist/src/app.js"></script>
 </body>
 </html>

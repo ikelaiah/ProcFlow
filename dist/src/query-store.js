@@ -23,7 +23,7 @@ function querySavedName(value) {
     return name.length > QUERY_NAME_MAX ? name.slice(0, QUERY_NAME_MAX) : name;
 }
 function queryValidRowLimit(value) {
-    var limit = typeof value === 'number' && isFinite(value) ? Math.floor(value) : 0;
+    var limit = typeof value === 'number' && Number.isFinite(value) ? Math.floor(value) : 0;
     return limit > 0 ? limit : 0;
 }
 function queryCloneJoinTypes(value) {
@@ -43,7 +43,7 @@ function queryClonePathChoices(value) {
         return out;
     Object.keys(value).forEach(function (key) {
         var entry = value[key];
-        if (typeof entry === 'number' && isFinite(entry) && entry >= 0)
+        if (typeof entry === 'number' && Number.isFinite(entry) && entry >= 0)
             out[key] = Math.floor(entry);
     });
     return out;
@@ -325,7 +325,7 @@ function queryStatePrune(state, graph) {
     Object.keys(state.pathChoices).forEach(function (key) {
         var parts = key.split('->');
         if (parts.length === 2 && nodeOf(parts[0]) && nodeOf(parts[1]) &&
-            isFinite(state.pathChoices[key])) {
+            Number.isFinite(state.pathChoices[key])) {
             pathChoices[key] = state.pathChoices[key];
         }
         else {

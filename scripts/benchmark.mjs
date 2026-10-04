@@ -12,9 +12,9 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const sourceRoot = join(root, "dist", "src");
 const context = createContext({ console });
 [
-  "tokenizer.js", "catalogue.js", "dialects.js", "lineage.js",
-  "analysis/confidence.js", "ir.js", "columns.js", "columnflow.js",
-  "exporters.js"
+  "tokenizer.js", "catalogue.js", "dialects.js", "token-utils.js",
+  "dialects-state.js", "lineage.js", "ir.js", "columns.js",
+  "columnflow.js", "exporters.js", "analysis/confidence.js"
 ].forEach((file) => {
   runInNewContext(readFileSync(join(sourceRoot, file), "utf8"), context,
     { filename: file });

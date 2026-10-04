@@ -13,7 +13,7 @@ var CATALOGUE_KINDS = S(['TABLE', 'VIEW', 'PROC', 'PROCEDURE', 'FUNCTION',
     'TRIGGER', 'SYNONYM', 'TYPE', 'SEQUENCE']);
 function normalizeCatalogueName(name) {
     return String(name == null ? '' : name)
-        .replace(/[\[\]"]/g, '').replace(/`/g, '')
+        .replace(/[[\]"]/g, '').replace(/`/g, '')
         .trim().toUpperCase().replace(/\s+/g, ' ');
 }
 function normalizeCatalogueKind(kind) {

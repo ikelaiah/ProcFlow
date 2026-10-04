@@ -327,7 +327,7 @@
                 var deterministic = JSON.stringify(L.positions) === JSON.stringify(L2.positions);
                 var finite = Object.keys(L.positions).every(function (id) {
                     var p = L.positions[id];
-                    return isFinite(p.x) && isFinite(p.y) && p.w > 0 && p.h > 0 && p.x >= 0 && p.y >= 0;
+                    return Number.isFinite(p.x) && Number.isFinite(p.y) && p.w > 0 && p.h > 0 && p.x >= 0 && p.y >= 0;
                 });
                 var monotonic = L.monotonicEdges + L.backEdges.length === L.backboneEdges;
                 var layOk = deterministic && finite && L.overlaps === 0 && monotonic &&

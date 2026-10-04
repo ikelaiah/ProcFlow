@@ -336,6 +336,11 @@ interface CteDefinition {
   name: string;
   body: Token[];
   info?: QueryReferenceInfo;
+  /* Present when the CTE declares an explicit column list (`WITH r(n) AS …`):
+     the tokens inside the list, so column scopes can carry provable columns.
+     `bodySpan` is the body's source span, shared by lineage and column flow. */
+  colToks?: Token[];
+  bodySpan?: SourceSpan | null;
 }
 
 interface CteSplit {

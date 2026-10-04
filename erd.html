@@ -88,7 +88,7 @@
         <label class="opt"><input type="checkbox" id="erd-compact"> Compact boxes</label>
         <details class="command-menu" id="erd-layout-menu">
           <summary class="btn">Layout</summary>
-          <div class="command-menu-panel export-actions" aria-label="ERD layout actions">
+          <div class="command-menu-panel export-actions" aria-label="ERD layout actions" role="group">
             <button class="menu-action primary-action" id="btn-erd-auto-arrange">Auto arrange</button>
             <label class="opt erd-layout-direction">Direction
               <select id="erd-layout-orientation">
@@ -171,7 +171,7 @@
                     title="Click two columns on the diagram to teach a join; the same table twice creates a self join">Teach join</button>
             <details class="command-menu" id="qb-query-menu">
               <summary class="btn">Query</summary>
-              <div class="command-menu-panel export-actions" aria-label="Query file actions">
+              <div class="command-menu-panel export-actions" aria-label="Query file actions" role="group">
                 <label class="opt qb-name">Name
                   <input type="text" id="qb-query-name" placeholder="orders by customer"
                          maxlength="80" spellcheck="false" aria-label="Query name for exports">
@@ -211,6 +211,7 @@
 <script src="dist/src/erd.js"></script>
 <script src="dist/src/query.js"></script>
 <script src="dist/src/query-store.js"></script>
+<script src="dist/src/token-utils.js"></script>
 <script src="dist/src/workspace.js"></script>
 <script src="dist/src/ui/large-input.js"></script>
 <script src="dist/src/ui/splitter.js"></script>

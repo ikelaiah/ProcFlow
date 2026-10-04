@@ -683,7 +683,7 @@
   function currentZoom(): number {
     if(!canvas) return 1;
     var value=parseFloat(canvas.style.getPropertyValue('--erd-zoom'));
-    return isNaN(value)?1:value;
+    return Number.isNaN(value)?1:value;
   }
 
   /* Card positions are absolute canvas pixels at 100%; zoom scales the whole
@@ -1176,6 +1176,24 @@
   if(tabDiagram) tabDiagram.addEventListener('click',function(){ tab('diagram'); });
   var tabMermaid=$('tab-erd-mermaid');
   if(tabMermaid) tabMermaid.addEventListener('click',function(){ tab('mermaid'); });
+  /* ARIA tabs pattern: Arrow Left/Right move between tabs, Home/End jump to
+     the ends, and the newly focused tab is selected. */
+  function tablistKeys(event: KeyboardEvent): void {
+    var order: Array<'diagram' | 'mermaid'>=['diagram','mermaid'];
+    var current=event.currentTarget===tabMermaid?1:0;
+    var next=-1;
+    if(event.key==='ArrowRight') next=(current+1)%order.length;
+    else if(event.key==='ArrowLeft') next=(current-1+order.length)%order.length;
+    else if(event.key==='Home') next=0;
+    else if(event.key==='End') next=order.length-1;
+    else return;
+    event.preventDefault();
+    tab(order[next]);
+    var target=order[next]==='diagram'?tabDiagram:tabMermaid;
+    if(target) target.focus();
+  }
+  if(tabDiagram) tabDiagram.addEventListener('keydown',tablistKeys);
+  if(tabMermaid) tabMermaid.addEventListener('keydown',tablistKeys);
 
   /* Query mode adds column checkboxes to the cards, so it needs a card
      rebuild and a redraw; compact mode is suspended while picking. */

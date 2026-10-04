@@ -403,7 +403,7 @@ function layoutFor(fixture: typeof PROCFLOW_PARITY_FIXTURES[number]) {
   var deterministic=JSON.stringify(A.positions)===JSON.stringify(B.positions);
   var finite=Object.keys(A.positions).every(function(id){
     var p=A.positions[id];
-    return isFinite(p.x)&&isFinite(p.y)&&p.w>0&&p.h>0&&p.x>=0&&p.y>=0;
+    return Number.isFinite(p.x)&&Number.isFinite(p.y)&&p.w>0&&p.h>0&&p.x>=0&&p.y>=0;
   });
   return {graph:graph, A:A, deterministic:deterministic, finite:finite,
           noOverlap:A.overlaps===0,

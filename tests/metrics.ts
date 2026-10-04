@@ -63,11 +63,11 @@
     r.diagnostics.forEach(function(d){
       if(d.scope==='region'){
         regionScoped++;
-        if(!!d.span&&d.span.start>=0&&d.span.end>d.span.start) regionValidSpan++;
+        if(d.span&&d.span.start>=0&&d.span.end>d.span.start) regionValidSpan++;
       }
     });
-    r.graph.edges.forEach(function(e){ edges++; if(!!e.kind) kindEdges++; });
-    r.graph.nodes.forEach(function(n){ nodes++; if(!!n.provenance) provenanceNodes++; });
+    r.graph.edges.forEach(function(e){ edges++; if(e.kind) kindEdges++; });
+    r.graph.nodes.forEach(function(n){ nodes++; if(n.provenance) provenanceNodes++; });
     walk(r.ast);
   });
 

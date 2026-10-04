@@ -12,16 +12,22 @@
 npm ci
 npm run typecheck
 npm run build
+npm test
 npm run test:file
 npm run benchmark
 npm run metrics
 ```
 
+`npm test` starts a local static server and runs every browser suite
+(golden, fuzz, ui, erd-ui, security) through a headless Chromium, so a
+contributor can gate a change with one command. It honours `CHROME_PATH`; if
+no browser is found it exits with a clear message.
+
 The generated `dist/` tree is the browser runtime. Serve the repository root
 and open these pages:
 
 - `tests/index.html` — golden, parity, layout, workspace, catalogue, report,
-  scale, realistic-corpus, and the v2.4.0 query-builder engine checks.
+  scale, realistic-corpus, and the query-builder engine checks.
 - `erd.html` — the schema DDL / entity relationship diagram page.
 - `tests/fuzz.html` — 400 deterministic mutation cases.
 - `tests/ui.html` — browser interaction and large-input responsiveness.
@@ -36,7 +42,7 @@ and open these pages:
 For a local run:
 
 ```text
-python -m http.server 8765 --bind 127.0.0.1
+python -m http.server 8000 --bind 127.0.0.1
 ```
 
 ### Adding a browser suite

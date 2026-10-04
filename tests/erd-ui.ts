@@ -15,6 +15,9 @@
     document.body.className=passed===results.length?'pass':'fail';
     document.getElementById('summary').textContent=passed+'/'+results.length+' tests passed';
     output.textContent=JSON.stringify(results,null,2);
+    /* Named result for scripts/test-all.mjs, which reads this instead of
+       scraping the DOM. */
+    (window as any).PROCFLOW_ERD_UI_PASS=passed===results.length;
   }
   function wait(ms: number): Promise<void> {
     return new Promise(function(resolve){ setTimeout(resolve,ms); });
@@ -35,7 +38,21 @@
     return d.documentElement.getAttribute('data-procflow-ready')==='true';
   }
 
-  frame.addEventListener('load',function(){
+  frame.addEventListener('load',function(){ run(); });
+  // The iframe may already have fired 'load' before this script ran (a fast
+  // local machine races the off-screen frame), but its document may still be
+  // the initial about:blank. Only start once the real page is present, and
+  // let the 'load' listener handle the normal case.
+  function pageLoaded(): boolean {
+    try{
+      return !!frame.contentDocument&&frame.contentDocument.readyState==='complete'&&
+        frame.contentDocument.location.href.indexOf('about:blank')<0;
+    }catch(err){ return false; }
+  }
+  if(pageLoaded()) run();
+  function run(): void {
+    if((frame as any).__procflowRan) return;
+    (frame as any).__procflowRan=true;
     var d=frame.contentDocument as Document;
     var body=frame.contentWindow as any;
     body.onerror=function(message: string){ record('no runtime errors: '+message,false); };
@@ -426,7 +443,7 @@
       record('suite completed without exceptions',false,String(err&&err.stack||err));
       finish();
     });
-  });
+  }
 })();
 
 

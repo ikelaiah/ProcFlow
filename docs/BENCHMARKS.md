@@ -1,5 +1,9 @@
 # v1.14.0 scalability evidence
 
+> **Historical baseline.** These figures were recorded at v1.14.0. The
+> benchmark still runs (`npm run benchmark`), and this remains a useful
+> reference, but it is not re-measured every release.
+
 Run the repeatable benchmark after compiling the checked-in runtime:
 
 ```text

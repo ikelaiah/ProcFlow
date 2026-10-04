@@ -96,8 +96,11 @@ function toMermaid(graph: Graph, dir?: DiagramDirection): string {
   var L: string[]=['flowchart '+(dir||'TD')];
   var wrap: Record<string, [string, string]>={rect:['["','"]'], diamond:['{"','"}'], hex:['{{"','"}}'],
             round:['(["','"])'], marker:['>"','"]'], io:['[("','")]'], call:['[["','"]]']};
-  graph.nodes.forEach(function(n){ if(n.shape==='io') n.cls=n.cls||'io'; });
-  graph.nodes.forEach(function(n){
+  /* Work on shallow node copies: an io shape defaults to the 'io' class for
+     styling and class grouping. The caller's graph must not be mutated, since
+     it may be cached or reused for later exports. */
+  var nodes=graph.nodes.map(function(n){ return n.cls||n.shape!=='io'?n:{...n,cls:'io'}; });
+  nodes.forEach(function(n){
     var shape=n.shape;
     if(shape==='rect'&&n.cls==='io') shape='io';
     if(shape==='rect'&&n.cls==='call') shape='call';
@@ -121,7 +124,7 @@ function toMermaid(graph: Graph, dir?: DiagramDirection): string {
   L.push(provenanceComment(graph));
   /* Class styling comes from the same canonical registry as draw.io. */
   var byClass: Record<string, string[]>={};
-  graph.nodes.forEach(function(n){ (byClass[n.cls]=byClass[n.cls]||[]).push(n.id); });
+  nodes.forEach(function(n){ (byClass[n.cls]=byClass[n.cls]||[]).push(n.id); });
   Object.keys(byClass).forEach(function(c){
     var box=CANONICAL_NODE_STYLE[c];
     if(!box) return;
@@ -356,9 +359,9 @@ function layoutAnalysis(graph: Graph, dir?: DiagramDirection): LayoutAnalysis {
       return {id:id, b:n?total/n:NaN, i:prev[id]};
     });
     withIx.sort(function(a,b){
-      if(isNaN(a.b)&&isNaN(b.b)) return a.i-b.i;
-      if(isNaN(a.b)) return 1;
-      if(isNaN(b.b)) return -1;
+      if(Number.isNaN(a.b)&&Number.isNaN(b.b)) return a.i-b.i;
+      if(Number.isNaN(a.b)) return 1;
+      if(Number.isNaN(b.b)) return -1;
       if(a.b!==b.b) return a.b-b.b;
       return a.i-b.i;
     });
@@ -366,8 +369,8 @@ function layoutAnalysis(graph: Graph, dir?: DiagramDirection): LayoutAnalysis {
     refresh();
   }
   for(var it=0;it<4;it++){
-    for(var g=1;g<layers.length;g++) sweepLayer(g,g-1);
-    for(var g=layers.length-2;g>=0;g--) sweepLayer(g,g+1);
+    for(var g1=1;g1<layers.length;g1++) sweepLayer(g1,g1-1);
+    for(var g2=layers.length-2;g2>=0;g2--) sweepLayer(g2,g2+1);
   }
 
   /* Final order record. */

@@ -52,7 +52,7 @@
     try{
       var opts: AnalyseOptions={dialect:seed.dialect||'auto',mode:'auto',group:false,sources:true};
       var a=analyse(sql,opts), b=analyse(sql,opts);
-      if(!isFinite(a.coverage)||a.coverage<0||a.coverage>1)
+      if(!Number.isFinite(a.coverage)||a.coverage<0||a.coverage>1)
         failures.push({case:i,reason:'coverage out of range'});
       else if(!Array.isArray(a.diagnostics))
         failures.push({case:i,reason:'diagnostics missing'});
@@ -87,4 +87,7 @@
   document.getElementById('summary').textContent=
     (pass?'PASS':'FAIL')+' · '+cases+' deterministic mutation cases';
   output.textContent=JSON.stringify({seed:'0x5052464c',cases:cases,failures:failures},null,2);
+  /* Named result for scripts/test-all.mjs, which reads this instead of
+     scraping the DOM. */
+  (window as any).PROCFLOW_FUZZ_PASS=pass;
 })();

@@ -39,48 +39,6 @@ interface ColCtx {
   depth: number;
 }
 
-/* CTE split that retains the explicit column list so CTE scopes can carry
-   provable columns (`WITH r(n) AS …` → r has exactly [n]). */
-function splitCtesColumn(toks: Token[]): {ctes: Array<{name: string; colToks: Token[];
-    body: Token[]; bodySpan: SourceSpan | null}>; finalStart: number; recursive?: boolean} {
-  var res: {ctes: Array<{name: string; colToks: Token[]; body: Token[]; bodySpan: SourceSpan | null}>;
-            finalStart: number; recursive?: boolean}={ctes:[], finalStart:0};
-  if(!toks.length||toks[0].u!=='WITH') return res;
-  var i=1;
-  if(toks[i]&&toks[i].u==='RECURSIVE'){ res.recursive=true; i++; }
-  while(i<toks.length){
-    var nameTok=toks[i];
-    if(!nameTok||nameTok.type!=='word') break;
-    var name=nameTok.v; i++;
-    var colToks: Token[]=[];
-    if(toks[i]&&toks[i].v==='('){
-      var d0=0;
-      while(i<toks.length){
-        var tk=toks[i];
-        if(tk.v==='(') d0++;
-        else if(tk.v===')'){ d0--; if(d0===0){ i++; break; } }
-        else if(d0===1) colToks.push(tk);
-        i++;
-      }
-    }
-    if(!(toks[i]&&toks[i].u==='AS')) break;
-    i++;
-    while(toks[i]&&['MATERIALIZED','NOT'].indexOf(toks[i].u)>=0) i++;
-    if(!(toks[i]&&toks[i].v==='(')) break;
-    var start=i, d=0;
-    while(i<toks.length){
-      if(toks[i].v==='(') d++;
-      else if(toks[i].v===')'){ d--; if(d===0){ i++; break; } }
-      i++;
-    }
-    var body=toks.slice(start+1,i-1);
-    res.ctes.push({name:name, colToks:colToks, body:body, bodySpan:spanOfTokens(body)});
-    if(toks[i]&&toks[i].v===','){ i++; continue; }
-    break;
-  }
-  res.finalStart=i;
-  return res;
-}
 
 function colNamesOf(toks: Token[]): string[] {
   var out: string[]=[];
@@ -652,7 +610,7 @@ function colAnalyseArm(toks: Token[], ctx: ColCtx, first: boolean):
 function colAnalyseToks(toks: Token[], ctx: ColCtx): ColumnLineage | null {
   if(!toks.length) return null;
   if(ctx.depth>8) return null;
-  var split=splitCtesColumn(toks);
+  var split=splitCTEs(toks);
   var diagnostics: Diagnostic[]=[];
   var references: ColumnReference[]=[];
   var wildcards: ColumnWildcard[]=[];

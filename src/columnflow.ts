@@ -681,7 +681,7 @@ function spanOfObjectTokens(ast: AstNode[]): SourceSpan | null {
     var s=spanOfTokens(st.toks);
     if(s){ lo=Math.min(lo,s.start); hi=Math.max(hi,s.end); }
   },0);
-  return isFinite(lo)?{start:lo,end:hi}:null;
+  return Number.isFinite(lo)?{start:lo,end:hi}:null;
 }
 
 /* ---------- export graph (own documented layout class) ---------- */
@@ -697,8 +697,7 @@ function buildColumnGraph(cf: ColumnFlow): Graph {
   });
   Object.keys(cf.objects).forEach(function(k){
     var o=cf.objects[k];
-    if(o.name.charAt(0)==='#') objIds[k]='cobj'+(++objSeq);
-    else objIds[k]='cobj'+(++objSeq);
+    objIds[k]='cobj'+(++objSeq);
     nodes.push({id:objIds[k], shape:'io', text:o.name, cls:'colobj', source:o.span||null,
                 provenance:o.span?'source':'synthetic',
                 reason:o.multi?'ambiguous reaching definition (no unique producer)':undefined});

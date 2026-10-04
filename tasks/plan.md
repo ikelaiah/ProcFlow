@@ -1,5 +1,8 @@
 # Implementation Plan: ProcFlow v2.0.0 qualification
 
+> **Historical.** This v2.0.0 qualification plan is complete and superseded by
+> the shipped release notes. Kept for provenance only.
+
 ## Overview
 
 Complete the bounded v2 release blockers from the current v1.14.1 baseline:

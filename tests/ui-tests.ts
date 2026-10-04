@@ -6,8 +6,26 @@
     document.body.className=passed===results.length?'pass':'fail';
     document.getElementById('summary').textContent=passed+'/'+results.length+' tests passed';
     output.textContent=JSON.stringify(results,null,2);
+    /* Named result for scripts/test-all.mjs, which reads this instead of
+       scraping the DOM. Named suites (parity, schema, ...) publish their own
+       PROCFLOW_*_PASS globals; UI suites publish this one. */
+    (window as any).PROCFLOW_UI_PASS=passed===results.length;
   }
-  frame.addEventListener('load',function(){
+  frame.addEventListener('load',function(){ run(); });
+  // The iframe may already have fired 'load' before this script ran (a fast
+  // local machine races the off-screen frame), but its document may still be
+  // the initial about:blank. Only start once the real page is present, and
+  // let the 'load' listener handle the normal case.
+  function pageLoaded(): boolean {
+    try{
+      return !!frame.contentDocument&&frame.contentDocument.readyState==='complete'&&
+        frame.contentDocument.location.href.indexOf('about:blank')<0;
+    }catch(err){ return false; }
+  }
+  if(pageLoaded()) run();
+  function run(): void {
+    if((frame as any).__procflowRan) return;
+    (frame as any).__procflowRan=true;
     var w=frame.contentWindow, d=frame.contentDocument, results: any[]=[];
     var get=function(id: string): any { return d.getElementById(id); };
     results.push({name:'compact local-processing header',
@@ -167,6 +185,16 @@
         pass:!!w.mermaid&&!Array.prototype.some.call(d.scripts,function(s){
           return /^https?:/i.test(s.getAttribute('src')||'');
         })});
+      /* The flowchart inserts Mermaid SVG via innerHTML; that is safe only
+         under the strict security level. Fail loudly if it is ever relaxed. */
+      var mermaidRuntime=(w as any).mermaid;
+      var mermaidConfig=(function(){
+        try{ return mermaidRuntime&&mermaidRuntime.mermaidAPI&&mermaidRuntime.mermaidAPI.getConfig(); }
+        catch(e){ return null; }
+      })();
+      results.push({name:'Mermaid renders under strict security level',
+        pass:!!mermaidConfig&&mermaidConfig.securityLevel==='strict',
+        detail:{securityLevel:mermaidConfig?mermaidConfig.securityLevel:'unavailable'}});
 
       /* v1.8.0 usable local workspace — dependency filtering and opt-in
          persistence (save → restore identical, explicit clear). */
@@ -362,5 +390,5 @@
         finish(results);
       },500);
     },1200);
-  });
+  }
 })();
