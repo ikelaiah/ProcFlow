@@ -48,6 +48,57 @@ if (selected.length === 0) {
   process.exit(1);
 }
 
+/* Suites publish their verdict as JSON in a <pre> inside the page. --dump-dom
+   serialises that text HTML-escaped, so unescape before parsing. */
+function unescapeHtml(text) {
+  return text
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
+/* Suites use one of two result payloads: an array of {name, pass, detail}
+   cases, or an object carrying a `failures` array (fuzz, security). Entries in
+   a `failures` array are failures by definition and may omit `pass`. */
+function failingCasesFrom(html) {
+  const match = /<pre id="(?:security-)?results"[^>]*>([\s\S]*?)<\/pre>/i.exec(html);
+  if (!match || !match[1].trim()) return null;
+  let payload;
+  try {
+    payload = JSON.parse(unescapeHtml(match[1].trim()));
+  } catch {
+    return null;
+  }
+  if (Array.isArray(payload)) return payload.filter((entry) => entry && entry.pass === false);
+  if (Array.isArray(payload?.failures)) return payload.failures.filter(Boolean);
+  return [];
+}
+
+function describeFailure(entry) {
+  const label = entry.name ?? (entry.case !== undefined ? `case ${entry.case}` : "(unnamed)");
+  const rest = { ...entry };
+  delete rest.name;
+  delete rest.case;
+  delete rest.pass;
+  const detail = Object.keys(rest).length ? ` → ${JSON.stringify(rest)}` : "";
+  return `${label}${detail}`;
+}
+
+function reportFailures(html) {
+  const failures = failingCasesFrom(html);
+  if (failures === null) {
+    console.error("  (no parsable result payload in the dumped DOM)");
+    return;
+  }
+  if (failures.length === 0) {
+    console.error("  (verdict was not 'pass' but no failing case was recorded)");
+    return;
+  }
+  for (const failure of failures) console.error(`  ✗ ${describeFailure(failure)}`);
+}
+
 function runSuite(suite, runDirectory, baseUrl) {
   return new Promise((resolve) => {
     const url = `${baseUrl}/${suite.path}`;
@@ -90,10 +141,9 @@ function runSuite(suite, runDirectory, baseUrl) {
         resolve(true);
       } else {
         console.error(`test-all: ${suite.name}: ${verdict}${summary ? ` · ${summary[1].trim()}` : ""}`);
-        if (debug) {
-          if (!stdout) console.error("  (no DOM output produced)");
-          if (stderr) console.error(stderr.slice(-8_000));
-        }
+        if (stdout) reportFailures(stdout);
+        else console.error("  (no DOM output produced)");
+        if (debug && stderr) console.error(stderr.slice(-8_000));
         resolve(false);
       }
     });

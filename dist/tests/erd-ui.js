@@ -23,7 +23,9 @@
         return new Promise(function (resolve) { setTimeout(resolve, ms); });
     }
     /* Overlay drawing is animation-frame driven; poll for the expected state
-       instead of assuming a fixed delay. */
+       instead of assuming a fixed delay. The budget is generous because CI
+       runners draw the overlay far more slowly than a desktop browser. */
+    var POLL_TIMEOUT_MS = 10000;
     function until(check, timeoutMs) {
         var deadline = Date.now() + timeoutMs;
         return new Promise(function (resolve) {
@@ -147,7 +149,7 @@
             record('declared FK join is emitted', sql().indexOf('LEFT JOIN [dbo].[OrderHeader] AS orderheader') >= 0, sql());
             record('plan edge is highlighted on the diagram', await until(function () {
                 return d.querySelectorAll('#erd-overlay path[stroke-width="3"]').length >= 1;
-            }, 3000));
+            }, POLL_TIMEOUT_MS));
             record('join card shows condition and explanation', (function () {
                 var card = d.querySelector('#qb-plan-body .qb-join');
                 return !!card && card.textContent.indexOf('OrderHeader.CustomerId') >= 0 &&
@@ -159,7 +161,7 @@
             record('join type switch applies INNER', sql().indexOf('INNER JOIN [dbo].[OrderHeader] AS orderheader') >= 0, sql());
             await until(function () {
                 return !!d.querySelector('#erd-overlay path[data-relationship]');
-            }, 3000);
+            }, POLL_TIMEOUT_MS);
             record('hovering a join card highlights its edge and endpoints', (function () {
                 var card = d.querySelector('#qb-plan-body .qb-join[data-edge]');
                 card.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
@@ -321,7 +323,7 @@
             fileInput.dispatchEvent(new Event('change', { bubbles: true }));
             await until(function () {
                 return get('qb-query-name').value === 'imported smoke';
-            }, 3000);
+            }, POLL_TIMEOUT_MS);
             record('importing a query file applies picks and options', get('qb-query-name').value === 'imported smoke' &&
                 get('qb-dialect').value === 'postgres' &&
                 sql().indexOf('"dbo"."Customer"') >= 0 &&
@@ -341,7 +343,7 @@
             await until(function () {
                 return d.querySelectorAll('#qb-picks .qb-chip').length === 2 &&
                     sql().indexOf('JOIN "dbo"."OrderHeader" AS orderheader') >= 0;
-            }, 3000);
+            }, POLL_TIMEOUT_MS);
             record('restoring brings back picks and SQL', (get('qb-store-status').textContent || '').indexOf('Restored') >= 0 &&
                 d.querySelectorAll('#qb-picks .qb-chip').length === 2, get('qb-store-status').textContent);
             get('btn-qb-forget').click();
@@ -356,7 +358,7 @@
             get('btn-qb-restore').click();
             await until(function () {
                 return d.querySelectorAll('#qb-picks .qb-chip').length === 2;
-            }, 3000);
+            }, POLL_TIMEOUT_MS);
             get('btn-qb-forget').click();
             /* ---- close and reopen ---- */
             get('btn-qb-close').click();

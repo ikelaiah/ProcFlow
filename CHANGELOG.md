@@ -3,7 +3,7 @@
 All notable released SQL Cartographer changes are recorded here. Detailed verification
 evidence belongs in the canonical release note under `docs/releases/`.
 
-## Unreleased
+## v3.0.0 — Rename to SQL Cartographer (breaking)
 
 ### Renamed: ProcFlow → SQL Cartographer
 
@@ -30,6 +30,20 @@ before this change will not load:**
 No migration path is provided. Before upgrading, export any saved queries and
 ERD layouts you want to keep and re-import them after the upgrade; workspace
 exports must be created by the old version and are not readable by the new one.
+
+Historical documents keep the old name on purpose: `docs/archive/`, the
+canonical release notes for v1.14.0 through v2.6.0, and the `CHANGELOG.md`
+entries for those releases describe what shipped under it.
+
+### Testing
+
+- `npm test` now prints each failing case by name and detail on suite
+  failure, instead of only the pass count. All three suite payload shapes are
+  handled: a bare case array (golden, ui, erd-ui) and a `{failures: [...]}`
+  wrapper (fuzz, security).
+- The five `erd-ui` polls that wait on requestAnimationFrame-driven overlay
+  drawing now allow 10s instead of 3s, so slow CI runners do not drop cases
+  that a desktop browser passes.
 
 ## v2.7.0 — Maintainability pass
 
