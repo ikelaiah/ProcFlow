@@ -106,7 +106,7 @@ function schemaFingerprint(result: SchemaResult): string {
   return ('0000000'+((hash>>>0).toString(16))).slice(-8);
 }
 
-function schemaIssue(ctx: SchemaCtx, severity: DiagnosticSeverity, code: string,
+function schemaIssue(ctx: SchemaCtx, severity: DiagnosticSeverity, code: DiagnosticCode,
                      message: string, span: SourceSpan): void {
   ctx.diagnostics.push({severity:severity,code:code,message:message,
                         span:span,scope:'region'});

@@ -110,7 +110,7 @@
 
   /* ---- Graph construction ---- */
   try{
-    var graph=queryBuildGraph(schema);
+    var graph=queryBuildJoinGraph(schema);
     var customerEdge=graph.nodes['DBO.CUSTOMER'].edges[0];
     record('v2.4.0 join graph uses declared FKs and treats self-references as one edge',
       graph.order.length===11&&graph.edges.length===10&&graph.skipped.length===0&&
@@ -434,7 +434,7 @@
       view.problems);
     var external=parseSchema(
       'CREATE TABLE dbo.Thing (Id INT PRIMARY KEY, RegionId INT REFERENCES dbo.Region (Id));');
-    var externalGraph=queryBuildGraph(external);
+    var externalGraph=queryBuildJoinGraph(external);
     record('v2.4.0 unresolved external targets are skipped and explained',
       externalGraph.skipped.length===1&&
         externalGraph.skipped[0].id==='external:DBO.REGION'&&
@@ -768,7 +768,7 @@
         aggregates:{'DBO.CUSTOMER|EMAIL':'sum',
                     'DBO.CUSTOMER|LEGACY':'count'}}
     });
-    var pruned=queryStatePrune(stale,queryBuildGraph(schema));
+    var pruned=queryStatePrune(stale,queryBuildJoinGraph(schema));
     record('v2.5.0 stale references are pruned and reported, never applied silently',
       pruned.state.selections.length===1&&
         pruned.state.selections[0].column==='Email'&&

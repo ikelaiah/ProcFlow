@@ -88,4 +88,4 @@ snapshot is current.
 Verify critical dependencies and resolution conclusions against the original
 SQL, the target database, and the actual catalogue of the audited environment.
 
-See [README.md](../README.md) for usage and development guidance.
+See [README.md](../../README.md) for usage and development guidance.

@@ -89,54 +89,6 @@ function buildGraph(ast, header, opts) {
             return 'tran';
         return 'stmt';
     }
-    function currentXactStates(ctx) {
-        while (ctx) {
-            if (ctx.xactStates !== undefined)
-                return ctx.xactStates;
-            ctx = ctx.parent;
-        }
-        return TSQL_XACT_ALL;
-    }
-    function currentTranDepth(ctx) {
-        while (ctx) {
-            if (ctx.tranDepth !== undefined)
-                return ctx.tranDepth;
-            ctx = ctx.parent;
-        }
-        return { min: 0, max: null };
-    }
-    function currentXactAbort(ctx) {
-        while (ctx) {
-            if (ctx.xactAbort !== undefined)
-                return ctx.xactAbort;
-            ctx = ctx.parent;
-        }
-        return undefined;
-    }
-    function currentSavepoints(ctx) {
-        while (ctx) {
-            if (ctx.savepoints !== undefined)
-                return ctx.savepoints;
-            ctx = ctx.parent;
-        }
-        return {};
-    }
-    function currentPgSubtransaction(ctx) {
-        while (ctx) {
-            if (ctx.pgSubtransaction)
-                return true;
-            ctx = ctx.parent;
-        }
-        return false;
-    }
-    function currentInCatch(ctx) {
-        while (ctx) {
-            if (ctx.inCatch)
-                return true;
-            ctx = ctx.parent;
-        }
-        return false;
-    }
     /* ---------- temp-table data flow (Workstream D) ----------
        A consumer wires to its unique reaching definition: the most recent write
        on a provably linear path. Conditional writes and branch merges mark the
@@ -218,80 +170,6 @@ function buildGraph(ast, header, opts) {
         mergeTempsMulti(out, from);
         return out;
     }
-    function withTsqlState(ctx, states, tranDepth) {
-        return { parent: ctx, handlers: [], handlerExits: [],
-            xactStates: states, tranDepth: tranDepth };
-    }
-    function xactStatesLabel(states) {
-        if (states === TSQL_XACT_UNCOMMITTABLE)
-            return '-1 · uncommittable';
-        if (states === TSQL_XACT_NONE)
-            return '0 · no transaction';
-        if (states === TSQL_XACT_COMMITTABLE)
-            return '1 · committable';
-        if (states === (TSQL_XACT_UNCOMMITTABLE | TSQL_XACT_COMMITTABLE))
-            return 'active · commit status unknown';
-        if (states === (TSQL_XACT_NONE | TSQL_XACT_COMMITTABLE))
-            return 'not uncommittable';
-        if (states === (TSQL_XACT_UNCOMMITTABLE | TSQL_XACT_NONE))
-            return 'not committable';
-        return states === 0 ? 'impossible' : 'any state';
-    }
-    function depthRangeLabel(range) {
-        if (range.max !== null && range.min > range.max)
-            return 'impossible';
-        if (range.max === 0)
-            return 'depth 0 · no transaction';
-        if (range.min === 1 && range.max === 1)
-            return 'depth 1 · outermost transaction';
-        if (range.min >= 2 && range.max === null)
-            return 'depth ≥' + range.min + ' · nested transaction';
-        if (range.min === 1 && range.max === null)
-            return 'depth ≥1 · active transaction';
-        if (range.max === null)
-            return 'depth ≥' + range.min;
-        if (range.min === range.max)
-            return 'depth ' + range.min;
-        return 'depth ' + range.min + '–' + range.max;
-    }
-    function intersectDepth(a, b) {
-        var max = a.max === null ? b.max : (b.max === null ? a.max : Math.min(a.max, b.max));
-        return { min: Math.max(a.min, b.min), max: max };
-    }
-    function statesForDepth(range) {
-        if (range.max !== null && range.min > range.max)
-            return 0;
-        if (range.max === 0)
-            return TSQL_XACT_NONE;
-        if (range.min >= 1)
-            return TSQL_XACT_UNCOMMITTABLE | TSQL_XACT_COMMITTABLE;
-        return TSQL_XACT_ALL;
-    }
-    function depthForStates(range, states) {
-        if (states === 0)
-            return { min: 1, max: 0 };
-        if ((states & TSQL_XACT_NONE) === 0)
-            return intersectDepth(range, { min: 1, max: null });
-        if ((states & (TSQL_XACT_UNCOMMITTABLE | TSQL_XACT_COMMITTABLE)) === 0)
-            return intersectDepth(range, { min: 0, max: 0 });
-        return range;
-    }
-    function tsqlTransactionAction(st) {
-        var toks = st.toks, head = toks.length ? toks[0].u : '', i = 1, target = '';
-        if (head === 'BEGIN' && toks[i] && toks[i].u === 'DISTRIBUTED')
-            i++;
-        if (toks[i] && (toks[i].u === 'TRAN' || toks[i].u === 'TRANSACTION' || toks[i].u === 'WORK'))
-            i++;
-        if ((head === 'ROLLBACK' || head === 'SAVE' || head === 'SAVEPOINT') && toks[i])
-            target = toks[i].v;
-        return {
-            kind: head === 'BEGIN' ? 'begin' : (head === 'COMMIT' ? 'commit' :
-                (head === 'ROLLBACK' ? 'rollback' :
-                    ((head === 'SAVE' || head === 'SAVEPOINT') ? 'save' : ''))),
-            target: target,
-            staticTarget: !!target && target.charAt(0) !== '@'
-        };
-    }
     function tsqlTransactionText(st, ctx) {
         var out = textOf(st), states = currentXactStates(ctx), depth = currentTranDepth(ctx);
         if (!st.toks.length)
@@ -357,19 +235,6 @@ function buildGraph(ast, header, opts) {
                 return textOf(st) + ' — statement errors may leave transaction active' + catchNote;
         }
         return textOf(st);
-    }
-    function invalidTsqlTransactionAction(st, ctx) {
-        var states = currentXactStates(ctx), head = st.toks.length ? st.toks[0].u : '';
-        if (head === 'COMMIT')
-            return states === TSQL_XACT_UNCOMMITTABLE || states === TSQL_XACT_NONE;
-        if (head === 'ROLLBACK')
-            return states === TSQL_XACT_NONE;
-        if (head === 'SAVE' || head === 'SAVEPOINT')
-            return states === TSQL_XACT_UNCOMMITTABLE || states === TSQL_XACT_NONE;
-        return false;
-    }
-    function tsqlStatefulStatement(st) {
-        return st.toks.length >= 2 && st.toks[0].u === 'SET' && st.toks[1].u === 'XACT_ABORT';
     }
     function applyTsqlStatementState(st, ctx) {
         if (st.toks.length >= 3 && st.toks[0].u === 'SET' && st.toks[1].u === 'XACT_ABORT') {
@@ -600,429 +465,461 @@ function buildGraph(ast, header, opts) {
         return { entry: entry, exits: exits, endTemps: local.temps || null,
             endSavepoints: local.savepoints || null };
     }
-    function emitOne(st, ctx, depth, reachable) {
-        switch (st.type) {
-            case 'block': {
-                if (st.atomic && dialect === 'db2') {
-                    var am = add('marker', 'BEGIN ATOMIC · rollback scope', 'try', null, null, 'DB2 ATOMIC block rollback scope');
-                    var innerA = emitList(st.body, ctx, depth + 1);
-                    if (innerA.entry)
-                        link(am, innerA.entry);
-                    var ao = [];
-                    var rb = null;
-                    for (var ai0 = 0; ai0 < innerA.exits.length; ai0++) {
-                        var ex0 = innerA.exits[ai0];
-                        var nd0 = nodes.filter(function (n) { return n.id === ex0.id; })[0];
-                        var unwind = nd0 && (/Exit compound block/.test(nd0.text) || /Undo and exit/.test(nd0.text));
-                        if (unwind) {
-                            if (!rb)
-                                rb = add('round', 'Implicit rollback · ATOMIC block', 'err', null, null, 'implicit DB2 ATOMIC rollback after UNDO/EXIT handler');
-                            link(ex0.id, rb, ex0.label || 'undo');
-                        }
-                        else
-                            ao.push(ex0);
-                    }
-                    return { entry: am, exits: ao, endTemps: innerA.endTemps || null,
-                        endSavepoints: innerA.endSavepoints || null };
-                }
-                return emitList(st.body, ctx, depth);
-            }
-            case 'stmt': {
-                stats.stmt++;
-                var statementKind = kindOf(st);
-                var pgTransaction = dialect === 'plpgsql' && statementKind === 'tran'
-                    ? pgTransactionAssessment(st.toks, header.kind || '', currentPgSubtransaction(ctx))
-                    : null;
-                var statementText = dialect === 'tsql' ? tsqlStatementText(st, ctx) : textOf(st);
-                if (pgTransaction)
-                    statementText += ' — ' + pgTransaction.label;
-                var invalidTransaction = statementKind === 'tran' &&
-                    ((dialect === 'tsql' && invalidTsqlTransactionAction(st, ctx)) ||
-                        (dialect === 'plpgsql' && !!pgTransaction && pgTransaction.invalid));
-                var id = add(invalidTransaction ? 'round' : 'rect', statementText, invalidTransaction ? 'err' : statementKind, spanOfTokens(st.toks));
-                var stmtWrites = reachable === false ? null : flowTempFacts(st, id, ctx);
-                return { entry: id, exits: invalidTransaction ? [] : [{ id: id }],
-                    endTemps: stmtWrites };
-            }
-            case 'dynamic': {
-                stats.stmt++;
-                stats.opaque++;
-                var dyn = add('rect', 'Dynamic SQL — ' + clip(joinToks(st.toks, 42), 42), 'opaque', spanOfTokens(st.toks));
-                return { entry: dyn, exits: [{ id: dyn }] };
-            }
-            case 'unknown': {
-                stats.stmt++;
-                stats.opaque++;
-                var unknown = add('rect', 'Unresolved SQL — ' + clip(joinToks(st.toks, 42), 42), 'opaque', spanOfTokens(st.toks));
-                return { entry: unknown, exits: [{ id: unknown }] };
-            }
-            case 'if': {
-                stats.branch++;
-                var xactTest = dialect === 'tsql' ? tsqlXactStateTest(st.cond) : null;
-                var depthTest = dialect === 'tsql' && !xactTest ? tsqlTranCountTest(st.cond) : null;
-                var incomingStates = currentXactStates(ctx);
-                var incomingDepth = currentTranDepth(ctx);
-                var trueDepth = xactTest
-                    ? depthForStates(incomingDepth, incomingStates & xactTest.trueStates)
-                    : (depthTest ? intersectDepth(incomingDepth, depthTest.trueDepth) : incomingDepth);
-                var falseDepth = xactTest
-                    ? depthForStates(incomingDepth, incomingStates & xactTest.falseStates)
-                    : (depthTest ? intersectDepth(incomingDepth, depthTest.falseDepth) : incomingDepth);
-                var trueStates = xactTest
-                    ? incomingStates & xactTest.trueStates
-                    : (depthTest ? incomingStates & statesForDepth(trueDepth) : incomingStates);
-                var falseStates = xactTest
-                    ? incomingStates & xactTest.falseStates
-                    : (depthTest ? incomingStates & statesForDepth(falseDepth) : incomingStates);
-                var conditionText = xactTest ? xactTest.text :
-                    (depthTest ? depthTest.text : clip(joinToks(st.cond, 60), 60));
-                var c = add('diamond', conditionText, 'cond', spanOfTokens(st.cond));
-                var trueCtx = xactTest || depthTest
-                    ? withTsqlState(ctx, trueStates, trueDepth) : ctx;
-                var falseCtx = xactTest || depthTest
-                    ? withTsqlState(ctx, falseStates, falseDepth) : ctx;
-                var t = st.then ? emitOne(st.then, trueCtx, depth + 1) : null;
-                var e = st.else ? emitOne(st.else, falseCtx, depth + 1) : null;
-                var ex = [];
-                var yesLabel = xactTest ? 'yes · ' + xactStatesLabel(trueStates) :
-                    (depthTest ? 'yes · ' + depthRangeLabel(trueDepth) : 'yes');
-                var noLabel = xactTest ? 'no · ' + xactStatesLabel(falseStates) :
-                    (depthTest ? 'no · ' + depthRangeLabel(falseDepth) : 'no');
-                if (t && t.entry) {
-                    link(c, t.entry, yesLabel);
-                    ex = ex.concat(t.exits);
+    function emitBlock(st, ctx, depth, reachable) {
+        if (st.atomic && dialect === 'db2') {
+            var am = add('marker', 'BEGIN ATOMIC · rollback scope', 'try', null, null, 'DB2 ATOMIC block rollback scope');
+            var innerA = emitList(st.body, ctx, depth + 1);
+            if (innerA.entry)
+                link(am, innerA.entry);
+            var ao = [];
+            var rb = null;
+            for (var ai0 = 0; ai0 < innerA.exits.length; ai0++) {
+                var ex0 = innerA.exits[ai0];
+                var nd0 = nodes.filter(function (n) { return n.id === ex0.id; })[0];
+                var unwind = nd0 && (/Exit compound block/.test(nd0.text) || /Undo and exit/.test(nd0.text));
+                if (unwind) {
+                    if (!rb)
+                        rb = add('round', 'Implicit rollback · ATOMIC block', 'err', null, null, 'implicit DB2 ATOMIC rollback after UNDO/EXIT handler');
+                    link(ex0.id, rb, ex0.label || 'undo');
                 }
                 else
-                    ex.push({ id: c, label: yesLabel });
-                if (e && e.entry) {
-                    link(c, e.entry, noLabel);
-                    ex = ex.concat(e.exits);
-                }
-                else
-                    ex.push({ id: c, label: noLabel });
-                var ifTemps = {};
-                mergeTempsMulti(ifTemps, t && t.endTemps);
-                mergeTempsMulti(ifTemps, e && e.endTemps);
-                return { entry: c, exits: ex,
-                    endTemps: Object.keys(ifTemps).length ? ifTemps : null };
+                    ao.push(ex0);
             }
-            case 'case': {
-                if (!st.branches.length) {
-                    stats.stmt++;
-                    var cs = add('rect', clip('CASE ' + joinToks(st.sel || [], 44), 52), 'stmt', spanOfTokens(st.sel));
-                    return { entry: cs, exits: [{ id: cs }] };
-                }
-                var selTxt = st.sel && st.sel.length ? joinToks(st.sel, 40) : '';
-                var entry = null, prev = null, exits = [];
-                var caseTemps = {};
-                for (var b = 0; b < st.branches.length; b++) {
-                    stats.branch++;
-                    var br = st.branches[b];
-                    var lab = (selTxt ? selTxt + ' = ' : '') + clip(joinToks(br.cond, 44), 44);
-                    var d = add('diamond', clip(lab, 58), 'cond', spanOfTokens(br.cond));
-                    if (!entry)
-                        entry = d;
-                    if (prev)
-                        link(prev, d, 'no');
-                    var bb = emitList(br.body, ctx, depth + 1);
-                    mergeTempsMulti(caseTemps, bb.endTemps);
-                    if (bb.entry) {
-                        link(d, bb.entry, 'yes');
-                        exits = exits.concat(bb.exits);
+            return { entry: am, exits: ao, endTemps: innerA.endTemps || null,
+                endSavepoints: innerA.endSavepoints || null };
+        }
+        return emitList(st.body, ctx, depth);
+    }
+    function emitStmt(st, ctx, depth, reachable) {
+        stats.stmt++;
+        var statementKind = kindOf(st);
+        var pgTransaction = dialect === 'plpgsql' && statementKind === 'tran'
+            ? pgTransactionAssessment(st.toks, header.kind || '', currentPgSubtransaction(ctx))
+            : null;
+        var statementText = dialect === 'tsql' ? tsqlStatementText(st, ctx) : textOf(st);
+        if (pgTransaction)
+            statementText += ' — ' + pgTransaction.label;
+        var invalidTransaction = statementKind === 'tran' &&
+            ((dialect === 'tsql' && invalidTsqlTransactionAction(st, ctx)) ||
+                (dialect === 'plpgsql' && !!pgTransaction && pgTransaction.invalid));
+        var id = add(invalidTransaction ? 'round' : 'rect', statementText, invalidTransaction ? 'err' : statementKind, spanOfTokens(st.toks));
+        var stmtWrites = reachable === false ? null : flowTempFacts(st, id, ctx);
+        return { entry: id, exits: invalidTransaction ? [] : [{ id: id }],
+            endTemps: stmtWrites };
+    }
+    function emitDynamic(st, ctx, depth, reachable) {
+        stats.stmt++;
+        stats.opaque++;
+        var dyn = add('rect', 'Dynamic SQL — ' + clip(joinToks(st.toks, 42), 42), 'opaque', spanOfTokens(st.toks));
+        return { entry: dyn, exits: [{ id: dyn }] };
+    }
+    function emitUnknown(st, ctx, depth, reachable) {
+        stats.stmt++;
+        stats.opaque++;
+        var unknown = add('rect', 'Unresolved SQL — ' + clip(joinToks(st.toks, 42), 42), 'opaque', spanOfTokens(st.toks));
+        return { entry: unknown, exits: [{ id: unknown }] };
+    }
+    function emitIf(st, ctx, depth, reachable) {
+        stats.branch++;
+        var xactTest = dialect === 'tsql' ? tsqlXactStateTest(st.cond) : null;
+        var depthTest = dialect === 'tsql' && !xactTest ? tsqlTranCountTest(st.cond) : null;
+        var incomingStates = currentXactStates(ctx);
+        var incomingDepth = currentTranDepth(ctx);
+        var trueDepth = xactTest
+            ? depthForStates(incomingDepth, incomingStates & xactTest.trueStates)
+            : (depthTest ? intersectDepth(incomingDepth, depthTest.trueDepth) : incomingDepth);
+        var falseDepth = xactTest
+            ? depthForStates(incomingDepth, incomingStates & xactTest.falseStates)
+            : (depthTest ? intersectDepth(incomingDepth, depthTest.falseDepth) : incomingDepth);
+        var trueStates = xactTest
+            ? incomingStates & xactTest.trueStates
+            : (depthTest ? incomingStates & statesForDepth(trueDepth) : incomingStates);
+        var falseStates = xactTest
+            ? incomingStates & xactTest.falseStates
+            : (depthTest ? incomingStates & statesForDepth(falseDepth) : incomingStates);
+        var conditionText = xactTest ? xactTest.text :
+            (depthTest ? depthTest.text : clip(joinToks(st.cond, 60), 60));
+        var c = add('diamond', conditionText, 'cond', spanOfTokens(st.cond));
+        var trueCtx = xactTest || depthTest
+            ? withTsqlState(ctx, trueStates, trueDepth) : ctx;
+        var falseCtx = xactTest || depthTest
+            ? withTsqlState(ctx, falseStates, falseDepth) : ctx;
+        var t = st.then ? emitOne(st.then, trueCtx, depth + 1) : null;
+        var e = st.else ? emitOne(st.else, falseCtx, depth + 1) : null;
+        var ex = [];
+        var yesLabel = xactTest ? 'yes · ' + xactStatesLabel(trueStates) :
+            (depthTest ? 'yes · ' + depthRangeLabel(trueDepth) : 'yes');
+        var noLabel = xactTest ? 'no · ' + xactStatesLabel(falseStates) :
+            (depthTest ? 'no · ' + depthRangeLabel(falseDepth) : 'no');
+        if (t && t.entry) {
+            link(c, t.entry, yesLabel);
+            ex = ex.concat(t.exits);
+        }
+        else
+            ex.push({ id: c, label: yesLabel });
+        if (e && e.entry) {
+            link(c, e.entry, noLabel);
+            ex = ex.concat(e.exits);
+        }
+        else
+            ex.push({ id: c, label: noLabel });
+        var ifTemps = {};
+        mergeTempsMulti(ifTemps, t && t.endTemps);
+        mergeTempsMulti(ifTemps, e && e.endTemps);
+        return { entry: c, exits: ex,
+            endTemps: Object.keys(ifTemps).length ? ifTemps : null };
+    }
+    function emitCase(st, ctx, depth, reachable) {
+        if (!st.branches.length) {
+            stats.stmt++;
+            var cs = add('rect', clip('CASE ' + joinToks(st.sel || [], 44), 52), 'stmt', spanOfTokens(st.sel));
+            return { entry: cs, exits: [{ id: cs }] };
+        }
+        var selTxt = st.sel && st.sel.length ? joinToks(st.sel, 40) : '';
+        var entry = null, prev = null, exits = [];
+        var caseTemps = {};
+        for (var b = 0; b < st.branches.length; b++) {
+            stats.branch++;
+            var br = st.branches[b];
+            var lab = (selTxt ? selTxt + ' = ' : '') + clip(joinToks(br.cond, 44), 44);
+            var d = add('diamond', clip(lab, 58), 'cond', spanOfTokens(br.cond));
+            if (!entry)
+                entry = d;
+            if (prev)
+                link(prev, d, 'no');
+            var bb = emitList(br.body, ctx, depth + 1);
+            mergeTempsMulti(caseTemps, bb.endTemps);
+            if (bb.entry) {
+                link(d, bb.entry, 'yes');
+                exits = exits.concat(bb.exits);
+            }
+            else
+                exits.push({ id: d, label: 'yes' });
+            prev = d;
+        }
+        if (st.else) {
+            var eb = emitList(st.else, ctx, depth + 1);
+            mergeTempsMulti(caseTemps, eb.endTemps);
+            if (eb.entry) {
+                link(prev, eb.entry, 'else');
+                exits = exits.concat(eb.exits);
+            }
+        }
+        else if (prev)
+            exits.push({ id: prev, label: 'no' });
+        return { entry: entry, exits: exits,
+            endTemps: Object.keys(caseTemps).length ? caseTemps : null };
+    }
+    function emitIteration(st, ctx, depth, reachable) {
+        stats.loop++;
+        var txt = st.type === 'while' ? clip(joinToks(st.cond, 58), 58)
+            : st.type === 'for' ? clip('for ' + joinToks(st.head, 54), 58)
+                : 'loop';
+        var wc = add('hex', txt, 'loop', spanOfTokens(st.cond || st.head));
+        var inner = {
+            loop: { cond: wc, breaks: [], label: st.label || null },
+            parent: ctx, handlers: [], handlerExits: []
+        };
+        var body = st.body ? emitOne(st.body, inner, depth + 1) : null;
+        if (body && body.entry) {
+            link(wc, body.entry, st.type === 'loop' ? '' : 'yes');
+            joinExits(body.exits, wc);
+        }
+        else
+            link(wc, wc, 'loop');
+        var outs = inner.loop.breaks.slice();
+        if (st.type !== 'loop')
+            outs.push({ id: wc, label: 'done' });
+        return { entry: wc, exits: outs, endTemps: ambiguousCopy(body && body.endTemps) };
+    }
+    function emitRepeat(st, ctx, depth, reachable) {
+        stats.loop++;
+        var rc = add('diamond', 'until ' + clip(joinToks(st.cond, 50), 50), 'loop', spanOfTokens(st.cond));
+        var inner2 = {
+            loop: { cond: rc, breaks: [], label: st.label || null },
+            parent: ctx, handlers: [], handlerExits: []
+        };
+        var body2 = st.body ? emitOne(st.body, inner2, depth + 1) : null;
+        if (body2 && body2.entry) {
+            joinExits(body2.exits, rc);
+            link(rc, body2.entry, 'no');
+            var repeatExits = [{ id: rc, label: 'yes' }];
+            return { entry: body2.entry, exits: repeatExits.concat(inner2.loop.breaks),
+                endTemps: ambiguousCopy(body2.endTemps) };
+        }
+        return { entry: rc, exits: [{ id: rc, label: 'yes' }] };
+    }
+    function emitTry(st, ctx, depth, reachable) {
+        stats.cat += st.handlers.length || 1;
+        var tstart = add('marker', dialect === 'tsql' ? 'BEGIN TRY' :
+            (dialect === 'plpgsql' ? 'BEGIN exception block · subtransaction' : 'BEGIN block'), 'try', null, null, 'exception-protected region entry');
+        var mark = nodes.length;
+        var exceptionCtx = dialect === 'plpgsql'
+            ? { parent: ctx, handlers: [], handlerExits: [], pgSubtransaction: true }
+            : ctx;
+        var tb = emitList(st.body, exceptionCtx, depth + 1);
+        if (tb.entry)
+            link(tstart, tb.entry);
+        var tryExits = tb.entry ? tb.exits.slice() : [{ id: tstart }];
+        /* T-SQL CATCH scope: savepoints declared in the TRY body remain visible
+           to savepoint-only recovery inside the handler, and statements know
+           they run in a CATCH scope. */
+        var handlerCtx = exceptionCtx;
+        if (dialect === 'tsql') {
+            handlerCtx = { parent: ctx, handlers: [], handlerExits: [], inCatch: true };
+            if (tb.endSavepoints && Object.keys(tb.endSavepoints).length)
+                handlerCtx.savepoints = tb.endSavepoints;
+        }
+        var tryTemps = {};
+        mergeTempsMulti(tryTemps, tb.endTemps);
+        /* Explicit errors always identify their source; fan-in adds potential raisers. */
+        var explicitRaisers = [], raisers = [];
+        nodes.slice(mark).forEach(function (n) {
+            if (n.cls === 'err' && !guarded[n.id] && !unreachable[n.id])
+                explicitRaisers.push(n.id);
+        });
+        raisers = explicitRaisers.slice();
+        if (fanIn)
+            nodes.slice(mark).forEach(function (n) {
+                if (PROTECTABLE.indexOf(n.cls) >= 0 && !guarded[n.id] && !unreachable[n.id] &&
+                    raisers.indexOf(n.id) < 0)
+                    raisers.push(n.id);
+            });
+        var handlerMarkers = [], handlerLabels = [];
+        for (var hh = 0; hh < st.handlers.length; hh++) {
+            var h = st.handlers[hh];
+            var lab2 = h.cond && h.cond.length ? clip(joinToks(h.cond, 40), 40) : 'CATCH';
+            var catchText = lab2 === 'CATCH' ? 'BEGIN CATCH' : ('WHEN ' + lab2);
+            if (dialect === 'tsql' && lab2 === 'CATCH' && currentXactAbort(ctx) === true)
+                catchText += ' · XACT_ABORT ON at TRY entry; inspect XACT_STATE';
+            var cm = add('marker', catchText, 'catch', null, null, 'exception handler entry');
+            if (lab2 !== 'CATCH' && dialect !== 'tsql')
+                nodes[nodes.length - 1].text = 'EXCEPTION WHEN ' + lab2;
+            handlerMarkers.push(cm);
+            handlerLabels.push(lab2);
+        }
+        var handlerReachable = handlerMarkers.map(function () { return false; });
+        var junction = null, handledRaisers = {};
+        if (dialect === 'plpgsql') {
+            var unknownRaisers = raisers.filter(function (id) { return !pgErrors[id]; });
+            explicitRaisers.forEach(function (id) {
+                var error = pgErrors[id];
+                if (!error)
+                    return;
+                for (var hi = 0; hi < st.handlers.length; hi++) {
+                    if (pgHandlerMatches(st.handlers[hi].cond, error)) {
+                        link(id, handlerMarkers[hi], '', 'dotted');
+                        handlerReachable[hi] = true;
+                        handledRaisers[id] = 1;
+                        break;
                     }
-                    else
-                        exits.push({ id: d, label: 'yes' });
-                    prev = d;
                 }
-                if (st.else) {
-                    var eb = emitList(st.else, ctx, depth + 1);
-                    mergeTempsMulti(caseTemps, eb.endTemps);
-                    if (eb.entry) {
-                        link(prev, eb.entry, 'else');
-                        exits = exits.concat(eb.exits);
-                    }
-                }
-                else if (prev)
-                    exits.push({ id: prev, label: 'no' });
-                return { entry: entry, exits: exits,
-                    endTemps: Object.keys(caseTemps).length ? caseTemps : null };
-            }
-            case 'while':
-            case 'for':
-            case 'loop': {
-                stats.loop++;
-                var txt = st.type === 'while' ? clip(joinToks(st.cond, 58), 58)
-                    : st.type === 'for' ? clip('for ' + joinToks(st.head, 54), 58)
-                        : 'loop';
-                var wc = add('hex', txt, 'loop', spanOfTokens(st.cond || st.head));
-                var inner = {
-                    loop: { cond: wc, breaks: [], label: st.label || null },
-                    parent: ctx, handlers: [], handlerExits: []
-                };
-                var body = st.body ? emitOne(st.body, inner, depth + 1) : null;
-                if (body && body.entry) {
-                    link(wc, body.entry, st.type === 'loop' ? '' : 'yes');
-                    joinExits(body.exits, wc);
-                }
-                else
-                    link(wc, wc, 'loop');
-                var outs = inner.loop.breaks.slice();
-                if (st.type !== 'loop')
-                    outs.push({ id: wc, label: 'done' });
-                return { entry: wc, exits: outs, endTemps: ambiguousCopy(body && body.endTemps) };
-            }
-            case 'repeat': {
-                stats.loop++;
-                var rc = add('diamond', 'until ' + clip(joinToks(st.cond, 50), 50), 'loop', spanOfTokens(st.cond));
-                var inner2 = {
-                    loop: { cond: rc, breaks: [], label: st.label || null },
-                    parent: ctx, handlers: [], handlerExits: []
-                };
-                var body2 = st.body ? emitOne(st.body, inner2, depth + 1) : null;
-                if (body2 && body2.entry) {
-                    joinExits(body2.exits, rc);
-                    link(rc, body2.entry, 'no');
-                    var repeatExits = [{ id: rc, label: 'yes' }];
-                    return { entry: body2.entry, exits: repeatExits.concat(inner2.loop.breaks),
-                        endTemps: ambiguousCopy(body2.endTemps) };
-                }
-                return { entry: rc, exits: [{ id: rc, label: 'yes' }] };
-            }
-            case 'try': {
-                stats.cat += st.handlers.length || 1;
-                var tstart = add('marker', dialect === 'tsql' ? 'BEGIN TRY' :
-                    (dialect === 'plpgsql' ? 'BEGIN exception block · subtransaction' : 'BEGIN block'), 'try', null, null, 'exception-protected region entry');
-                var mark = nodes.length;
-                var exceptionCtx = dialect === 'plpgsql'
-                    ? { parent: ctx, handlers: [], handlerExits: [], pgSubtransaction: true }
-                    : ctx;
-                var tb = emitList(st.body, exceptionCtx, depth + 1);
-                if (tb.entry)
-                    link(tstart, tb.entry);
-                var tryExits = tb.entry ? tb.exits.slice() : [{ id: tstart }];
-                /* T-SQL CATCH scope: savepoints declared in the TRY body remain visible
-                   to savepoint-only recovery inside the handler, and statements know
-                   they run in a CATCH scope. */
-                var handlerCtx = exceptionCtx;
-                if (dialect === 'tsql') {
-                    handlerCtx = { parent: ctx, handlers: [], handlerExits: [], inCatch: true };
-                    if (tb.endSavepoints && Object.keys(tb.endSavepoints).length)
-                        handlerCtx.savepoints = tb.endSavepoints;
-                }
-                var tryTemps = {};
-                mergeTempsMulti(tryTemps, tb.endTemps);
-                /* Explicit errors always identify their source; fan-in adds potential raisers. */
-                var explicitRaisers = [], raisers = [];
-                nodes.slice(mark).forEach(function (n) {
-                    if (n.cls === 'err' && !guarded[n.id] && !unreachable[n.id])
-                        explicitRaisers.push(n.id);
+            });
+            if (unknownRaisers.length && handlerMarkers.length > 1) {
+                junction = add('marker', 'on error', 'catch', null, null, 'exception fan-in junction');
+                unknownRaisers.forEach(function (id) { link(id, junction, '', 'dotted'); });
+                handlerMarkers.forEach(function (id, index) {
+                    link(junction, id, handlerLabels[index], 'dotted');
+                    handlerReachable[index] = true;
                 });
-                raisers = explicitRaisers.slice();
-                if (fanIn)
-                    nodes.slice(mark).forEach(function (n) {
-                        if (PROTECTABLE.indexOf(n.cls) >= 0 && !guarded[n.id] && !unreachable[n.id] &&
-                            raisers.indexOf(n.id) < 0)
-                            raisers.push(n.id);
-                    });
-                var handlerMarkers = [], handlerLabels = [];
-                for (var hh = 0; hh < st.handlers.length; hh++) {
-                    var h = st.handlers[hh];
-                    var lab2 = h.cond && h.cond.length ? clip(joinToks(h.cond, 40), 40) : 'CATCH';
-                    var catchText = lab2 === 'CATCH' ? 'BEGIN CATCH' : ('WHEN ' + lab2);
-                    if (dialect === 'tsql' && lab2 === 'CATCH' && currentXactAbort(ctx) === true)
-                        catchText += ' · XACT_ABORT ON at TRY entry; inspect XACT_STATE';
-                    var cm = add('marker', catchText, 'catch', null, null, 'exception handler entry');
-                    if (lab2 !== 'CATCH' && dialect !== 'tsql')
-                        nodes[nodes.length - 1].text = 'EXCEPTION WHEN ' + lab2;
-                    handlerMarkers.push(cm);
-                    handlerLabels.push(lab2);
+            }
+            else if (unknownRaisers.length && handlerMarkers.length) {
+                unknownRaisers.forEach(function (id) { link(id, handlerMarkers[0], '', 'dotted'); });
+                handlerReachable[0] = true;
+            }
+            if (st.handlers.some(function (handler) { return pgHandlerHasOthers(handler.cond); }))
+                unknownRaisers.forEach(function (id) { handledRaisers[id] = 1; });
+            if (!fanIn || !raisers.length)
+                handlerMarkers.forEach(function (id, index) {
+                    link(tstart, id, 'error', 'dotted');
+                    handlerReachable[index] = true;
+                });
+        }
+        else {
+            if (fanIn && raisers.length && handlerMarkers.length > 1)
+                junction = add('marker', 'on error', 'catch', null, null, 'exception fan-in junction');
+            handlerMarkers.forEach(function (cm, index) {
+                if (junction) {
+                    link(junction, cm, handlerLabels[index] === 'CATCH' ? '' : handlerLabels[index], 'dotted');
+                    handlerReachable[index] = true;
                 }
-                var handlerReachable = handlerMarkers.map(function () { return false; });
-                var junction = null, handledRaisers = {};
-                if (dialect === 'plpgsql') {
-                    var unknownRaisers = raisers.filter(function (id) { return !pgErrors[id]; });
-                    explicitRaisers.forEach(function (id) {
-                        var error = pgErrors[id];
-                        if (!error)
-                            return;
-                        for (var hi = 0; hi < st.handlers.length; hi++) {
-                            if (pgHandlerMatches(st.handlers[hi].cond, error)) {
-                                link(id, handlerMarkers[hi], '', 'dotted');
-                                handlerReachable[hi] = true;
-                                handledRaisers[id] = 1;
-                                break;
-                            }
-                        }
-                    });
-                    if (unknownRaisers.length && handlerMarkers.length > 1) {
-                        junction = add('marker', 'on error', 'catch', null, null, 'exception fan-in junction');
-                        unknownRaisers.forEach(function (id) { link(id, junction, '', 'dotted'); });
-                        handlerMarkers.forEach(function (id, index) {
-                            link(junction, id, handlerLabels[index], 'dotted');
-                            handlerReachable[index] = true;
-                        });
-                    }
-                    else if (unknownRaisers.length && handlerMarkers.length) {
-                        unknownRaisers.forEach(function (id) { link(id, handlerMarkers[0], '', 'dotted'); });
-                        handlerReachable[0] = true;
-                    }
-                    if (st.handlers.some(function (handler) { return pgHandlerHasOthers(handler.cond); }))
-                        unknownRaisers.forEach(function (id) { handledRaisers[id] = 1; });
-                    if (!fanIn || !raisers.length)
-                        handlerMarkers.forEach(function (id, index) {
-                            link(tstart, id, 'error', 'dotted');
-                            handlerReachable[index] = true;
-                        });
+                else if (fanIn && raisers.length) {
+                    raisers.forEach(function (id) { link(id, cm, '', 'dotted'); });
+                    handlerReachable[index] = true;
                 }
                 else {
-                    if (fanIn && raisers.length && handlerMarkers.length > 1)
-                        junction = add('marker', 'on error', 'catch', null, null, 'exception fan-in junction');
-                    handlerMarkers.forEach(function (cm, index) {
-                        if (junction) {
-                            link(junction, cm, handlerLabels[index] === 'CATCH' ? '' : handlerLabels[index], 'dotted');
-                            handlerReachable[index] = true;
-                        }
-                        else if (fanIn && raisers.length) {
-                            raisers.forEach(function (id) { link(id, cm, '', 'dotted'); });
-                            handlerReachable[index] = true;
-                        }
-                        else {
-                            link(tstart, cm, 'error', 'dotted');
-                            explicitRaisers.forEach(function (id) { link(id, cm, '', 'dotted'); });
-                            handlerReachable[index] = true;
-                        }
-                    });
-                    if (junction)
-                        raisers.forEach(function (id) { link(id, junction, '', 'dotted'); });
-                    (fanIn ? raisers : explicitRaisers).forEach(function (id) { handledRaisers[id] = 1; });
+                    link(tstart, cm, 'error', 'dotted');
+                    explicitRaisers.forEach(function (id) { link(id, cm, '', 'dotted'); });
+                    handlerReachable[index] = true;
                 }
-                for (var hbIndex = 0; hbIndex < st.handlers.length; hbIndex++) {
-                    var handlerScopeMark = nodes.length;
-                    var rollbackMarker = null;
-                    if (dialect === 'plpgsql') {
-                        var rollbackLines = ['Implicit rollback · ' + clip(handlerLabels[hbIndex], 32),
-                            'Persistent changes undone · variables preserved'];
-                        rollbackMarker = add('marker', rollbackLines.join('\n'), 'tran', null, rollbackLines, 'implicit PL/pgSQL subtransaction rollback');
-                    }
-                    var cb2 = emitList(st.handlers[hbIndex].body, handlerCtx, depth + 1);
-                    mergeTempsMulti(tryTemps, cb2.endTemps);
-                    if (handlerReachable[hbIndex] && cb2.entry) {
-                        if (rollbackMarker) {
-                            link(handlerMarkers[hbIndex], rollbackMarker);
-                            link(rollbackMarker, cb2.entry);
-                        }
-                        else
-                            link(handlerMarkers[hbIndex], cb2.entry);
-                        tryExits = tryExits.concat(cb2.exits);
-                    }
-                    else if (handlerReachable[hbIndex]) {
-                        if (rollbackMarker) {
-                            link(handlerMarkers[hbIndex], rollbackMarker);
-                            tryExits.push({ id: rollbackMarker });
-                        }
-                        else
-                            tryExits.push({ id: handlerMarkers[hbIndex] });
-                    }
-                    else {
-                        unreachable[handlerMarkers[hbIndex]] = 1;
-                        nodes.slice(handlerScopeMark).forEach(function (node) { unreachable[node.id] = 1; });
-                    }
+            });
+            if (junction)
+                raisers.forEach(function (id) { link(id, junction, '', 'dotted'); });
+            (fanIn ? raisers : explicitRaisers).forEach(function (id) { handledRaisers[id] = 1; });
+        }
+        for (var hbIndex = 0; hbIndex < st.handlers.length; hbIndex++) {
+            var handlerScopeMark = nodes.length;
+            var rollbackMarker = null;
+            if (dialect === 'plpgsql') {
+                var rollbackLines = ['Implicit rollback · ' + clip(handlerLabels[hbIndex], 32),
+                    'Persistent changes undone · variables preserved'];
+                rollbackMarker = add('marker', rollbackLines.join('\n'), 'tran', null, rollbackLines, 'implicit PL/pgSQL subtransaction rollback');
+            }
+            var cb2 = emitList(st.handlers[hbIndex].body, handlerCtx, depth + 1);
+            mergeTempsMulti(tryTemps, cb2.endTemps);
+            if (handlerReachable[hbIndex] && cb2.entry) {
+                if (rollbackMarker) {
+                    link(handlerMarkers[hbIndex], rollbackMarker);
+                    link(rollbackMarker, cb2.entry);
                 }
-                Object.keys(handledRaisers).forEach(function (id) { guarded[id] = 1; });
-                return { entry: tstart, exits: tryExits,
-                    endTemps: Object.keys(tryTemps).length ? tryTemps : null };
+                else
+                    link(handlerMarkers[hbIndex], cb2.entry);
+                tryExits = tryExits.concat(cb2.exits);
             }
-            case 'handler': {
-                stats.cat++;
-                var condition = clip(joinToks(st.conds, 34), 34);
-                var hm = add('marker', st.kind + ' HANDLER FOR ' + condition, 'catch', spanOfTokens(st.conds));
-                /* Same-scope handlers do not handle conditions raised by one another. */
-                var hb = st.body ? emitList([st.body], ctx ? ctx.parent : null, depth + 1) : null;
-                if (hb && hb.entry)
-                    link(hm, hb.entry);
-                var terminalText = st.kind === 'CONTINUE'
-                    ? 'Resume after raising statement'
-                    : (st.kind === 'UNDO' ? 'Undo and exit compound block' : 'Exit compound block');
-                var terminal = add('marker', terminalText, st.kind === 'CONTINUE' ? 'flowctl' : 'catch', null, null, 'DB2 handler terminal action');
-                joinExits(hb && hb.entry ? hb.exits : [{ id: hm }], terminal);
-                if (ctx) {
-                    var handlerFlow = {
-                        id: hm, kind: st.kind, label: condition || 'condition',
-                        conditionKey: (condition || 'condition').toUpperCase(),
-                        scopeExit: st.kind === 'CONTINUE' ? null : terminal,
-                        summarySource: null, terminal: terminal, resumeSources: []
-                    };
-                    ctx.handlers.push(handlerFlow);
-                    db2Handlers.push(handlerFlow);
-                    if (st.kind !== 'CONTINUE')
-                        ctx.handlerExits.push({ id: terminal, label: st.kind === 'UNDO' ? 'undo' : 'handler exit' });
+            else if (handlerReachable[hbIndex]) {
+                if (rollbackMarker) {
+                    link(handlerMarkers[hbIndex], rollbackMarker);
+                    tryExits.push({ id: rollbackMarker });
                 }
-                return { entry: null, exits: [],
-                    endTemps: ambiguousCopy(hb && hb.endTemps) };
+                else
+                    tryExits.push({ id: handlerMarkers[hbIndex] });
             }
-            case 'return': {
-                var r = add('round', clip(joinToks(st.toks, 40), 40) || 'RETURN', 'ret', spanOfTokens(st.toks));
-                return { entry: r, exits: [] };
+            else {
+                unreachable[handlerMarkers[hbIndex]] = 1;
+                nodes.slice(handlerScopeMark).forEach(function (node) { unreachable[node.id] = 1; });
             }
-            case 'throw': {
-                var th = add('round', clip(joinToks(st.toks, 46), 46), 'err', spanOfTokens(st.toks));
-                if (dialect === 'plpgsql')
-                    pgErrors[th] = pgErrorFromRaise(st.toks);
-                return { entry: th, exits: [] };
+        }
+        Object.keys(handledRaisers).forEach(function (id) { guarded[id] = 1; });
+        return { entry: tstart, exits: tryExits,
+            endTemps: Object.keys(tryTemps).length ? tryTemps : null };
+    }
+    function emitHandler(st, ctx, depth, reachable) {
+        stats.cat++;
+        var condition = clip(joinToks(st.conds, 34), 34);
+        var hm = add('marker', st.kind + ' HANDLER FOR ' + condition, 'catch', spanOfTokens(st.conds));
+        /* Same-scope handlers do not handle conditions raised by one another. */
+        var hb = st.body ? emitList([st.body], ctx ? ctx.parent : null, depth + 1) : null;
+        if (hb && hb.entry)
+            link(hm, hb.entry);
+        var terminalText = st.kind === 'CONTINUE'
+            ? 'Resume after raising statement'
+            : (st.kind === 'UNDO' ? 'Undo and exit compound block' : 'Exit compound block');
+        var terminal = add('marker', terminalText, st.kind === 'CONTINUE' ? 'flowctl' : 'catch', null, null, 'DB2 handler terminal action');
+        joinExits(hb && hb.entry ? hb.exits : [{ id: hm }], terminal);
+        if (ctx) {
+            var handlerFlow = {
+                id: hm, kind: st.kind, label: condition || 'condition',
+                conditionKey: (condition || 'condition').toUpperCase(),
+                scopeExit: st.kind === 'CONTINUE' ? null : terminal,
+                summarySource: null, terminal: terminal, resumeSources: []
+            };
+            ctx.handlers.push(handlerFlow);
+            db2Handlers.push(handlerFlow);
+            if (st.kind !== 'CONTINUE')
+                ctx.handlerExits.push({ id: terminal, label: st.kind === 'UNDO' ? 'undo' : 'handler exit' });
+        }
+        return { entry: null, exits: [],
+            endTemps: ambiguousCopy(hb && hb.endTemps) };
+    }
+    function emitReturn(st, ctx, depth, reachable) {
+        var r = add('round', clip(joinToks(st.toks, 40), 40) || 'RETURN', 'ret', spanOfTokens(st.toks));
+        return { entry: r, exits: [] };
+    }
+    function emitThrow(st, ctx, depth, reachable) {
+        var th = add('round', clip(joinToks(st.toks, 46), 46), 'err', spanOfTokens(st.toks));
+        if (dialect === 'plpgsql')
+            pgErrors[th] = pgErrorFromRaise(st.toks);
+        return { entry: th, exits: [] };
+    }
+    function emitSqliteRaise(st, ctx, depth, reachable) {
+        var effects = {
+            IGNORE: 'abandon trigger/query; no rollback',
+            FAIL: 'stop statement; keep prior changes',
+            ABORT: 'roll back statement changes',
+            ROLLBACK: 'roll back transaction'
+        };
+        var sr = add('round', 'RAISE ' + st.action + ' — ' + effects[st.action], st.action === 'IGNORE' ? 'halt' : 'err', spanOfTokens(st.toks));
+        return { entry: sr, exits: [] };
+    }
+    function emitLoopControl(st, ctx, depth, reachable) {
+        var isBreak = st.type === 'break';
+        var L = findLoop(ctx, st.target);
+        var word = (st.word || (isBreak ? 'BREAK' : 'CONTINUE')).toUpperCase() + (st.target ? ' ' + st.target : '');
+        if (st.when && st.when.length) {
+            stats.branch++;
+            var dq = add('diamond', word + ' WHEN ' + clip(joinToks(st.when, 40), 40), 'cond', st.span);
+            if (L) {
+                if (isBreak)
+                    L.breaks.push({ id: dq, label: 'yes' });
+                else
+                    link(dq, L.cond, 'yes');
             }
-            case 'sqlite_raise': {
-                var effects = {
-                    IGNORE: 'abandon trigger/query; no rollback',
-                    FAIL: 'stop statement; keep prior changes',
-                    ABORT: 'roll back statement changes',
-                    ROLLBACK: 'roll back transaction'
-                };
-                var sr = add('round', 'RAISE ' + st.action + ' — ' + effects[st.action], st.action === 'IGNORE' ? 'halt' : 'err', spanOfTokens(st.toks));
-                return { entry: sr, exits: [] };
+            else if (st.target) {
+                var uq = add('rect', 'Unresolved label: ' + st.target, 'flowctl', null, null, 'unresolved ' + word.split(' ')[0].toLowerCase() + ' target');
+                link(dq, uq, 'goto', 'dotted');
             }
+            return { entry: dq, exits: [{ id: dq, label: 'no' }] };
+        }
+        var bn = add('rect', word, 'flowctl', st.span);
+        if (L) {
+            if (isBreak)
+                L.breaks.push({ id: bn });
+            else
+                link(bn, L.cond, 'continue');
+        }
+        else if (st.target) {
+            var ub = add('rect', 'Unresolved label: ' + st.target, 'flowctl', null, null, 'unresolved ' + word.split(' ')[0].toLowerCase() + ' target');
+            link(bn, ub, 'goto', 'dotted');
+        }
+        return { entry: bn, exits: [] };
+    }
+    function emitLabel(st, ctx, depth, reachable) {
+        var lb = add('marker', st.label + ':', 'flowctl', st.span);
+        labels[st.label.toUpperCase()] = lb;
+        return { entry: lb, exits: [{ id: lb }] };
+    }
+    function emitGoto(st, ctx, depth, reachable) {
+        var g = add('rect', 'GOTO ' + st.label, 'flowctl', st.span);
+        gotos.push({ from: g, to: st.label.toUpperCase(), label: st.label });
+        return { entry: g, exits: [] };
+    }
+    function emitOne(st, ctx, depth, reachable) {
+        switch (st.type) {
+            case 'block':
+                return emitBlock(st, ctx, depth, reachable);
+            case 'stmt':
+                return emitStmt(st, ctx, depth, reachable);
+            case 'dynamic':
+                return emitDynamic(st, ctx, depth, reachable);
+            case 'unknown':
+                return emitUnknown(st, ctx, depth, reachable);
+            case 'if':
+                return emitIf(st, ctx, depth, reachable);
+            case 'case':
+                return emitCase(st, ctx, depth, reachable);
+            case 'while':
+            case 'for':
+            case 'loop':
+                return emitIteration(st, ctx, depth, reachable);
+            case 'repeat':
+                return emitRepeat(st, ctx, depth, reachable);
+            case 'try':
+                return emitTry(st, ctx, depth, reachable);
+            case 'handler':
+                return emitHandler(st, ctx, depth, reachable);
+            case 'return':
+                return emitReturn(st, ctx, depth, reachable);
+            case 'throw':
+                return emitThrow(st, ctx, depth, reachable);
+            case 'sqlite_raise':
+                return emitSqliteRaise(st, ctx, depth, reachable);
             case 'break':
-            case 'continue': {
-                var isBreak = st.type === 'break';
-                var L = findLoop(ctx, st.target);
-                var word = (st.word || (isBreak ? 'BREAK' : 'CONTINUE')).toUpperCase() + (st.target ? ' ' + st.target : '');
-                if (st.when && st.when.length) {
-                    stats.branch++;
-                    var dq = add('diamond', word + ' WHEN ' + clip(joinToks(st.when, 40), 40), 'cond', st.span);
-                    if (L) {
-                        if (isBreak)
-                            L.breaks.push({ id: dq, label: 'yes' });
-                        else
-                            link(dq, L.cond, 'yes');
-                    }
-                    else if (st.target) {
-                        var uq = add('rect', 'Unresolved label: ' + st.target, 'flowctl', null, null, 'unresolved ' + word.split(' ')[0].toLowerCase() + ' target');
-                        link(dq, uq, 'goto', 'dotted');
-                    }
-                    return { entry: dq, exits: [{ id: dq, label: 'no' }] };
-                }
-                var bn = add('rect', word, 'flowctl', st.span);
-                if (L) {
-                    if (isBreak)
-                        L.breaks.push({ id: bn });
-                    else
-                        link(bn, L.cond, 'continue');
-                }
-                else if (st.target) {
-                    var ub = add('rect', 'Unresolved label: ' + st.target, 'flowctl', null, null, 'unresolved ' + word.split(' ')[0].toLowerCase() + ' target');
-                    link(bn, ub, 'goto', 'dotted');
-                }
-                return { entry: bn, exits: [] };
-            }
-            case 'label': {
-                var lb = add('marker', st.label + ':', 'flowctl', st.span);
-                labels[st.label.toUpperCase()] = lb;
-                return { entry: lb, exits: [{ id: lb }] };
-            }
-            case 'goto': {
-                var g = add('rect', 'GOTO ' + st.label, 'flowctl', st.span);
-                gotos.push({ from: g, to: st.label.toUpperCase(), label: st.label });
-                return { entry: g, exits: [] };
-            }
+            case 'continue':
+                return emitLoopControl(st, ctx, depth, reachable);
+            case 'label':
+                return emitLabel(st, ctx, depth, reachable);
+            case 'goto':
+                return emitGoto(st, ctx, depth, reachable);
         }
         return null;
     }
@@ -1632,7 +1529,15 @@ function analyse(sql, opts) {
         });
     }
     catch (err) {
+        /* Column flow is best-effort metadata, so a failure must not break the
+           analysis. It must not vanish silently either: the reader has to know the
+           column view is missing rather than empty. Same shape as the report
+           pipeline's `report_dataset_analysis_error`. */
         columnFlow = null;
+        diagnostics.push({ severity: 'warning', code: 'column_flow_analysis_error',
+            message: 'Column-flow analysis failed and was omitted: ' +
+                (err instanceof Error ? err.message : String(err)),
+            span: null, scope: 'document' });
     }
     if (columnFlow) {
         columnFlow.diagnostics.forEach(function (d) { diagnostics.push(d); });
@@ -1655,7 +1560,13 @@ function analyse(sql, opts) {
                 columnFlowGraph = buildColumnGraph(columnFlow);
             }
             catch (err) {
+                /* The model itself is still valid and still exported as columnFlow;
+                   only the rendered column graph is lost. Say so. */
                 columnFlowGraph = null;
+                diagnostics.push({ severity: 'warning', code: 'column_flow_analysis_error',
+                    message: 'Column-flow graph layout failed and was omitted; the column-flow model is still available: ' +
+                        (err instanceof Error ? err.message : String(err)),
+                    span: null, scope: 'document' });
             }
     }
     return { dialect: dialect, detected: det, confidence: confidence,

@@ -62,7 +62,7 @@
   }
   [100,250,500].forEach(function(count){
     var graph=scaleGraph(count), layout=layoutAnalysis(graph,'TD');
-    var positions=layoutDrawio(graph,'TD');
+    var positions=layout.positions;
     var xml=toDrawio(graph,{title:'scale-'+count,dir:'TD'});
     var parsed=new DOMParser().parseFromString(xml,'application/xml');
     record('dependency layout budget · '+count+' nodes',

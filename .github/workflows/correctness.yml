@@ -113,6 +113,18 @@ jobs:
             exit 1
           fi
 
+      - name: Check the runtime ships the current wordmark
+        shell: bash
+        run: |
+          # v3.0.0 renamed ProcFlow to SQL Cartographer and promised one
+          # consistent wordmark, but the app header still shipped "proc>flow"
+          # because the markup splits it across a <span class="caret">. A plain
+          # "procflow" grep misses that, so match the split form too.
+          if grep -REni 'proc\s*<span|proc&gt;|procflow' index.html erd.html styles.css src dist; then
+            echo "Runtime pages must ship the sql>cartographer wordmark."
+            exit 1
+          fi
+
       - name: Run browser suites (golden, fuzz, ui, erd-ui, security)
         run: npm test
 

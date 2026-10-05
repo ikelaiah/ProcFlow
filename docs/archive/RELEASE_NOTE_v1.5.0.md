@@ -70,4 +70,4 @@ external HTTP URLs.
 Verify critical dependencies, execution paths, transaction behavior, and
 security conclusions against the original SQL and target database.
 
-See [README.md](../README.md) for usage and development guidance.
+See [README.md](../../README.md) for usage and development guidance.

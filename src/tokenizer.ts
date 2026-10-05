@@ -7,7 +7,7 @@ var S = function(a: string[]): StringSet {
 /* ---------- tokeniser ---------- */
 function tokenize(sql: string): TokenList {
   var toks: TokenList=[], diagnostics: Diagnostic[]=[], i=0, n=sql.length, nl=true;
-  function issue(code: string, message: string, start: number, end: number): void {
+  function issue(code: DiagnosticCode, message: string, start: number, end: number): void {
     diagnostics.push({severity:'error',code:code,message:message,
                       span:{start:start,end:Math.max(start+1,Math.min(n,end))}});
   }

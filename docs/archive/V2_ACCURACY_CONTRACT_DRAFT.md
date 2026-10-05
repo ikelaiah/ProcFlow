@@ -1,6 +1,6 @@
 # ProcFlow v2 accuracy contract — superseded draft
 
-> Superseded by [V2_ACCURACY_CONTRACT.md](V2_ACCURACY_CONTRACT.md) in v2.0.0.
+> Superseded by [V2_ACCURACY_CONTRACT.md](../V2_ACCURACY_CONTRACT.md) in v2.0.0.
 > Retained to show the pre-qualification proposal and the evidence that was
 > required before promotion.
 

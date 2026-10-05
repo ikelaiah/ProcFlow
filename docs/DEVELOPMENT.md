@@ -79,6 +79,10 @@ contract and qualification evidence are complete.
 
 ## TypeScript and change discipline
 
+For the full change process — fixtures before fixes, the review axes, and the
+pre-PR checklist — see [CONTRIBUTING.md](../CONTRIBUTING.md). This section
+covers only the technical conventions.
+
 The application intentionally retains global-script compatibility for the
 runtime. A strict pilot covers the extracted confidence and large-input policy
 modules with `tsconfig.strict.json`; the legacy global code still has a

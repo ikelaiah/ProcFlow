@@ -114,7 +114,7 @@ function queryStateToJSON(state: ErdQuerySavedState): string {
 
 function queryStateFromJSON(text: string): ErdQueryStoreParseResult {
   var diagnostics: Diagnostic[]=[];
-  function fail(code: string, message: string): ErdQueryStoreParseResult {
+  function fail(code: DiagnosticCode, message: string): ErdQueryStoreParseResult {
     diagnostics.push({severity:'error',code:code,message:message,span:null,
                       scope:'document'});
     return {state:null,diagnostics:diagnostics};

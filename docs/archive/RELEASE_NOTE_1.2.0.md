@@ -3,7 +3,7 @@
 **Release date:** 2026-08-05
 
 This release delivers the **Trust statement boundaries** milestone from the
-[ROADMAP.md](../ROADMAP.md) (Workstream A in full, plus the E boundary
+[ROADMAP.md](../../ROADMAP.md) (Workstream A in full, plus the E boundary
 diagnostics it ships). Statement splitting no longer depends on newline
 position, semicolons are authoritative, numbers lex more completely, and
 uncertain dialect detection reports an explicit tie guardrail.
@@ -81,4 +81,4 @@ uncertain dialect detection reports an explicit tie guardrail.
   5.05 % on the prior 90-fixture corpus); no unknown-node fallbacks.
 
 See [RELEASE_NOTE_v1.2.0.md](RELEASE_NOTE_v1.2.0.md) for the release
-summary and [README.md](../README.md) for usage.
+summary and [README.md](../../README.md) for usage.

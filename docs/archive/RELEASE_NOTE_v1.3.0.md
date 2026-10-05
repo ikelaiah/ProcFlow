@@ -68,6 +68,6 @@ external HTTP URLs.
 Verify critical dependencies, execution paths, transaction behavior, and
 security conclusions against the original SQL and target database.
 
-See [README.md](../README.md) for usage and development guidance, and
+See [README.md](../../README.md) for usage and development guidance, and
 [RELEASE_NOTE_1.3.0.md](RELEASE_NOTE_1.3.0.md) for the detailed
 control-flow changes.

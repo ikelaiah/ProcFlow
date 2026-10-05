@@ -1,4 +1,7 @@
-/* sql-cartographer v2.7.0 — dialect transaction and error-state helpers.
+/* sql-cartographer v3.1.0 — dialect transaction and error-state model.
+   (Role introduced v2.7.0; the pure T-SQL transaction algebra moved here from
+   src/ir.ts in v3.1.0 so the bitmask model and the functions that operate on
+   it live together and can be tested without building a graph.)
    PL/pgSQL error-code mapping and handler matching, PL/pgSQL transaction
    legality assessment, and the T-SQL transaction-depth/XACT_STATE model.
    These are pure token/AST utilities extracted from ir.ts so the graph builder
@@ -161,8 +164,12 @@ function tsqlXactFunctionAt(toks: TokenList, start: number, end: number): boolea
          toks[start+1].v==='('&&toks[start+2].v===')';
 }
 
-function tsqlXactStateTest(toks: TokenList) {
-  var start=0, end=toks.length, changed=true;
+/* Narrow a token range by stripping balanced outer parentheses. Shared by the
+   XACT_STATE and @@TRANCOUNT condition tests so the two cannot drift apart in
+   how they read `((XACT_STATE() = 0))`. */
+function tsqlStripOuterParens(toks: TokenList, start: number, end: number):
+    {start: number; end: number} {
+  var changed=true;
   while(changed&&end-start>=2&&toks[start].v==='('&&toks[end-1].v===')'){
     changed=false;
     var depth=0;
@@ -175,6 +182,12 @@ function tsqlXactStateTest(toks: TokenList) {
       }
     }
   }
+  return {start:start, end:end};
+}
+
+function tsqlXactStateTest(toks: TokenList) {
+  var outer=tsqlStripOuterParens(toks,0,toks.length),
+      start=outer.start, end=outer.end;
   var op='', state=null;
   if(tsqlXactFunctionAt(toks,start,end)&&start+3<end){
     op=toks[start+3].v;
@@ -204,19 +217,8 @@ function tsqlXactStateTest(toks: TokenList) {
 }
 
 function tsqlTranCountTest(toks: TokenList) {
-  var start=0, end=toks.length, changed=true;
-  while(changed&&end-start>=2&&toks[start].v==='('&&toks[end-1].v===')'){
-    changed=false;
-    var depth=0;
-    for(var w=start;w<end;w++){
-      if(toks[w].v==='(') depth++;
-      else if(toks[w].v===')') depth--;
-      if(depth===0){
-        if(w===end-1){ start++; end--; changed=true; }
-        break;
-      }
-    }
-  }
+  var outer=tsqlStripOuterParens(toks,0,toks.length),
+      start=outer.start, end=outer.end;
   var op='', value=null, countFirst=false;
   if(toks[start]&&toks[start].u==='@@TRANCOUNT'&&start+2<end){
     op=toks[start+1].v;
@@ -238,13 +240,15 @@ function tsqlTranCountTest(toks: TokenList) {
     op=reversed[op];
   } else if(value.next!==end) return null;
 
-  var n=value.value, any: TsqlTransactionDepth={min:0,max:null};
-  var trueDepth: TsqlTransactionDepth=any, falseDepth: TsqlTransactionDepth=any;
+  /* `anyDepth` is the unconstrained reading: the statement tells us nothing
+     about @@TRANCOUNT here, so both branches inherit an open range. */
+  var n=value.value, anyDepth: TsqlTransactionDepth={min:0,max:null};
+  var trueDepth: TsqlTransactionDepth=anyDepth, falseDepth: TsqlTransactionDepth=anyDepth;
   if(op==='='){
     trueDepth={min:n,max:n};
-    falseDepth=n===0?{min:1,max:null}:any;
+    falseDepth=n===0?{min:1,max:null}:anyDepth;
   } else if(op==='<>'||op==='!='){
-    trueDepth=n===0?{min:1,max:null}:any;
+    trueDepth=n===0?{min:1,max:null}:anyDepth;
     falseDepth={min:n,max:n};
   } else if(op==='>'){
     trueDepth={min:n+1,max:null};
@@ -270,3 +274,145 @@ function tsqlTranCountTest(toks: TokenList) {
     falseDepth:falseDepth
   };
 }
+
+/* ===== T-SQL transaction state model =====
+   Pure functions over FlowContext, StatementNode, and TsqlTransactionDepth.
+   Extracted from src/ir.ts (v3.1.0) so the transaction algebra lives with the
+   TSQL_XACT_* bitmask model it operates on, and is testable without a graph.
+
+   The bitmask: TSQL_XACT_UNCOMMITTABLE=1, TSQL_XACT_NONE=2,
+   TSQL_XACT_COMMITTABLE=4, and TSQL_XACT_ALL is their union. @@TRANCOUNT can
+   be any of these, or a set of them when a branch is not statically resolved,
+   so states are held as a bit set and depth as an inclusive range. */
+  function currentXactStates(ctx: FlowContext | null): number {
+    while(ctx){
+      if(ctx.xactStates!==undefined) return ctx.xactStates;
+      ctx=ctx.parent;
+    }
+    return TSQL_XACT_ALL;
+  }
+
+  function currentTranDepth(ctx: FlowContext | null): TsqlTransactionDepth {
+    while(ctx){
+      if(ctx.tranDepth!==undefined) return ctx.tranDepth;
+      ctx=ctx.parent;
+    }
+    return {min:0,max:null};
+  }
+
+  function currentXactAbort(ctx: FlowContext | null): boolean | undefined {
+    while(ctx){
+      if(ctx.xactAbort!==undefined) return ctx.xactAbort;
+      ctx=ctx.parent;
+    }
+    return undefined;
+  }
+
+  function currentSavepoints(ctx: FlowContext | null): StringSet {
+    while(ctx){
+      if(ctx.savepoints!==undefined) return ctx.savepoints;
+      ctx=ctx.parent;
+    }
+    return {};
+  }
+
+  function currentPgSubtransaction(ctx: FlowContext | null): boolean {
+    while(ctx){
+      if(ctx.pgSubtransaction) return true;
+      ctx=ctx.parent;
+    }
+    return false;
+  }
+
+  function currentInCatch(ctx: FlowContext | null): boolean {
+    while(ctx){
+      if(ctx.inCatch) return true;
+      ctx=ctx.parent;
+    }
+    return false;
+  }
+
+  function withTsqlState(ctx: FlowContext | null, states: number,
+      tranDepth: TsqlTransactionDepth): FlowContext {
+    return {parent:ctx,handlers:[],handlerExits:[],
+            xactStates:states,tranDepth:tranDepth};
+  }
+
+  function xactStatesLabel(states: number): string {
+    if(states===TSQL_XACT_UNCOMMITTABLE) return '-1 · uncommittable';
+    if(states===TSQL_XACT_NONE) return '0 · no transaction';
+    if(states===TSQL_XACT_COMMITTABLE) return '1 · committable';
+    if(states===(TSQL_XACT_UNCOMMITTABLE|TSQL_XACT_COMMITTABLE))
+      return 'active · commit status unknown';
+    if(states===(TSQL_XACT_NONE|TSQL_XACT_COMMITTABLE)) return 'not uncommittable';
+    if(states===(TSQL_XACT_UNCOMMITTABLE|TSQL_XACT_NONE)) return 'not committable';
+    return states===0?'impossible':'any state';
+  }
+
+  function depthRangeLabel(range: TsqlTransactionDepth): string {
+    if(range.max!==null&&range.min>range.max) return 'impossible';
+    if(range.max===0) return 'depth 0 · no transaction';
+    if(range.min===1&&range.max===1) return 'depth 1 · outermost transaction';
+    if(range.min>=2&&range.max===null) return 'depth ≥'+range.min+' · nested transaction';
+    if(range.min===1&&range.max===null) return 'depth ≥1 · active transaction';
+    if(range.max===null) return 'depth ≥'+range.min;
+    if(range.min===range.max) return 'depth '+range.min;
+    return 'depth '+range.min+'–'+range.max;
+  }
+
+  function intersectDepth(a: TsqlTransactionDepth,
+      b: TsqlTransactionDepth): TsqlTransactionDepth {
+    var max=a.max===null?b.max:(b.max===null?a.max:Math.min(a.max,b.max));
+    return {min:Math.max(a.min,b.min),max:max};
+  }
+
+  function statesForDepth(range: TsqlTransactionDepth): number {
+    if(range.max!==null&&range.min>range.max) return 0;
+    if(range.max===0) return TSQL_XACT_NONE;
+    if(range.min>=1) return TSQL_XACT_UNCOMMITTABLE|TSQL_XACT_COMMITTABLE;
+    return TSQL_XACT_ALL;
+  }
+
+  function depthForStates(range: TsqlTransactionDepth, states: number): TsqlTransactionDepth {
+    if(states===0) return {min:1,max:0};
+    if((states&TSQL_XACT_NONE)===0) return intersectDepth(range,{min:1,max:null});
+    if((states&(TSQL_XACT_UNCOMMITTABLE|TSQL_XACT_COMMITTABLE))===0)
+      return intersectDepth(range,{min:0,max:0});
+    return range;
+  }
+
+  function tsqlTransactionAction(st: StatementNode) {
+    var toks=st.toks, head=toks.length?toks[0].u:'', i=1, target='';
+    if(head==='BEGIN'&&toks[i]&&toks[i].u==='DISTRIBUTED') i++;
+    if(toks[i]&&(toks[i].u==='TRAN'||toks[i].u==='TRANSACTION'||toks[i].u==='WORK')) i++;
+    if(head==='ROLLBACK'||head==='SAVE'||head==='SAVEPOINT'){
+      /* `ROLLBACK [TRAN[SACTION]] TO <savepoint>` spells its target after the
+         TO keyword, while SAVE/SAVEPOINT take it directly. Skipping TO here is
+         what makes `ROLLBACK TO my_sp` name `my_sp`; without it the keyword is
+         read as the savepoint name. */
+      if(toks[i]&&toks[i].u==='TO') i++;
+      if(toks[i]) target=toks[i].v;
+    }
+    return {
+      kind:head==='BEGIN'?'begin':(head==='COMMIT'?'commit':
+           (head==='ROLLBACK'?'rollback':
+           ((head==='SAVE'||head==='SAVEPOINT')?'save':''))),
+      target:target,
+      staticTarget:!!target&&target.charAt(0)!=='@'
+    };
+  }
+
+  function invalidTsqlTransactionAction(st: StatementNode,
+      ctx: FlowContext | null): boolean {
+    var states=currentXactStates(ctx), head=st.toks.length?st.toks[0].u:'';
+    if(head==='COMMIT')
+      return states===TSQL_XACT_UNCOMMITTABLE||states===TSQL_XACT_NONE;
+    if(head==='ROLLBACK') return states===TSQL_XACT_NONE;
+    if(head==='SAVE'||head==='SAVEPOINT')
+      return states===TSQL_XACT_UNCOMMITTABLE||states===TSQL_XACT_NONE;
+    return false;
+  }
+
+  function tsqlStatefulStatement(st: StatementNode): boolean {
+    return st.toks.length>=2&&st.toks[0].u==='SET'&&st.toks[1].u==='XACT_ABORT';
+  }

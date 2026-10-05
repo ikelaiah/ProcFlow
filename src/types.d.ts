@@ -6,6 +6,79 @@ type DiagramDirection = 'TD' | 'LR';
 type DiagramMode = 'auto' | 'flow' | 'query';
 type DiagnosticSeverity = 'error' | 'warning' | 'info';
 type DiagnosticScope = 'document' | 'region';
+
+/* Every diagnostic code the analyser can emit. This is a closed vocabulary:
+   adding a code is a deliberate, reviewable act, and a typo is a compile error
+   rather than a message that silently never matches a test.
+
+   Codes are stable identifiers — see the v2 accuracy contract. Removing or
+   changing the meaning of a code needs a compatibility mapping or a major
+   version notice. Grouped by the module that owns the concept. */
+type DiagnosticCode =
+  /* tokenizer — lexical boundaries that do not close */
+  | 'unterminated_comment'
+  | 'unterminated_dollar_quote'
+  | 'unterminated_string'
+  | 'unterminated_identifier'
+  | 'unexpected_closing_parenthesis'
+  | 'unclosed_parenthesis'
+  /* dialects — batch and statement structure */
+  | 'unexpected_end'
+  | 'missing_end'
+  | 'unconsumed_input'
+  | 'parser_guard_exhausted'
+  | 'goto_unresolved'
+  | 'dialect_ambiguous'
+  | 'dialect_low_confidence'
+  | 'dynamic_sql'
+  /* dialects-state — transaction and error-state modelling */
+  | 'plpgsql_savepoint_unsupported'
+  | 'plpgsql_transaction_context'
+  | 'plpgsql_transaction_context_required'
+  | 'plpgsql_transaction_in_exception_scope'
+  | 'plpgsql_transaction_start_unsupported'
+  /* ir and lineage — graph construction and query structure */
+  | 'source_opaque'
+  | 'temp_flow_ambiguous'
+  | 'cte_recursive'
+  | 'cte_recursion_approx'
+  | 'apply_heuristic'
+  /* columns and columnflow — column resolution */
+  | 'column_opaque'
+  | 'column_ambiguous'
+  | 'column_flow_opaque'
+  | 'column_flow_analysis_error'
+  /* catalogue */
+  | 'catalogue_parse_error'
+  | 'catalogue_empty'
+  | 'catalogue_partial'
+  | 'catalogue_conflict'
+  /* report import */
+  | 'report_parse_error'
+  | 'report_not_report'
+  | 'report_empty'
+  | 'report_dataset_unresolved'
+  | 'report_dataset_analysis_error'
+  /* schema and ERD */
+  | 'schema_empty'
+  | 'schema_duplicate_entity'
+  | 'schema_duplicate_column'
+  | 'schema_unparsed_statement'
+  | 'schema_ignored_statement'
+  | 'schema_columns_unknown'
+  | 'schema_alter_unknown_table'
+  | 'schema_unresolved_reference'
+  | 'schema_ambiguous_reference'
+  | 'erd_layout_parse_error'
+  | 'erd_layout_format_error'
+  | 'erd_layout_version_error'
+  | 'erd_query_parse_error'
+  | 'erd_query_format_error'
+  | 'erd_query_version_error'
+  | 'erd_query_entries_ignored'
+  /* query builder */
+  | 'disconnected';
+
 type NodeProvenance = 'source' | 'external' | 'synthetic';
 type EdgeKind = 'control' | 'exception' | 'data' | 'dependency' | 'call';
 type QueryReferenceRole = 'read' | 'write' | 'call' | 'produce';
@@ -18,7 +91,7 @@ interface SourceSpan {
 
 interface Diagnostic {
   severity: DiagnosticSeverity;
-  code: string;
+  code: DiagnosticCode;
   message: string;
   span: SourceSpan | null;
   scope?: DiagnosticScope;
@@ -225,7 +298,7 @@ interface PgErrorCondition {
 interface PgTransactionAssessment {
   invalid: boolean;
   label: string;
-  code: string | null;
+  code: DiagnosticCode | null;
   severity: DiagnosticSeverity | null;
   message: string;
 }
@@ -1322,6 +1395,11 @@ interface Window {
     layoutTotal: number;
   };
   SQL_CARTOGRAPHER_COLUMNFLOW_DETAIL?: Array<{name: string; pass: boolean; detail: unknown}>;
+  /* v3.1.0 transaction-state suite results (pure T-SQL transaction algebra
+     extracted from src/ir.ts), published for the golden and metrics pages. */
+  SQL_CARTOGRAPHER_XACTSTATE_PASS?: boolean;
+  SQL_CARTOGRAPHER_XACTSTATE_RESULT?: {passed: number; total: number};
+  SQL_CARTOGRAPHER_XACTSTATE_DETAIL?: Array<{name: string; pass: boolean; detail: unknown}>;
   /* v1.12.0 report-import suite results (SSRS/RDL parse, report→dataset
      linking, XML source locations, and region/document-scoped diagnostics),
      published for the golden and metrics pages. */

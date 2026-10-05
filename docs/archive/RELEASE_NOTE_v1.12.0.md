@@ -94,4 +94,4 @@ snapshot is current.
 Verify critical dependencies and report findings against the original RDL and
 the target report server.
 
-See [README.md](../README.md) for usage and development guidance.
+See [README.md](../../README.md) for usage and development guidance.

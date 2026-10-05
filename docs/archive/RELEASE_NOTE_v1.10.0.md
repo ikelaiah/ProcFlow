@@ -91,4 +91,4 @@ snapshot is current.
 Verify critical column bindings and dependency conclusions against the original
 SQL and the target database.
 
-See [README.md](../README.md) for usage and development guidance.
+See [README.md](../../README.md) for usage and development guidance.

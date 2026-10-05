@@ -22,7 +22,7 @@ connection, sign-in, or installation is required.
 > database compiler. Treat diagrams as investigation aids and verify important
 > findings against the source SQL and target database.
 
-> **Trust model:** SQL Cartographer v3.0.0 asserts semantic relationships only where
+> **Trust model:** SQL Cartographer v3.1.0 asserts semantic relationships only where
 > static evidence supports them. Dynamic and ambiguous regions stay explicit.
 > See [Accuracy](docs/ACCURACY.md) and the [v2 accuracy contract](docs/V2_ACCURACY_CONTRACT.md).
 
@@ -48,16 +48,20 @@ connection, sign-in, or installation is required.
 
 ## Quick start
 
-1. Download the `v3.0.0` runtime ZIP from the [GitHub release](https://github.com/ikelaiah/sql-cartographer/releases/tag/v3.0.0), or clone this repository.
+1. Download the `v3.1.0` runtime ZIP from the [GitHub release](https://github.com/ikelaiah/sql-cartographer/releases/tag/v3.1.0), or clone this repository.
 2. Open `index.html` in a current Chromium, Firefox, or Edge browser.
 3. Paste SQL or import local files, select a dialect or **Auto**, and choose
    **Refresh**.
 4. Choose an object and scope, then inspect the source spans and diagnostics
    before relying on a relationship.
 
+![SQL Cartographer analysing a T-SQL procedure: the source editor on the left, the control-flow diagram on the right, and the confidence, coverage, diagnostics, and cyclomatic-complexity strip below](docs/assets/flow-analysis.png)
+
 For schema DDL, open `erd.html`, paste or import `CREATE TABLE` / `ALTER TABLE`
 statements (T-SQL, PostgreSQL, DB2, or SQLite), and review the declared
 entities and foreign keys. Highlights:
+
+![The ERD page: declared tables and a view as entity cards with primary, foreign, unique, and not-null key badges, joined by orthogonally routed relationship lines](docs/assets/erd-diagram.png)
 
 - **Explore:** drag the canvas to pan, drag cards to declutter relationship
   lines, and select a table to highlight and list its declared foreign keys
@@ -84,6 +88,8 @@ entities and foreign keys. Highlights:
   browser (explicit Save/Restore/Forget), exports and imports a versioned
   query file, and downloads the `.sql`. Joins are highlighted on the diagram,
   and the dialect-quoted SQL is ready to paste into a client such as DBeaver.
+
+  ![The ERD query builder floating window: picked-column chips, a join plan with a tagged bridge table and plain-language row policy, and the generated dialect-quoted SELECT](docs/assets/erd-query-builder.png)
 - **Honesty:** the ERD asserts declared constraints only. It never infers a
   relationship from query text, and unresolved references stay explicit.
 
@@ -117,7 +123,7 @@ in the browser.
 
 ## Supported dialects
 
-SQL Cartographer v3.0.0 supports Microsoft T-SQL, IBM DB2 SQL PL, PostgreSQL
+SQL Cartographer v3.1.0 supports Microsoft T-SQL, IBM DB2 SQL PL, PostgreSQL
 PL/pgSQL, and SQLite. Detection is automatic but can be overridden. Vendor
 extensions outside these tested constructs may produce diagnostics or reduced
 coverage; see [Accuracy](docs/ACCURACY.md).
@@ -132,8 +138,14 @@ suite, and hostile labels are escaped for diagram/XML output. Read the full
 
 ## Documentation
 
-- [User guide](docs/USER_GUIDE.md) — workflows, imports, filters, workspaces,
-  large inputs, and exports.
+Start at [docs/README.md](docs/README.md) — the documentation map, with a
+learning path for users, contributors, and reviewers.
+
+- [User guide](docs/USER_GUIDE.md) — first run, reading a diagram, workflows,
+  imports, filters, workspaces, large inputs, and exports.
+- [Query builder](docs/QUERY_BUILDER.md) — declared-evidence joins, bridge
+  tables, taught and self joins, SQL options, and limits.
+- [Glossary](docs/GLOSSARY.md) — the vocabulary the docs and the UI share.
 - [Accuracy](docs/ACCURACY.md) — confidence, coverage, diagnostics, and limits.
 - [Architecture](docs/ARCHITECTURE.md) — pipeline, modules, and invariants.
 - [Security](docs/SECURITY.md) — data handling and hostile-input boundaries.
@@ -145,24 +157,23 @@ suite, and hostile labels are escaped for diagram/XML output. Read the full
   status.
 - [v2 accuracy contract](docs/V2_ACCURACY_CONTRACT.md) — stable guarantees,
   semantics, compatibility, and qualification evidence.
-- [Query builder](docs/QUERY_BUILDER.md) — declared-evidence joins, taught and
-  self joins, SQL options, and limits.
 - [ADR-001](docs/decisions/ADR-001-declared-evidence-query-builder.md) — why
   the query builder only uses declared keys.
 - [ADR-002](docs/decisions/ADR-002-query-persistence.md) — why saved queries
   are explicit, versioned, and fingerprint-pruned.
 - [ADR-003](docs/decisions/ADR-003-aggregates-derive-group-by.md) — why
   aggregates derive their `GROUP BY` from the remaining picks.
-- [v3.0.0 release note](docs/releases/v3.0.0.md) — current release details.
-- [Roadmap](ROADMAP.md) — planned convergence work.
+- [v3.1.0 release note](docs/releases/v3.1.0.md) — current release details.
+- [Roadmap](ROADMAP.md) — the historical v1.x / v2.0 accuracy workstreams,
+  all shipped.
 
 ## Contributing
 
-Keep runtime code local-only, preserve source spans and conservative semantics,
-add deterministic fixtures for behavior changes, and rebuild `dist/` before a
-commit. Run the commands in [Development](docs/DEVELOPMENT.md), including the
-browser and package smoke suites. Use the issue forms for anonymised parser
-reports, bugs, and feature requests; never include confidential SQL.
+Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) — the
+non-negotiables, how to write a fixture before a fix, and the checklist a
+change must pass — then [Development](docs/DEVELOPMENT.md) for the commands.
+Use the issue forms for anonymised parser reports, bugs, and feature requests;
+never include confidential SQL.
 
 ## License
 

@@ -417,10 +417,6 @@ function layoutAnalysis(graph: Graph, dir?: DiagramDirection): LayoutAnalysis {
   };
 }
 
-function layoutDrawio(graph: Graph, dir?: DiagramDirection): Record<string, DrawioPosition> {
-  return layoutAnalysis(graph,dir).positions;
-}
-
 /* Deterministic routing for temp-table data edges: each such edge gets a pair of
    waypoints on a dedicated lane beyond the widest content, so the routed data
    flow never pierces a node box and stays separate from the control spine. */

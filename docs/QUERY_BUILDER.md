@@ -9,6 +9,21 @@ decision records are
 [ADR-002](decisions/ADR-002-query-persistence.md), and
 [ADR-003](decisions/ADR-003-aggregates-derive-group-by.md).
 
+## Contents
+
+- [The declared-evidence rule](#the-declared-evidence-rule)
+- [How joins are chosen](#how-joins-are-chosen)
+  - [Bridge tables](#bridge-tables)
+  - [When two paths tie](#when-two-paths-tie)
+- [Join direction and row policy](#join-direction-and-row-policy)
+- [Unjoinable picks](#unjoinable-picks)
+- [Self joins](#self-joins)
+- [SQL emission](#sql-emission)
+- [Aggregates and grouping](#aggregates-and-grouping)
+- [Saving, exporting, and restoring](#saving-exporting-and-restoring)
+- [What it never does](#what-it-never-does)
+- [Verification](#verification)
+
 ## The declared-evidence rule
 
 Every join comes from a declared `PRIMARY KEY`, `UNIQUE`, or `FOREIGN KEY`
@@ -41,9 +56,45 @@ joined and tagged, but their columns are never selected. Because ties keep
 declaration order, the same schema plus the same picks always produce the same
 plan and SQL.
 
-When several shortest paths tie, the plan lists them under "Two declared paths
-reach …". The first declared constraint is used until you pick another; the
-choice only changes which constraint is followed, never invents an edge.
+### Bridge tables
+
+A bridge table is the price of reaching a picked table through declared
+evidence. It is joined, tagged in the plan, and its columns are never selected.
+
+```mermaid
+flowchart LR
+    subgraph picked["Picked columns"]
+        C["customer<br/><i>Email</i>"]
+        I["invoice<br/><i>Total</i>"]
+    end
+    OH["orderheader<br/><b>bridge table</b><br/>joined, never selected"]
+    C -- "customer.customerid<br/>= orderheader.customerid" --> OH
+    OH -- "orderheader.orderid<br/>= invoice.orderid" --> I
+```
+
+You asked for `customer.Email` and `invoice.Total`. Nothing declares
+`customer` to `invoice` directly, so the plan routes through `orderheader`,
+which you never picked. It appears in the `FROM`/`JOIN` list with a **bridge**
+tag and contributes no columns to the `SELECT`.
+
+### When two paths tie
+
+When several shortest paths reach the same table, the plan lists them under
+"Two declared paths reach …". The first declared constraint is used until you
+pick another; the choice only changes which constraint is followed, never
+invents an edge.
+
+```mermaid
+flowchart LR
+    O["orderheader"]
+    C["customer"]
+    O -- "constraint A<br/>orderheader.customerid → customer.customerid<br/><b>used first</b>" --> C
+    O -- "constraint B<br/>orderheader.altcustomerid → customer.customerid<br/><i>listed as an alternative</i>" --> C
+```
+
+Both edges are real declared foreign keys, so both are shown. Neither is
+hidden, and choosing B produces a different, equally valid plan — it does not
+create a relationship the DDL never declared.
 
 ## Join direction and row policy
 
@@ -87,6 +138,14 @@ added twice: the primary alias and a `_2` alias (for example `customer` and
 lets you tick which ones read from the second copy. The SQL header documents
 the alias as `second copy, self join: <columns>`. Only one self join per table
 is applied; a second one is reported and ignored.
+
+```mermaid
+flowchart LR
+    A["customer<br/>primary alias<br/><i>picked: Email</i>"]
+    B["customer_2<br/>second copy, self join<br/><i>picked: Email</i>"]
+    A -- "customer.managerid<br/>= customer_2.customerid" --> B
+    A --- |each picked column is ticked<br/>for either copy, your choice| B
+```
 
 Self joins only apply to a table that already has a picked column. A self join
 on an unpicked table is ignored with a warning.

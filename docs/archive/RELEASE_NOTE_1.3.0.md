@@ -3,7 +3,7 @@
 **Release date:** 2026-08-06
 
 This release delivers the **Trust procedural control flow** milestone from
-[ROADMAP.md](../ROADMAP.md) (Workstream B in full). Procedural control flow is
+[ROADMAP.md](../../ROADMAP.md) (Workstream B in full). Procedural control flow is
 now resolved and verified end to end: mixed `IF`/`WHILE` forms parse into a
 single AST, labelled loop-control and `GOTO` are validated with source spans,
 cursor queries join the query graphs, and DB2 `ATOMIC` blocks carry a rollback
@@ -120,4 +120,4 @@ condition, and block exits flow to the next statement.
 - Catalogue, columns, and RDL → v1.9.0+
 
 See [RELEASE_NOTE_v1.3.0.md](RELEASE_NOTE_v1.3.0.md) for the release summary
-and [README.md](../README.md) for usage.
+and [README.md](../../README.md) for usage.

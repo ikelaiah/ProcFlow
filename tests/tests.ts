@@ -6,6 +6,26 @@
   function has(list: string[], value: string): boolean {
     return (list||[]).some(function(v){ return v.toUpperCase()===value.toUpperCase(); });
   }
+  /* A source span that is present, non-negative, and non-empty. The single
+     definition of "this diagnostic or node is inspectable in the source". */
+  function hasValidSpan(span: SourceSpan | null): boolean {
+    return !!span&&span.start>=0&&span.end>span.start;
+  }
+  /* Severities a reviewer must act on. Informational annotations are recorded
+     for provenance and deliberately do not count as findings. */
+  function findingCount(diags: Diagnostic[]): number {
+    return diags.filter(function(d){return d.severity==='warning'||d.severity==='error';}).length;
+  }
+  /* Does the reference list mention this object, case-insensitively. */
+  function refsInclude(list: StructuredQueryReference[], name: string): boolean {
+    return (list||[]).some(function(r){return r.name.toUpperCase()===name.toUpperCase();});
+  }
+  /* Analyse one statement and extract its structured query references. */
+  function queryRefsOf(sql: string, dialect: Dialect): QueryReferenceInfo {
+    var a=analyse(sql,{dialect:dialect, mode:'query', group:false, sources:true});
+    var stmt=a.ast.filter(function(n){return n.type==='stmt';})[0] as StatementNode;
+    return refsIn(stmt?stmt.toks:[]);
+  }
 
   SQL_CARTOGRAPHER_FIXTURES.forEach(function(f){
     try{
@@ -464,14 +484,11 @@
 
   /* v1.3.0: procedural control flow — labelled/GOTO spans, unresolved labels,
      cursor query graphs, DB2 ATOMIC scope, extended summarise, export parity. */
-  function spanOk31(span: SourceSpan | null): boolean {
-    return !!span&&span.start>=0&&span.end>span.start;
-  }
   try{
     var unresDiag=analyse('CREATE PROC dbo.und AS BEGIN GOTO nope; END',
       {dialect:'tsql',mode:'flow',group:false,sources:true});
     var hasGotoDiag=unresDiag.diagnostics.some(function(d){
-      return d.code==='goto_unresolved'&&d.scope==='region'&&spanOk31(d.span);
+      return d.code==='goto_unresolved'&&d.scope==='region'&&hasValidSpan(d.span);
     });
     var hasUnresNode=unresDiag.graph.nodes.some(function(n){
       return /Unresolved label: nope/.test(n.text);
@@ -489,9 +506,9 @@
     var spanGoto=analyse(spanSrc,
       {dialect:'tsql',mode:'flow',group:false,sources:true});
     var gotoSpans=spanGoto.graph.nodes.filter(function(n){return /^GOTO done/.test(n.text);})
-      .every(function(n){return spanOk31(n.source);});
+      .every(function(n){return hasValidSpan(n.source);});
     var labelSpans=spanGoto.graph.nodes.filter(function(n){return /^done:/.test(n.text);})
-      .every(function(n){return spanOk31(n.source);});
+      .every(function(n){return hasValidSpan(n.source);});
     record('v1.3.0 labelled loop-control and GOTO carry source spans',
       gotoSpans&&labelSpans,
       JSON.stringify(spanGoto.graph.nodes.map(function(n){return {text:n.text,src:n.source};})));
@@ -585,27 +602,15 @@
 
   /* v1.4.0: report every object a query touches — Workstream C structured
      references, read extraction, recursive CTE annotations, F export parity. */
-  function spanOk40(span: SourceSpan | null): boolean {
-    return !!span&&span.start>=0&&span.end>span.start;
-  }
-  function hasRef40(list: StructuredQueryReference[], name: string): boolean {
-    return (list||[]).some(function(r){return r.name.toUpperCase()===name.toUpperCase();});
-  }
-  function refsOf40(sql: string, dialect: Dialect): QueryReferenceInfo {
-    var a=analyse(sql,{dialect:dialect, mode:'query', group:false, sources:true});
-    var stmt=a.ast.filter(function(n){return n.type==='stmt';})[0] as StatementNode;
-    return refsIn(stmt?stmt.toks:[]);
-  }
-
   try{
-    var comma40=refsOf40('SELECT * FROM dbo.orders o, dbo.customers c, dbo.items i;','tsql');
+    var comma40=queryRefsOf('SELECT * FROM dbo.orders o, dbo.customers c, dbo.items i;','tsql');
     var commaNames40=comma40.structuredRefs.map(function(r){return r.name;});
     var commaOk40=commaNames40.length>=3&&
-      hasRef40(comma40.structuredRefs,'dbo.orders')&&
-      hasRef40(comma40.structuredRefs,'dbo.customers')&&
-      hasRef40(comma40.structuredRefs,'dbo.items')&&
+      refsInclude(comma40.structuredRefs,'dbo.orders')&&
+      refsInclude(comma40.structuredRefs,'dbo.customers')&&
+      refsInclude(comma40.structuredRefs,'dbo.items')&&
       comma40.structuredRefs.every(function(r){
-        return r.role==='read'&&r.resolution==='exact'&&spanOk40(r.span);
+        return r.role==='read'&&r.resolution==='exact'&&hasValidSpan(r.span);
       });
     record('v1.4.0 comma-separated sources in refsIn',
       commaOk40,JSON.stringify(comma40.structuredRefs));
@@ -614,15 +619,15 @@
   }
 
   try{
-    var apply40=refsOf40('SELECT a.id FROM dbo.a a CROSS APPLY dbo.fn(a.id) f;','tsql');
-    var tab40=refsOf40('SELECT * FROM dbo.doc d, UNNEST(d.ids) AS x(id);','plpgsql');
+    var apply40=queryRefsOf('SELECT a.id FROM dbo.a a CROSS APPLY dbo.fn(a.id) f;','tsql');
+    var tab40=queryRefsOf('SELECT * FROM dbo.doc d, UNNEST(d.ids) AS x(id);','plpgsql');
     var fnRef40=(apply40.structuredRefs||[]).filter(function(r){
       return r.name.toUpperCase()==='DBO.FN';})[0];
     var opaqueRef40=(tab40.structuredRefs||[]).filter(function(r){
       return r.resolution==='opaque';})[0];
-    var applyOk40=hasRef40(apply40.structuredRefs,'dbo.a')&&
-      !!fnRef40&&fnRef40.resolution==='heuristic'&&spanOk40(fnRef40.span);
-    var tabOk40=!!opaqueRef40&&opaqueRef40.role==='read'&&spanOk40(opaqueRef40.span);
+    var applyOk40=refsInclude(apply40.structuredRefs,'dbo.a')&&
+      !!fnRef40&&fnRef40.resolution==='heuristic'&&hasValidSpan(fnRef40.span);
+    var tabOk40=!!opaqueRef40&&opaqueRef40.role==='read'&&hasValidSpan(opaqueRef40.span);
     record('v1.4.0 APPLY and tabular functions as structured references',
       applyOk40&&tabOk40,
       JSON.stringify({apply:apply40.structuredRefs,tab:tab40.structuredRefs}));
@@ -654,7 +659,7 @@
       {dialect:'plpgsql',mode:'query',group:false,sources:true});
     var recInfo40=rec40.diagnostics.filter(function(d){return d.code==='cte_recursive';})[0];
     var hasRecInfo40=!!recInfo40&&recInfo40.severity==='info'&&
-      recInfo40.scope==='region'&&spanOk40(recInfo40.span);
+      recInfo40.scope==='region'&&hasValidSpan(recInfo40.span);
     var noRecWarn40=!rec40.diagnostics.some(function(d){
       return d.code==='cte_recursion_approx';});
     var recMarked40=rec40.graph.nodes.some(function(n){
@@ -662,7 +667,7 @@
     var approx40=analyse('WITH RECURSIVE r AS (SELECT 1 UNION ALL SELECT n+1 FROM r, GENERATE_SERIES(1,10) WHERE n<10) SELECT * FROM r;',
       {dialect:'plpgsql',mode:'query',group:false,sources:true});
     var approxWarn40=approx40.diagnostics.some(function(d){
-      return d.code==='cte_recursion_approx'&&d.severity==='warning'&&spanOk40(d.span);
+      return d.code==='cte_recursion_approx'&&d.severity==='warning'&&hasValidSpan(d.span);
     });
     record('v1.4.0 recursive CTE informational annotation and metadata',
       hasRecInfo40&&noRecWarn40&&recMarked40,
@@ -791,13 +796,7 @@
   /* v1.6.0: honest measurement — a versioned confidence formula derived from
      per-region signals, document-scoped findings with no fabricated spans,
      region diagnostics for every approximate resolution, and informational
-     annotations that never inflate the findings count. */
-  function findings160(diags: Diagnostic[]): number {
-    return diags.filter(function(d){return d.severity==='warning'||d.severity==='error';}).length;
-  }
-  function spanOk160(span: SourceSpan | null): boolean {
-    return !!span&&span.start>=0&&span.end>span.start;
-  }
+      annotations that never inflate the findings count. */
 
   try{
     var clean160=analyse('CREATE PROC dbo.clean160 AS BEGIN SELECT 1; SELECT 2; END',
@@ -854,11 +853,11 @@
     var apDiag160=apply160.diagnostics.filter(function(d){return d.code==='apply_heuristic';})[0];
     record('v1.6.0 opaque table-expression region diagnostic',
       !!opDiag160&&opDiag160.severity==='warning'&&opDiag160.scope==='region'&&
-        spanOk160(opDiag160.span)&&opTable160.confidence<1,
+        hasValidSpan(opDiag160.span)&&opTable160.confidence<1,
       JSON.stringify(opTable160.diagnostics));
     record('v1.6.0 partially resolved APPLY region diagnostic',
       !!apDiag160&&apDiag160.severity==='warning'&&apDiag160.scope==='region'&&
-        spanOk160(apDiag160.span)&&apply160.confidence<1,
+        hasValidSpan(apDiag160.span)&&apply160.confidence<1,
       JSON.stringify(apply160.diagnostics));
   }catch(err){
     record('v1.6.0 opaque table-expression region diagnostic',
@@ -874,10 +873,10 @@
       'END',
       {dialect:'tsql',mode:'flow',group:false,sources:true});
     var hasInfo160=rec160.diagnostics.some(function(d){
-      return d.code==='cte_recursive'&&d.severity==='info'&&spanOk160(d.span);
+      return d.code==='cte_recursive'&&d.severity==='info'&&hasValidSpan(d.span);
     });
     record('v1.6.0 informational annotations do not inflate the findings count',
-      hasInfo160&&findings160(rec160.diagnostics)===0,
+      hasInfo160&&findingCount(rec160.diagnostics)===0,
       JSON.stringify(rec160.diagnostics));
   }catch(err){
     record('v1.6.0 informational annotations do not inflate the findings count',
@@ -966,6 +965,21 @@
       window.SQL_CARTOGRAPHER_COLUMNFLOW_RESULT);
   }catch(err){
     record('v1.11.0 column-flow pipelines, exports, and column layout fixtures',
+      false,String(err&&err.stack||err));
+  }
+
+  /* v3.1.0: the T-SQL transaction state model lives in src/dialects-state.ts
+     as pure functions and is covered directly by tests/xact-state.ts. Gate the
+     golden page on them. */
+  try{
+    record('v3.1.0 T-SQL transaction state model fixtures',
+      window.SQL_CARTOGRAPHER_XACTSTATE_PASS===true&&
+        !!window.SQL_CARTOGRAPHER_XACTSTATE_RESULT&&
+        window.SQL_CARTOGRAPHER_XACTSTATE_RESULT.passed===
+          window.SQL_CARTOGRAPHER_XACTSTATE_RESULT.total,
+      window.SQL_CARTOGRAPHER_XACTSTATE_RESULT);
+  }catch(err){
+    record('v3.1.0 T-SQL transaction state model fixtures',
       false,String(err&&err.stack||err));
   }
 

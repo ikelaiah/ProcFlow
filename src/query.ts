@@ -31,8 +31,13 @@ var QUERY_DIALECT_LABELS: Record<QueryDialect, string> = {
    Nodes are selectable tables/views with declared columns. Edges are declared
    foreign keys: child = FK holder, parent = referenced key. External
    (unresolved) targets and objects without declared columns cannot be picked
-   or joined; they are listed in `skipped` so the UI can explain why. */
-function queryBuildGraph(result: SchemaResult): QueryGraph {
+   or joined; they are listed in `skipped` so the UI can explain why.
+
+   Not to be confused with `buildQueryGraph` in src/lineage.ts, which plots the
+   query *structure* of a statement (CTEs, reads, writes, subqueries) for the
+   flowchart. This one models declared schema relationships for the query
+   builder; that one models what a single statement does. */
+function queryBuildJoinGraph(result: SchemaResult): QueryGraph {
   var graph: QueryGraph={nodes:{},order:[],edges:[],skipped:[]};
   var entities=(result&&result.entities)||[];
   entities.forEach(function(entity){
@@ -317,7 +322,7 @@ function queryPathSummary(graph: QueryGraph, path: QueryPath): string {
 }
 
 function queryBuildPlan(input: QueryBuildInput): QueryPlan {
-  var graph=queryBuildGraph(input.result);
+  var graph=queryBuildJoinGraph(input.result);
   var warnings=queryManualEdges(graph,input.manual||[]);
   var plan: QueryPlan={graph:graph,selections:[],fromId:null,usedIds:[],joins:[],
     bridges:[],problems:[],ambiguities:[],warnings:warnings,education:[]};

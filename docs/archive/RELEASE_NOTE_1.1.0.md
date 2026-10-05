@@ -3,7 +3,7 @@
 **Release date:** 2026-08-04
 
 This release delivers the **Trustworthy semantic foundation** milestone from the
-[ROADMAP.md](../ROADMAP.md). It makes accuracy, uncertainty, and export parity
+[ROADMAP.md](../../ROADMAP.md). It makes accuracy, uncertainty, and export parity
 explicit in the model before expanding parser coverage in later releases.
 
 ## What's new

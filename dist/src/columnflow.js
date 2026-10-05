@@ -87,18 +87,18 @@ function cfSeedCatalogueObject(ctx, name) {
 /* Flatten a column reference through a tracked object to its ultimate origin.
    An ambiguous reaching definition or an unknown produced column yields an
    opaque result with a region-scoped diagnostic. */
-function cfTraceAgainstObject(O, col, span, ctx) {
-    if (!O || O.multi) {
+function cfTraceAgainstObject(obj, col, span, ctx) {
+    if (!obj || obj.multi) {
         ctx.seen.diagnostics.push({ severity: 'warning', code: 'column_flow_opaque',
-            message: 'Column reference "' + col + '" reads ' + (O ? ('"' + O.name + '"') : 'an object') +
+            message: 'Column reference "' + col + '" reads ' + (obj ? ('"' + obj.name + '"') : 'an object') +
                 ' whose reaching definition is ambiguous (conditional write or branch merge); the binding is left opaque.',
             span: span || null, scope: 'region' });
         return { resolution: 'opaque', source: null, sourceColumn: null, sourceSpan: null };
     }
-    var def = cfFindColumn(O.columns, col);
+    var def = cfFindColumn(obj.columns, col);
     if (!def) {
         ctx.seen.diagnostics.push({ severity: 'warning', code: 'column_flow_opaque',
-            message: 'Column "' + col + '" is not produced by any known definition of "' + O.name +
+            message: 'Column "' + col + '" is not produced by any known definition of "' + obj.name +
                 '"; its binding across statements is opaque.',
             span: span || null, scope: 'region' });
         return { resolution: 'opaque', source: null, sourceColumn: null, sourceSpan: null };
@@ -113,9 +113,9 @@ function cfTraceAgainstObject(O, col, span, ctx) {
 function cfTraceSource(cs, col, span, ctx) {
     if (!cs)
         return { resolution: 'opaque', source: null, sourceColumn: null, sourceSpan: null };
-    var O = cfObjectByRawName(ctx, cs.name);
-    if (O)
-        return cfTraceAgainstObject(O, col, span, ctx);
+    var obj = cfObjectByRawName(ctx, cs.name);
+    if (obj)
+        return cfTraceAgainstObject(obj, col, span, ctx);
     /* untracked cte/table: exact provenance at reference level */
     return { resolution: 'exact', source: cs.name, sourceColumn: col, sourceSpan: span };
 }
@@ -146,12 +146,12 @@ function cfDefineObject(ctx, stepId, name, columns, span) {
 }
 /* Record a consume edge from an object's reaching definition producer, if one
    exists, and drive the end-to-end pipeline edges. */
-function cfRecordConsume(ctx, stepId, O, names, span) {
-    var key = cfNorm(O.name);
+function cfRecordConsume(ctx, stepId, obj, names, span) {
+    var key = cfNorm(obj.name);
     var defStep = ctx.seen.defs[key];
     var anyOpaque = names.some(function (n) { return n.resolution === 'opaque'; });
     if (defStep && defStep !== stepId) {
-        ctx.seen.edges.push({ fromStep: defStep, toStep: stepId, object: O.name,
+        ctx.seen.edges.push({ fromStep: defStep, toStep: stepId, object: obj.name,
             columns: names.map(function (n) {
                 return { name: n.col, resolution: n.resolution,
                     span: n.span || null };
@@ -161,17 +161,17 @@ function cfRecordConsume(ctx, stepId, O, names, span) {
 }
 /* Record a step's consumption from a tracked/catalogue object and resolve the
    common consume resolution. Returns whether every name resolved exactly. */
-function cfConsumeObject(ctx, stepId, O, names, span, step) {
+function cfConsumeObject(ctx, stepId, obj, names, span, step) {
     if (!names.length)
         return;
     var resolved = names.map(function (n) {
-        var tr = cfTraceAgainstObject(O, n.col, n.span, ctx);
+        var tr = cfTraceAgainstObject(obj, n.col, n.span, ctx);
         return { col: n.col, span: n.span || null, resolution: tr.resolution };
     });
     var anyOpaque = resolved.some(function (r) { return r.resolution !== 'exact'; });
-    step.consumes.push({ object: O.name, names: resolved.map(function (r) { return r.col; }),
+    step.consumes.push({ object: obj.name, names: resolved.map(function (r) { return r.col; }),
         resolution: anyOpaque ? 'opaque' : 'exact', span: span });
-    cfRecordConsume(ctx, stepId, O, resolved, span);
+    cfRecordConsume(ctx, stepId, obj, resolved, span);
     if (anyOpaque)
         ctx.seen.opaqueCount++;
 }
@@ -180,17 +180,17 @@ function cfConsumeObject(ctx, stepId, O, names, span, step) {
    produce known columns (a T-SQL `col = expr` alias target is such a false
    candidate). When no binding matches, all are kept so the genuinely unknown
    reference stays opaque with a region diagnostic and never invents an edge. */
-function cfConsumeGroup(ctx, stepId, O, triples, span, step) {
-    var hasCols = (O.columns || []).length > 0;
+function cfConsumeGroup(ctx, stepId, obj, triples, span, step) {
+    var hasCols = (obj.columns || []).length > 0;
     var unknown = [];
     triples.forEach(function (t) {
-        if (hasCols && !cfFindColumn(O.columns, t.col))
+        if (hasCols && !cfFindColumn(obj.columns, t.col))
             unknown.push(t);
     });
     var kept = hasCols && unknown.length && unknown.length < triples.length
-        ? triples.filter(function (t) { return !!cfFindColumn(O.columns, t.col); })
+        ? triples.filter(function (t) { return !!cfFindColumn(obj.columns, t.col); })
         : triples;
-    cfConsumeObject(ctx, stepId, O, kept, span, step);
+    cfConsumeObject(ctx, stepId, obj, kept, span, step);
 }
 /* ---------- statement handlers ---------- */
 function cfSelect(st, step, ctx) {
@@ -210,18 +210,18 @@ function cfSelect(st, step, ctx) {
             var cs = cfSourceByKey(lin, b.source);
             if (!cs)
                 return;
-            var O = cfObjectByRawName(ctx, cs.name) || cfSeedCatalogueObject(ctx, cs.name);
-            if (!O)
+            var obj = cfObjectByRawName(ctx, cs.name) || cfSeedCatalogueObject(ctx, cs.name);
+            if (!obj)
                 return;
-            var key = cfNorm(O.name);
+            var key = cfNorm(obj.name);
             consumed[key] = consumed[key] || [];
             consumed[key].push({ col: b.column, span: b.span || null });
         });
     });
     Object.keys(consumed).forEach(function (key) {
-        var O = ctx.objects[key];
-        if (O)
-            cfConsumeGroup(ctx, step.id, O, consumed[key], span, step);
+        var obj = ctx.objects[key];
+        if (obj)
+            cfConsumeGroup(ctx, step.id, obj, consumed[key], span, step);
     });
     /* produces: SELECT ... INTO target */
     facts.writes.forEach(function (writeName) {
@@ -260,9 +260,9 @@ function cfInsert(st, step, ctx) {
     }
     if (selIx < 0) {
         /* INSERT ... VALUES: schema unknown unless the object is already defined. */
-        var O = cfLookupObject(ctx, target);
-        if (O && !O.multi) {
-            step.produces.push({ object: O.name, columns: O.columns.slice(), multi: false });
+        var obj = cfLookupObject(ctx, target);
+        if (obj && !obj.multi) {
+            step.produces.push({ object: obj.name, columns: obj.columns.slice(), multi: false });
         }
         else {
             ctx.seen.diagnostics.push({ severity: 'warning', code: 'column_flow_opaque',
@@ -354,17 +354,17 @@ function cfUpdate(st, step, ctx) {
     if (!target) {
         return;
     }
-    var O = cfLookupObject(ctx, target);
-    if (!O || O.multi) {
+    var obj = cfLookupObject(ctx, target);
+    if (!obj || obj.multi) {
         step.resolution = 'opaque';
         step.opaque = true;
         ctx.seen.opaqueCount++;
         return;
     }
     var sets = cfParseUpdateSets(toks);
-    var src = { key: O.name, name: O.name, alias: null, kind: 'table',
-        columns: O.columns.map(function (c) { return c.name; }),
-        columnsKnown: O.columns.length > 0, span: span };
+    var src = { key: obj.name, name: obj.name, alias: null, kind: 'table',
+        columns: obj.columns.map(function (c) { return c.name; }),
+        columnsKnown: obj.columns.length > 0, span: span };
     var reads = [];
     sets.forEach(function (s) {
         if (!s || !s.col)
@@ -373,8 +373,8 @@ function cfUpdate(st, step, ctx) {
         var bound = scan.bound.filter(function (b) { return b.source; });
         if (bound.length === 1 && bound[0].name) {
             reads.push({ col: bound[0].name, span: bound[0].span || null });
-            var origin = cfTraceAgainstObject(O, bound[0].name, bound[0].span || null, ctx);
-            O.columns.forEach(function (c) {
+            var origin = cfTraceAgainstObject(obj, bound[0].name, bound[0].span || null, ctx);
+            obj.columns.forEach(function (c) {
                 if (cfNorm(c.name) === cfNorm(s.col)) {
                     c.resolution = origin.resolution;
                     c.source = origin.source;
@@ -386,9 +386,9 @@ function cfUpdate(st, step, ctx) {
     });
     /* read-modify-write: the update consumes its own object first */
     if (reads.length)
-        cfConsumeGroup(ctx, step.id, O, reads, span, step);
-    step.produces.push({ object: O.name, columns: O.columns.slice(), multi: false });
-    cfDefineObject(ctx, step.id, O.name, O.columns.slice(), span);
+        cfConsumeGroup(ctx, step.id, obj, reads, span, step);
+    step.produces.push({ object: obj.name, columns: obj.columns.slice(), multi: false });
+    cfDefineObject(ctx, step.id, obj.name, obj.columns.slice(), span);
 }
 function cfParseUpdateSets(toks) {
     var d = 0, si = -1;
@@ -517,9 +517,9 @@ function cfMerge(st, step, ctx) {
        unchanged; the source is consumed but its column mapping is opaque here. */
     var facts = statementFacts(st.toks || [], false);
     var target = facts.writes[0];
-    var O = target ? cfLookupObject(ctx, target) : null;
-    if (O && !O.multi) {
-        step.produces.push({ object: O.name, columns: O.columns.slice(), multi: false });
+    var obj = target ? cfLookupObject(ctx, target) : null;
+    if (obj && !obj.multi) {
+        step.produces.push({ object: obj.name, columns: obj.columns.slice(), multi: false });
     }
     else if (target) {
         step.resolution = 'opaque';

@@ -1,4 +1,6 @@
-/* ===== v2.5.0 Usable local workspace (README post-v1.0.0 item 7) =====
+/* sql-cartographer v3.1.0 — usable local workspace and presentation filters.
+   (Role introduced v2.5.0; storage access consolidated v3.1.0.)
+
    Optional local workspace persistence and dependency filtering.
 
    Persistence is opt-in: nothing is ever written to storage automatically.
@@ -163,69 +165,79 @@ function workspaceLastError(): string | null {
    independent of the workspace snapshot and can be forgotten separately. */
 var ERD_LAYOUT_STORAGE_KEY = 'sql-cartographer.erd.layout';
 
-function writeErdLayout(text: string): boolean {
-  try {
-    window.localStorage.setItem(ERD_LAYOUT_STORAGE_KEY,text);
-    return true;
-  }catch(e){
-    return false;
-  }
-}
-
-function readErdLayout(): string | null {
-  try { return window.localStorage.getItem(ERD_LAYOUT_STORAGE_KEY); } catch(e){ return null; }
-}
-
-function hasStoredErdLayout(): boolean {
-  try { return !!window.localStorage.getItem(ERD_LAYOUT_STORAGE_KEY); } catch(e){ return false; }
-}
-
-function clearErdLayout(): void {
-  try { window.localStorage.removeItem(ERD_LAYOUT_STORAGE_KEY); } catch(e){}
-}
-
 /* v2.5.0 — ERD query persistence. Same opt-in rule again: one saved query per
    browser, explicit Save/Restore/Forget only, under its own key. Serialization
    and validation live in src/query-store.ts; this module owns storage. */
 var ERD_QUERY_STORAGE_KEY = 'sql-cartographer.erd.query';
 
-function writeErdQuery(text: string): boolean {
+/* ---- the only four ways this module touches browser storage ----
+   `window.localStorage` throws rather than returning a failure: quota
+   exceeded, disabled in private browsing, or blocked by policy. None of those
+   may break the app or surface a raw exception in the UI, so every access goes
+   through one of these four and degrades to its fallback as a returned value.
+
+   `storageClear` returns whether the entry is actually gone. A failed Forget
+   is deliberately not surfaced: in the only state where `removeItem` can throw
+   (storage unavailable) the matching Save has already failed and reported
+   itself, so the entry the user asked to forget was never written. Reporting
+   it again would be noise on top of an error the user has already been told
+   about. */
+function storageRead(key: string): string | null {
+  try { return window.localStorage.getItem(key); } catch(e){ return null; }
+}
+function storageWrite(key: string, text: string): boolean {
   try {
-    window.localStorage.setItem(ERD_QUERY_STORAGE_KEY,text);
+    window.localStorage.setItem(key,text);
     return true;
   }catch(e){
     return false;
   }
 }
+function storageHas(key: string): boolean {
+  try { return !!window.localStorage.getItem(key); } catch(e){ return false; }
+}
+function storageClear(key: string): boolean {
+  try { window.localStorage.removeItem(key); return true; } catch(e){ return false; }
+}
 
+function writeErdLayout(text: string): boolean {
+  return storageWrite(ERD_LAYOUT_STORAGE_KEY,text);
+}
+function readErdLayout(): string | null {
+  return storageRead(ERD_LAYOUT_STORAGE_KEY);
+}
+function hasStoredErdLayout(): boolean {
+  return storageHas(ERD_LAYOUT_STORAGE_KEY);
+}
+function clearErdLayout(): void {
+  storageClear(ERD_LAYOUT_STORAGE_KEY);
+}
+
+function writeErdQuery(text: string): boolean {
+  return storageWrite(ERD_QUERY_STORAGE_KEY,text);
+}
 function readErdQuery(): string | null {
-  try { return window.localStorage.getItem(ERD_QUERY_STORAGE_KEY); } catch(e){ return null; }
+  return storageRead(ERD_QUERY_STORAGE_KEY);
 }
-
 function hasStoredErdQuery(): boolean {
-  try { return !!window.localStorage.getItem(ERD_QUERY_STORAGE_KEY); } catch(e){ return false; }
+  return storageHas(ERD_QUERY_STORAGE_KEY);
 }
-
 function clearErdQuery(): void {
-  try { window.localStorage.removeItem(ERD_QUERY_STORAGE_KEY); } catch(e){}
+  storageClear(ERD_QUERY_STORAGE_KEY);
 }
 
 function hasSavedWorkspace(): boolean {
-  try { return !!window.localStorage.getItem(WORKSPACE_STORAGE_KEY); } catch(e){ return false; }
+  return storageHas(WORKSPACE_STORAGE_KEY);
 }
 
 function writeWorkspace(snapshot: WorkspaceSnapshot): boolean {
-  try {
-    window.localStorage.setItem(WORKSPACE_STORAGE_KEY,serializeWorkspace(snapshot));
-    WORKSPACE_LAST_ERROR=null;
-    return true;
-  }catch(e){
-    return false;
-  }
+  if(!storageWrite(WORKSPACE_STORAGE_KEY,serializeWorkspace(snapshot))) return false;
+  WORKSPACE_LAST_ERROR=null;
+  return true;
 }
 
 function clearWorkspace(): void {
-  try { window.localStorage.removeItem(WORKSPACE_STORAGE_KEY); } catch(e){}
+  storageClear(WORKSPACE_STORAGE_KEY);
   WORKSPACE_LAST_ERROR=null;
 }
 

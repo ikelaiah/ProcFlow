@@ -6,6 +6,17 @@
 > [CHANGELOG.md](CHANGELOG.md) and [docs/RELEASES.md](docs/RELEASES.md) for
 > what shipped.
 
+## Contents
+
+- [Guiding principles](#guiding-principles)
+- [Where accuracy is lost today](#where-accuracy-is-lost-today)
+- [Workstreams](#workstreams)
+- [Release plan — v1.1.0 through v2.0.0](#release-plan--v110-through-v200)
+- [Test and verification strategy](#test-and-verification-strategy)
+- [Metrics that matter](#metrics-that-matter)
+- [Non-goals](#non-goals)
+- [How to contribute](#how-to-contribute)
+
 This roadmap has one goal: **diagrams that accurately represent the logic flow
 of the SQL they are given.** Because SQL Cartographer is a heuristic, browser-only
 parser, accuracy is pursued on three fronts:
@@ -513,6 +524,10 @@ fixture corpus in CI; SQL Cartographer does not collect runtime telemetry or use
   about graph classes where crossings remain.
 
 ## How to contribute
+
+> Superseded by [CONTRIBUTING.md](CONTRIBUTING.md), which is the single home
+> for contribution guidance. The notes below describe the discipline this
+> roadmap required and still reflect the project's fixture rules.
 
 - Add a failing-before/passing-after fixture per item; prefer graph-edge
   assertions over counts.

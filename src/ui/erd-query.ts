@@ -721,7 +721,7 @@
       return;
     }
     buildIndexes(schema);
-    graph=queryBuildGraph(schema);
+    graph=queryBuildJoinGraph(schema);
     var valid: StringSet={};
     graph.order.forEach(function(id){ valid[id]=1; });
     picks=picks.filter(function(entry){

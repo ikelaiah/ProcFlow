@@ -474,6 +474,65 @@
       false,String(err&&err.stack||err));
   }
 
+  /* ---- F: a column-flow pipeline failure is never silent ----
+     Column flow is best-effort metadata, but a reader must be told when it is
+     missing. The outer guards in analyse() previously swallowed the failure and
+     returned no column flow at all with no diagnostic, which contradicts the
+     contract that unknown constructs stay explicit. These two fixtures force
+     each guard and require a document-scoped diagnostic naming the failure. */
+  try{
+    var realCF: any=(window as any).analyseColumnFlow;
+    (window as any).analyseColumnFlow=function(){ throw new Error('forced column-flow failure'); };
+    var degraded: AnalysisResult | null=null;
+    try{
+      degraded=analyse('CREATE PROC dbo.degrade AS BEGIN\n'+
+        '  SELECT id INTO #t FROM dbo.student;\n  SELECT id FROM #t;\nEND',
+        {dialect:'tsql',mode:'flow',group:false,sources:true});
+    }finally{
+      (window as any).analyseColumnFlow=realCF;
+    }
+
+    var reportDiag: Diagnostic | null=null;
+    ((degraded&&degraded.diagnostics)||[]).forEach(function(d){
+      if(d.code==='column_flow_analysis_error') reportDiag=d;
+    });
+    record('v3.1.0 a column-flow failure is reported, not swallowed',
+      !!reportDiag&&reportDiag.scope==='document'&&!!reportDiag.message,
+      {codes:(degraded&&degraded.diagnostics||[]).map(function(d){return d.code;}),
+       got:reportDiag&&{code:reportDiag.code, scope:reportDiag.scope,
+                        message:reportDiag.message}});
+  }catch(err){
+    record('v3.1.0 a column-flow failure is reported, not swallowed',
+      false,String(err&&err.stack||err));
+  }
+
+  try{
+    var realBCG: any=(window as any).buildColumnGraph;
+    (window as any).buildColumnGraph=function(){ throw new Error('forced graph failure'); };
+    var noGraph: AnalysisResult | null=null;
+    try{
+      noGraph=analyse('CREATE PROC dbo.nograph AS BEGIN\n'+
+        '  SELECT id INTO #t FROM dbo.student;\n  SELECT id FROM #t;\nEND',
+        {dialect:'tsql',mode:'flow',group:false,sources:true});
+    }finally{
+      (window as any).buildColumnGraph=realBCG;
+    }
+
+    var graphDiag: Diagnostic | null=null;
+    ((noGraph&&noGraph.diagnostics)||[]).forEach(function(d){
+      if(d.code==='column_flow_analysis_error') graphDiag=d;
+    });
+    /* the column-flow model itself must survive; only the export graph is lost */
+    var modelSurvives=!!(noGraph&&noGraph.columnFlow)&&
+      (noGraph!.columnFlow!.steps.length===2);
+    record('v3.1.0 a column-graph failure keeps the model and reports the gap',
+      modelSurvives&&!!graphDiag&&graphDiag.scope==='document',
+      {model:modelSurvives, codes:(noGraph&&noGraph.diagnostics||[]).map(function(d){return d.code;})});
+  }catch(err){
+    record('v3.1.0 a column-graph failure keeps the model and reports the gap',
+      false,String(err&&err.stack||err));
+  }
+
   var passed=results.filter(function(r){return r.pass;}).length;
   window.SQL_CARTOGRAPHER_COLUMNFLOW_RESULT={passed:passed,total:results.length,
     layoutPassed:layoutPassed,layoutTotal:layoutTotal};

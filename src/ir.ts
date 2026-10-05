@@ -81,49 +81,6 @@ function buildGraph(ast: AstNode[], header: SqlHeader,
     if(['COMMIT','ROLLBACK','SAVE','SAVEPOINT','RELEASE','BEGIN','START'].indexOf(h)>=0) return 'tran';
     return 'stmt';
   }
-  function currentXactStates(ctx: FlowContext | null): number {
-    while(ctx){
-      if(ctx.xactStates!==undefined) return ctx.xactStates;
-      ctx=ctx.parent;
-    }
-    return TSQL_XACT_ALL;
-  }
-  function currentTranDepth(ctx: FlowContext | null): TsqlTransactionDepth {
-    while(ctx){
-      if(ctx.tranDepth!==undefined) return ctx.tranDepth;
-      ctx=ctx.parent;
-    }
-    return {min:0,max:null};
-  }
-  function currentXactAbort(ctx: FlowContext | null): boolean | undefined {
-    while(ctx){
-      if(ctx.xactAbort!==undefined) return ctx.xactAbort;
-      ctx=ctx.parent;
-    }
-    return undefined;
-  }
-  function currentSavepoints(ctx: FlowContext | null): StringSet {
-    while(ctx){
-      if(ctx.savepoints!==undefined) return ctx.savepoints;
-      ctx=ctx.parent;
-    }
-    return {};
-  }
-  function currentPgSubtransaction(ctx: FlowContext | null): boolean {
-    while(ctx){
-      if(ctx.pgSubtransaction) return true;
-      ctx=ctx.parent;
-    }
-    return false;
-  }
-  function currentInCatch(ctx: FlowContext | null): boolean {
-    while(ctx){
-      if(ctx.inCatch) return true;
-      ctx=ctx.parent;
-    }
-    return false;
-  }
-
   /* ---------- temp-table data flow (Workstream D) ----------
      A consumer wires to its unique reaching definition: the most recent write
      on a provably linear path. Conditional writes and branch merges mark the
@@ -193,63 +150,6 @@ function buildGraph(ast: AstNode[], header: SqlHeader,
     mergeTempsMulti(out,from);
     return out;
   }
-  function withTsqlState(ctx: FlowContext | null, states: number,
-      tranDepth: TsqlTransactionDepth): FlowContext {
-    return {parent:ctx,handlers:[],handlerExits:[],
-            xactStates:states,tranDepth:tranDepth};
-  }
-  function xactStatesLabel(states: number): string {
-    if(states===TSQL_XACT_UNCOMMITTABLE) return '-1 · uncommittable';
-    if(states===TSQL_XACT_NONE) return '0 · no transaction';
-    if(states===TSQL_XACT_COMMITTABLE) return '1 · committable';
-    if(states===(TSQL_XACT_UNCOMMITTABLE|TSQL_XACT_COMMITTABLE))
-      return 'active · commit status unknown';
-    if(states===(TSQL_XACT_NONE|TSQL_XACT_COMMITTABLE)) return 'not uncommittable';
-    if(states===(TSQL_XACT_UNCOMMITTABLE|TSQL_XACT_NONE)) return 'not committable';
-    return states===0?'impossible':'any state';
-  }
-  function depthRangeLabel(range: TsqlTransactionDepth): string {
-    if(range.max!==null&&range.min>range.max) return 'impossible';
-    if(range.max===0) return 'depth 0 · no transaction';
-    if(range.min===1&&range.max===1) return 'depth 1 · outermost transaction';
-    if(range.min>=2&&range.max===null) return 'depth ≥'+range.min+' · nested transaction';
-    if(range.min===1&&range.max===null) return 'depth ≥1 · active transaction';
-    if(range.max===null) return 'depth ≥'+range.min;
-    if(range.min===range.max) return 'depth '+range.min;
-    return 'depth '+range.min+'–'+range.max;
-  }
-  function intersectDepth(a: TsqlTransactionDepth,
-      b: TsqlTransactionDepth): TsqlTransactionDepth {
-    var max=a.max===null?b.max:(b.max===null?a.max:Math.min(a.max,b.max));
-    return {min:Math.max(a.min,b.min),max:max};
-  }
-  function statesForDepth(range: TsqlTransactionDepth): number {
-    if(range.max!==null&&range.min>range.max) return 0;
-    if(range.max===0) return TSQL_XACT_NONE;
-    if(range.min>=1) return TSQL_XACT_UNCOMMITTABLE|TSQL_XACT_COMMITTABLE;
-    return TSQL_XACT_ALL;
-  }
-  function depthForStates(range: TsqlTransactionDepth, states: number): TsqlTransactionDepth {
-    if(states===0) return {min:1,max:0};
-    if((states&TSQL_XACT_NONE)===0) return intersectDepth(range,{min:1,max:null});
-    if((states&(TSQL_XACT_UNCOMMITTABLE|TSQL_XACT_COMMITTABLE))===0)
-      return intersectDepth(range,{min:0,max:0});
-    return range;
-  }
-  function tsqlTransactionAction(st: StatementNode) {
-    var toks=st.toks, head=toks.length?toks[0].u:'', i=1, target='';
-    if(head==='BEGIN'&&toks[i]&&toks[i].u==='DISTRIBUTED') i++;
-    if(toks[i]&&(toks[i].u==='TRAN'||toks[i].u==='TRANSACTION'||toks[i].u==='WORK')) i++;
-    if((head==='ROLLBACK'||head==='SAVE'||head==='SAVEPOINT')&&toks[i])
-      target=toks[i].v;
-    return {
-      kind:head==='BEGIN'?'begin':(head==='COMMIT'?'commit':
-           (head==='ROLLBACK'?'rollback':
-           ((head==='SAVE'||head==='SAVEPOINT')?'save':''))),
-      target:target,
-      staticTarget:!!target&&target.charAt(0)!=='@'
-    };
-  }
   function tsqlTransactionText(st: StatementNode, ctx: FlowContext | null): string {
     var out=textOf(st), states=currentXactStates(ctx), depth=currentTranDepth(ctx);
     if(!st.toks.length) return out;
@@ -307,19 +207,6 @@ function buildGraph(ast: AstNode[], header: SqlHeader,
         return textOf(st)+' — statement errors may leave transaction active'+catchNote;
     }
     return textOf(st);
-  }
-  function invalidTsqlTransactionAction(st: StatementNode,
-      ctx: FlowContext | null): boolean {
-    var states=currentXactStates(ctx), head=st.toks.length?st.toks[0].u:'';
-    if(head==='COMMIT')
-      return states===TSQL_XACT_UNCOMMITTABLE||states===TSQL_XACT_NONE;
-    if(head==='ROLLBACK') return states===TSQL_XACT_NONE;
-    if(head==='SAVE'||head==='SAVEPOINT')
-      return states===TSQL_XACT_UNCOMMITTABLE||states===TSQL_XACT_NONE;
-    return false;
-  }
-  function tsqlStatefulStatement(st: StatementNode): boolean {
-    return st.toks.length>=2&&st.toks[0].u==='SET'&&st.toks[1].u==='XACT_ABORT';
   }
   function applyTsqlStatementState(st: StatementNode, ctx: FlowContext): void {
     if(st.toks.length>=3&&st.toks[0].u==='SET'&&st.toks[1].u==='XACT_ABORT'){
@@ -519,10 +406,8 @@ function buildGraph(ast: AstNode[], header: SqlHeader,
             endSavepoints:local.savepoints||null};
   }
 
-  function emitOne(st: AstNode, ctx: FlowContext | null, depth: number,
+  function emitBlock(st: BlockNode, ctx: FlowContext | null, depth: number,
       reachable?: boolean): EmitResult | null {
-    switch(st.type){
-      case 'block': {
       if((st as any).atomic&&dialect==='db2'){
         var am=add('marker','BEGIN ATOMIC · rollback scope','try',null,null,
                    'DB2 ATOMIC block rollback scope');
@@ -544,9 +429,9 @@ function buildGraph(ast: AstNode[], header: SqlHeader,
                 endSavepoints:innerA.endSavepoints||null};
       }
       return emitList(st.body, ctx, depth);
-    }
-
-      case 'stmt': {
+  }
+  function emitStmt(st: StatementNode, ctx: FlowContext | null, depth: number,
+      reachable?: boolean): EmitResult | null {
         stats.stmt++;
         var statementKind=kindOf(st);
         var pgTransaction=dialect==='plpgsql'&&statementKind==='tran'
@@ -562,23 +447,23 @@ function buildGraph(ast: AstNode[], header: SqlHeader,
         var stmtWrites=reachable===false?null:flowTempFacts(st,id,ctx);
         return {entry:id, exits:invalidTransaction?[]:[{id:id}],
                 endTemps:stmtWrites};
-      }
-
-      case 'dynamic': {
+  }
+  function emitDynamic(st: DynamicSqlNode, ctx: FlowContext | null, depth: number,
+      reachable?: boolean): EmitResult | null {
         stats.stmt++; stats.opaque++;
         var dyn=add('rect', 'Dynamic SQL — '+clip(joinToks(st.toks,42),42),
                     'opaque', spanOfTokens(st.toks));
         return {entry:dyn, exits:[{id:dyn}]};
-      }
-
-      case 'unknown': {
+  }
+  function emitUnknown(st: UnknownNode, ctx: FlowContext | null, depth: number,
+      reachable?: boolean): EmitResult | null {
         stats.stmt++; stats.opaque++;
         var unknown=add('rect','Unresolved SQL — '+clip(joinToks(st.toks,42),42),
                         'opaque',spanOfTokens(st.toks));
         return {entry:unknown,exits:[{id:unknown}]};
-      }
-
-      case 'if': {
+  }
+  function emitIf(st: IfNode, ctx: FlowContext | null, depth: number,
+      reachable?: boolean): EmitResult | null {
         stats.branch++;
         var xactTest=dialect==='tsql'?tsqlXactStateTest(st.cond):null;
         var depthTest=dialect==='tsql'&&!xactTest?tsqlTranCountTest(st.cond):null;
@@ -619,9 +504,9 @@ function buildGraph(ast: AstNode[], header: SqlHeader,
         mergeTempsMulti(ifTemps,e&&e.endTemps);
         return {entry:c, exits:ex,
                 endTemps:Object.keys(ifTemps).length?ifTemps:null};
-      }
-
-      case 'case': {
+  }
+  function emitCase(st: CaseNode, ctx: FlowContext | null, depth: number,
+      reachable?: boolean): EmitResult | null {
         if(!st.branches.length){
           stats.stmt++;
           var cs=add('rect', clip('CASE '+joinToks(st.sel||[],44),52), 'stmt',
@@ -651,11 +536,9 @@ function buildGraph(ast: AstNode[], header: SqlHeader,
         } else if(prev) exits.push({id:prev, label:'no'});
         return {entry:entry, exits:exits,
                 endTemps:Object.keys(caseTemps).length?caseTemps:null};
-      }
-
-      case 'while':
-      case 'for':
-      case 'loop': {
+  }
+  function emitIteration(st: LoopNode, ctx: FlowContext | null, depth: number,
+      reachable?: boolean): EmitResult | null {
         stats.loop++;
         var txt = st.type==='while' ? clip(joinToks(st.cond,58),58)
                 : st.type==='for'   ? clip('for '+joinToks(st.head,54),58)
@@ -671,9 +554,9 @@ function buildGraph(ast: AstNode[], header: SqlHeader,
         var outs=inner.loop.breaks.slice();
         if(st.type!=='loop') outs.push({id:wc, label:'done'});
         return {entry:wc, exits:outs, endTemps:ambiguousCopy(body&&body.endTemps)};
-      }
-
-      case 'repeat': {
+  }
+  function emitRepeat(st: LoopNode, ctx: FlowContext | null, depth: number,
+      reachable?: boolean): EmitResult | null {
         stats.loop++;
         var rc=add('diamond', 'until '+clip(joinToks(st.cond,50),50), 'loop',
                    spanOfTokens(st.cond));
@@ -690,9 +573,9 @@ function buildGraph(ast: AstNode[], header: SqlHeader,
                   endTemps:ambiguousCopy(body2.endTemps)};
         }
         return {entry:rc, exits:[{id:rc, label:'yes'}]};
-      }
-
-      case 'try': {
+  }
+  function emitTry(st: TryNode, ctx: FlowContext | null, depth: number,
+      reachable?: boolean): EmitResult | null {
         stats.cat += st.handlers.length||1;
         var tstart=add('marker',
           dialect==='tsql'?'BEGIN TRY':
@@ -830,9 +713,9 @@ function buildGraph(ast: AstNode[], header: SqlHeader,
         Object.keys(handledRaisers).forEach(function(id){guarded[id]=1;});
         return {entry:tstart, exits:tryExits,
                 endTemps:Object.keys(tryTemps).length?tryTemps:null};
-      }
-
-      case 'handler': {
+  }
+  function emitHandler(st: Db2HandlerNode, ctx: FlowContext | null, depth: number,
+      reachable?: boolean): EmitResult | null {
         stats.cat++;
         var condition=clip(joinToks(st.conds,34),34);
         var hm=add('marker', st.kind+' HANDLER FOR '+condition, 'catch',
@@ -860,22 +743,22 @@ function buildGraph(ast: AstNode[], header: SqlHeader,
         }
         return {entry:null, exits:[],
                 endTemps:ambiguousCopy(hb&&hb.endTemps)};
-      }
-
-      case 'return': {
+  }
+  function emitReturn(st: ReturnNode, ctx: FlowContext | null, depth: number,
+      reachable?: boolean): EmitResult | null {
         var r=add('round', clip(joinToks(st.toks,40),40)||'RETURN', 'ret',
                   spanOfTokens(st.toks));
         return {entry:r, exits:[]};
-      }
-
-      case 'throw': {
+  }
+  function emitThrow(st: ThrowNode, ctx: FlowContext | null, depth: number,
+      reachable?: boolean): EmitResult | null {
         var th=add('round', clip(joinToks(st.toks,46),46), 'err',
                    spanOfTokens(st.toks));
         if(dialect==='plpgsql') pgErrors[th]=pgErrorFromRaise(st.toks);
         return {entry:th, exits:[]};
-      }
-
-      case 'sqlite_raise': {
+  }
+  function emitSqliteRaise(st: SqliteRaiseNode, ctx: FlowContext | null, depth: number,
+      reachable?: boolean): EmitResult | null {
         var effects: Record<SqliteRaiseAction, string>={
           IGNORE:'abandon trigger/query; no rollback',
           FAIL:'stop statement; keep prior changes',
@@ -885,10 +768,9 @@ function buildGraph(ast: AstNode[], header: SqlHeader,
         var sr=add('round','RAISE '+st.action+' — '+effects[st.action],
                    st.action==='IGNORE'?'halt':'err',spanOfTokens(st.toks));
         return {entry:sr,exits:[]};
-      }
-
-      case 'break':
-      case 'continue': {
+  }
+  function emitLoopControl(st: LoopControlNode, ctx: FlowContext | null, depth: number,
+      reachable?: boolean): EmitResult | null {
         var isBreak=st.type==='break';
         var L=findLoop(ctx, st.target);
         var word=(st.word||(isBreak?'BREAK':'CONTINUE')).toUpperCase()+(st.target?' '+st.target:'');
@@ -904,19 +786,58 @@ function buildGraph(ast: AstNode[], header: SqlHeader,
         if(L){ if(isBreak) L.breaks.push({id:bn}); else link(bn, L.cond, 'continue'); }
         else if(st.target){ var ub=add('rect','Unresolved label: '+st.target,'flowctl',null,null,'unresolved '+word.split(' ')[0].toLowerCase()+' target'); link(bn, ub, 'goto', 'dotted'); }
         return {entry:bn, exits:[]};
-      }
-
-      case 'label': {
+  }
+  function emitLabel(st: LabelNode, ctx: FlowContext | null, depth: number,
+      reachable?: boolean): EmitResult | null {
         var lb=add('marker', st.label+':', 'flowctl', st.span);
         labels[st.label.toUpperCase()]=lb;
         return {entry:lb, exits:[{id:lb}]};
-      }
-
-      case 'goto': {
+  }
+  function emitGoto(st: GotoNode, ctx: FlowContext | null, depth: number,
+      reachable?: boolean): EmitResult | null {
         var g=add('rect','GOTO '+st.label,'flowctl', st.span);
         gotos.push({from:g, to:st.label.toUpperCase(), label:st.label});
         return {entry:g, exits:[]};
-      }
+  }
+
+  function emitOne(st: AstNode, ctx: FlowContext | null, depth: number,
+      reachable?: boolean): EmitResult | null {
+    switch(st.type){
+      case 'block':
+        return emitBlock(st, ctx, depth, reachable);
+      case 'stmt':
+        return emitStmt(st, ctx, depth, reachable);
+      case 'dynamic':
+        return emitDynamic(st, ctx, depth, reachable);
+      case 'unknown':
+        return emitUnknown(st, ctx, depth, reachable);
+      case 'if':
+        return emitIf(st, ctx, depth, reachable);
+      case 'case':
+        return emitCase(st, ctx, depth, reachable);
+      case 'while':
+      case 'for':
+      case 'loop':
+        return emitIteration(st, ctx, depth, reachable);
+      case 'repeat':
+        return emitRepeat(st, ctx, depth, reachable);
+      case 'try':
+        return emitTry(st, ctx, depth, reachable);
+      case 'handler':
+        return emitHandler(st, ctx, depth, reachable);
+      case 'return':
+        return emitReturn(st, ctx, depth, reachable);
+      case 'throw':
+        return emitThrow(st, ctx, depth, reachable);
+      case 'sqlite_raise':
+        return emitSqliteRaise(st, ctx, depth, reachable);
+      case 'break':
+      case 'continue':
+        return emitLoopControl(st, ctx, depth, reachable);
+      case 'label':
+        return emitLabel(st, ctx, depth, reachable);
+      case 'goto':
+        return emitGoto(st, ctx, depth, reachable);
     }
     return null;
   }
@@ -1471,7 +1392,15 @@ function analyse(sql: string, opts?: AnalyseOptions): AnalysisResult {
       viewBodyTokens:(header.kind==='VIEW')?bodyToks:null
     });
   }catch(err){
+    /* Column flow is best-effort metadata, so a failure must not break the
+       analysis. It must not vanish silently either: the reader has to know the
+       column view is missing rather than empty. Same shape as the report
+       pipeline's `report_dataset_analysis_error`. */
     columnFlow=null;
+    diagnostics.push({severity:'warning', code:'column_flow_analysis_error',
+      message:'Column-flow analysis failed and was omitted: '+
+        (err instanceof Error?err.message:String(err)),
+      span:null, scope:'document'});
   }
   if(columnFlow){
     columnFlow.diagnostics.forEach(function(d){ diagnostics.push(d); });
@@ -1492,7 +1421,17 @@ function analyse(sql: string, opts?: AnalyseOptions): AnalysisResult {
       constructCoverage.opaque+=cfoO+cfeO;
     }
     if(columnFlow.steps.length||columnFlow.edges.length)
-      try{ columnFlowGraph=buildColumnGraph(columnFlow); }catch(err){ columnFlowGraph=null; }
+      try{
+        columnFlowGraph=buildColumnGraph(columnFlow);
+      }catch(err){
+        /* The model itself is still valid and still exported as columnFlow;
+           only the rendered column graph is lost. Say so. */
+        columnFlowGraph=null;
+        diagnostics.push({severity:'warning', code:'column_flow_analysis_error',
+          message:'Column-flow graph layout failed and was omitted; the column-flow model is still available: '+
+            (err instanceof Error?err.message:String(err)),
+          span:null, scope:'document'});
+      }
   }
 
   return {dialect:dialect, detected:det, confidence:confidence,
