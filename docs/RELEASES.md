@@ -45,12 +45,13 @@ match `package.json`.
 
 ## Current release
 
-[v2.7.0 — Maintainability pass](releases/v2.7.0.md)
+[v3.0.0 — Rename and identifier reset](releases/v3.0.0.md)
 
 ## Historical releases
 
 Canonical notes, newest first:
 
+- [v2.7.0](releases/v2.7.0.md)
 - [v2.6.0](releases/v2.6.0.md)
 - [v2.5.0](releases/v2.5.0.md)
 - [v2.4.0](releases/v2.4.0.md)
