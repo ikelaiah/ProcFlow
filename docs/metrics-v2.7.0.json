@@ -1,5 +1,5 @@
 {
-  "generator": "proc&gt;flow fixture-corpus metrics (deterministic, fixture-only)",
+  "generator": "sql-cartographer fixture-corpus metrics (deterministic, fixture-only)",
   "formulaVersion": "1.6.0",
   "corpus": {
     "golden": 109,
