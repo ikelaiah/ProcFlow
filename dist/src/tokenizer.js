@@ -1,5 +1,5 @@
 "use strict";
-/* proc>flow: tokenization and source positions */
+/* sql-cartographer: tokenization and source positions */
 var S = function (a) {
     var o = {};
     for (var i = 0; i < a.length; i++)

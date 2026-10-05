@@ -1,4 +1,4 @@
-/* proc>flow v2.6.0 — ERD query-builder panel.
+/* sql-cartographer v2.6.0 — ERD query-builder panel.
    Query mode turns column rows on the diagram cards into checkboxes and shows
    a floating window with the SQL, the join plan, and any unjoinable picks.
    Join problems are never resolved silently: each one offers teach-the-join,
@@ -387,7 +387,7 @@
     }
     if(statusEl) statusEl.textContent=statusMessage();
     if(bodyEl) bodyEl.scrollTop=scrollTop;
-    document.dispatchEvent(new CustomEvent('procflow-query-changed'));
+    document.dispatchEvent(new CustomEvent('sql-cartographer-query-changed'));
   }
 
   /* Live regions re-announce their whole subtree, so the panel publishes one
@@ -561,7 +561,7 @@
     var text=sqlEl.textContent||'';
     if(!text||text.indexOf('-- Pick')===0) return;
     var base=schema?queryFileBaseName(queryStateBuild(schema,currentStoreInput()))
-                   :'procflow-query';
+                   :'sql-cartographer-query';
     downloadText(base+'.sql',text,'text/plain');
     setStoreStatus('Downloaded '+base+'.sql.');
     closeQueryMenu();
@@ -702,7 +702,7 @@
       if(commentsEl) commentsEl.checked=withComments;
       sqlEl.textContent='';
     }
-    document.dispatchEvent(new CustomEvent('procflow-query-mode',{detail:{active:on}}));
+    document.dispatchEvent(new CustomEvent('sql-cartographer-query-mode',{detail:{active:on}}));
     refresh();
     if(on&&!picks.length&&typeof hasStoredErdQuery==='function'&&
        hasStoredErdQuery()){

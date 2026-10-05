@@ -1,4 +1,4 @@
--- proc>flow v2.1.0 — DB2 ERD sample (8 tables, 4 views).
+-- sql-cartographer v2.1.0 — DB2 ERD sample (8 tables, 4 views).
 -- Tables EMPLOYEE (2) and ORDERS (4) are related through the employee who
 -- took the order. AUDIT_LOG and APP_SETTINGS are standalone: nothing
 -- references them and they reference nothing.

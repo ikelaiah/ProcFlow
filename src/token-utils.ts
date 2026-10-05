@@ -1,4 +1,4 @@
-/* proc>flow v2.7.0 — shared token and AST helpers.
+/* sql-cartographer v2.7.0 — shared token and AST helpers.
    Pure, side-effect-free utilities used across graph construction, column
    lineage, and export: token joining/spans, identifier quoting, statement
    summarisation, Mermaid label escaping, AST traversal, and name dedup.

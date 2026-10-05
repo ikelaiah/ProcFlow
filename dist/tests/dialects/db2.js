@@ -1,6 +1,6 @@
 "use strict";
 /* DB2 SQL PL fixtures whose assertions describe control-flow edges, not just counts. */
-var PROCFLOW_DB2_GRAPH_FIXTURES = [
+var SQL_CARTOGRAPHER_DB2_GRAPH_FIXTURES = [
     {
         name: 'DB2 graph · EXIT handler scope',
         dialect: 'db2',
@@ -314,6 +314,6 @@ var PROCFLOW_DB2_GRAPH_FIXTURES = [
         }
     }
 ];
-var PROCFLOW_GRAPH_FIXTURES = PROCFLOW_DB2_GRAPH_FIXTURES.slice();
-PROCFLOW_FIXTURES = PROCFLOW_FIXTURES.concat(PROCFLOW_DB2_GRAPH_FIXTURES);
+var SQL_CARTOGRAPHER_GRAPH_FIXTURES = SQL_CARTOGRAPHER_DB2_GRAPH_FIXTURES.slice();
+SQL_CARTOGRAPHER_FIXTURES = SQL_CARTOGRAPHER_FIXTURES.concat(SQL_CARTOGRAPHER_DB2_GRAPH_FIXTURES);
 //# sourceMappingURL=db2.js.map

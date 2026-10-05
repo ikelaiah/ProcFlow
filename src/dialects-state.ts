@@ -1,4 +1,4 @@
-/* proc>flow v2.7.0 — dialect transaction and error-state helpers.
+/* sql-cartographer v2.7.0 — dialect transaction and error-state helpers.
    PL/pgSQL error-code mapping and handler matching, PL/pgSQL transaction
    legality assessment, and the T-SQL transaction-depth/XACT_STATE model.
    These are pure token/AST utilities extracted from ir.ts so the graph builder

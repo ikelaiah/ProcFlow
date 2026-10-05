@@ -1,4 +1,4 @@
-/* proc>flow v1.13.0 — report intelligence (report → dataset → object → column
+/* sql-cartographer v1.13.0 — report intelligence (report → dataset → object → column
    dependency views, built on the v1.9.0 catalogue and the v1.11.0 column
    contract, with F export fidelity for report graphs).
 
@@ -13,8 +13,8 @@
    derives a filtered view at render time and never mutates the underlying
    graph. A named `report` layout class meets its documented budget.
 
-   After this suite runs, PROCFLOW_REPORTGRAPH_PASS and
-   PROCFLOW_REPORTGRAPH_RESULT gate the golden suite (tests/tests.ts) and feed
+   After this suite runs, SQL_CARTOGRAPHER_REPORTGRAPH_PASS and
+   SQL_CARTOGRAPHER_REPORTGRAPH_RESULT gate the golden suite (tests/tests.ts) and feed
    the fixture-corpus metrics (tests/metrics.ts). */
 (function(){
   var results: Array<{name: string; pass: boolean; detail: unknown}>=[];
@@ -74,7 +74,7 @@
     });
   }
 
-  var PROCFLOW_REPORTGRAPH_FIXTURES: ReportGraphFixture[] = [
+  var SQL_CARTOGRAPHER_REPORTGRAPH_FIXTURES: ReportGraphFixture[] = [
     {
       name:'report → dataset → object → column complete chain',
       rdl:rdl(DS_SCHOOL,
@@ -255,7 +255,7 @@
   }
 
   var layoutPassed=0, layoutTotal=0;
-  PROCFLOW_REPORTGRAPH_FIXTURES.forEach(function(f){
+  SQL_CARTOGRAPHER_REPORTGRAPH_FIXTURES.forEach(function(f){
     try{
       var got=runGraph(f);
       var graph=got.graph;
@@ -376,7 +376,7 @@
 
   /* ---- filtering is presentation-only ---- */
   try{
-    var f8=PROCFLOW_REPORTGRAPH_FIXTURES[7];
+    var f8=SQL_CARTOGRAPHER_REPORTGRAPH_FIXTURES[7];
     var got8=runGraph(f8);
     var full8=got8.graph;
     var baseline8=JSON.stringify({nodes:full8.nodes,edges:full8.edges});
@@ -400,10 +400,10 @@
   }
 
   var passed=results.filter(function(r){return r.pass;}).length;
-  window.PROCFLOW_REPORTGRAPH_RESULT={passed:passed,total:results.length,
+  window.SQL_CARTOGRAPHER_REPORTGRAPH_RESULT={passed:passed,total:results.length,
     layoutPassed:layoutPassed,layoutTotal:layoutTotal};
-  window.PROCFLOW_REPORTGRAPH_PASS=passed===results.length;
-  window.PROCFLOW_REPORTGRAPH_DETAIL=results;
+  window.SQL_CARTOGRAPHER_REPORTGRAPH_PASS=passed===results.length;
+  window.SQL_CARTOGRAPHER_REPORTGRAPH_DETAIL=results;
 
   var out=document.getElementById('reportgraph-results');
   if(out) out.textContent=JSON.stringify({

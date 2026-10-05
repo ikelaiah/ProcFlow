@@ -14,7 +14,7 @@
    telemetry are ever collected. scripts/metrics.mjs drives this page to
    produce or verify the active release metric snapshot. */
 (function(){
-  var corpus=PROCFLOW_FIXTURES||[];
+  var corpus=SQL_CARTOGRAPHER_FIXTURES||[];
 
   var totalTokens=0, attributedAll=0, unresolvedTokens=0, opaqueTokens=0,
       tailUnconsumed=0;
@@ -75,7 +75,7 @@
     return d?Math.round((n/d)*1000000)/1000000:1;
   }
   var metrics: Record<string, unknown>={
-    generator:'proc>flow fixture-corpus metrics (deterministic, fixture-only)',
+    generator:'sql-cartographer fixture-corpus metrics (deterministic, fixture-only)',
     formulaVersion:sampleConfidenceFormula,
     corpus:{
       /* Corpus size is checked in, so any growth of the fixture suite (or a
@@ -84,30 +84,30 @@
       golden:corpus.length,
       fuzz:400,
       ui:31,
-      parity:window.PROCFLOW_PARITY_RESULT?window.PROCFLOW_PARITY_RESULT.total/2:0,
-      layout:window.PROCFLOW_LAYOUT_RESULT?window.PROCFLOW_LAYOUT_RESULT.total:0,
-      workspace:window.PROCFLOW_WORKSPACE_RESULT
-        ?window.PROCFLOW_WORKSPACE_RESULT.total:0,
-      catalogue:window.PROCFLOW_CATALOGUE_RESULT
-        ?window.PROCFLOW_CATALOGUE_RESULT.total:0,
-      columns:window.PROCFLOW_COLUMN_RESULT
-        ?window.PROCFLOW_COLUMN_RESULT.total:0,
-      columnFlow:window.PROCFLOW_COLUMNFLOW_RESULT
-        ?window.PROCFLOW_COLUMNFLOW_RESULT.total:0,
-      columnLayout:window.PROCFLOW_COLUMNFLOW_RESULT
-        ?window.PROCFLOW_COLUMNFLOW_RESULT.layoutTotal:0,
-      report:window.PROCFLOW_REPORT_RESULT
-        ?window.PROCFLOW_REPORT_RESULT.total:0,
-      reportGraph:window.PROCFLOW_REPORTGRAPH_RESULT
-        ?window.PROCFLOW_REPORTGRAPH_RESULT.total:0,
-      reportGraphLayout:window.PROCFLOW_REPORTGRAPH_RESULT
-        ?window.PROCFLOW_REPORTGRAPH_RESULT.layoutTotal:0,
-      scalability:window.PROCFLOW_SCALABILITY_RESULT
-        ?window.PROCFLOW_SCALABILITY_RESULT.total:0,
-      realistic:window.PROCFLOW_REALISTIC_CORPUS_RESULT
-        ?window.PROCFLOW_REALISTIC_CORPUS_RESULT.total:0,
-      adversarial:window.PROCFLOW_ADVERSARIAL_RESULT
-        ?window.PROCFLOW_ADVERSARIAL_RESULT.caseCount:0
+      parity:window.SQL_CARTOGRAPHER_PARITY_RESULT?window.SQL_CARTOGRAPHER_PARITY_RESULT.total/2:0,
+      layout:window.SQL_CARTOGRAPHER_LAYOUT_RESULT?window.SQL_CARTOGRAPHER_LAYOUT_RESULT.total:0,
+      workspace:window.SQL_CARTOGRAPHER_WORKSPACE_RESULT
+        ?window.SQL_CARTOGRAPHER_WORKSPACE_RESULT.total:0,
+      catalogue:window.SQL_CARTOGRAPHER_CATALOGUE_RESULT
+        ?window.SQL_CARTOGRAPHER_CATALOGUE_RESULT.total:0,
+      columns:window.SQL_CARTOGRAPHER_COLUMN_RESULT
+        ?window.SQL_CARTOGRAPHER_COLUMN_RESULT.total:0,
+      columnFlow:window.SQL_CARTOGRAPHER_COLUMNFLOW_RESULT
+        ?window.SQL_CARTOGRAPHER_COLUMNFLOW_RESULT.total:0,
+      columnLayout:window.SQL_CARTOGRAPHER_COLUMNFLOW_RESULT
+        ?window.SQL_CARTOGRAPHER_COLUMNFLOW_RESULT.layoutTotal:0,
+      report:window.SQL_CARTOGRAPHER_REPORT_RESULT
+        ?window.SQL_CARTOGRAPHER_REPORT_RESULT.total:0,
+      reportGraph:window.SQL_CARTOGRAPHER_REPORTGRAPH_RESULT
+        ?window.SQL_CARTOGRAPHER_REPORTGRAPH_RESULT.total:0,
+      reportGraphLayout:window.SQL_CARTOGRAPHER_REPORTGRAPH_RESULT
+        ?window.SQL_CARTOGRAPHER_REPORTGRAPH_RESULT.layoutTotal:0,
+      scalability:window.SQL_CARTOGRAPHER_SCALABILITY_RESULT
+        ?window.SQL_CARTOGRAPHER_SCALABILITY_RESULT.total:0,
+      realistic:window.SQL_CARTOGRAPHER_REALISTIC_CORPUS_RESULT
+        ?window.SQL_CARTOGRAPHER_REALISTIC_CORPUS_RESULT.total:0,
+      adversarial:window.SQL_CARTOGRAPHER_ADVERSARIAL_RESULT
+        ?window.SQL_CARTOGRAPHER_ADVERSARIAL_RESULT.caseCount:0
     },
     attributionRate:rate(attributedAll,totalTokens),
     unresolvedTokenRate:rate(unresolvedTokens,totalTokens),
@@ -121,83 +121,83 @@
        and layout-budget rates come from tests/parity.ts, which parses each
        Mermaid and draw.io output back to a semantic manifest and compares it
        with the input Graph at its documented size limits. */
-    exportParityPassRate:window.PROCFLOW_PARITY_RESULT
-      ? rate(window.PROCFLOW_PARITY_RESULT.passed,window.PROCFLOW_PARITY_RESULT.total)
+    exportParityPassRate:window.SQL_CARTOGRAPHER_PARITY_RESULT
+      ? rate(window.SQL_CARTOGRAPHER_PARITY_RESULT.passed,window.SQL_CARTOGRAPHER_PARITY_RESULT.total)
       : 0,
-    exportTraceabilityRate:window.PROCFLOW_PARITY_RESULT
-      ? rate(window.PROCFLOW_PARITY_RESULT.traceabilityPassed,
-             window.PROCFLOW_PARITY_RESULT.traceabilityTotal)
+    exportTraceabilityRate:window.SQL_CARTOGRAPHER_PARITY_RESULT
+      ? rate(window.SQL_CARTOGRAPHER_PARITY_RESULT.traceabilityPassed,
+             window.SQL_CARTOGRAPHER_PARITY_RESULT.traceabilityTotal)
       : 1,
-    layoutBudgetPassRate:window.PROCFLOW_LAYOUT_RESULT
-      ? rate(window.PROCFLOW_LAYOUT_RESULT.passed,window.PROCFLOW_LAYOUT_RESULT.total)
+    layoutBudgetPassRate:window.SQL_CARTOGRAPHER_LAYOUT_RESULT
+      ? rate(window.SQL_CARTOGRAPHER_LAYOUT_RESULT.passed,window.SQL_CARTOGRAPHER_LAYOUT_RESULT.total)
       : 0,
     /* v1.8.0 usable local workspace: persistence round-trip, migration,
        corrupt recovery, explicit clearing, and presentation-only dependency
        filtering all pass on the checked-in fixture corpus. */
-    workspacePassRate:window.PROCFLOW_WORKSPACE_RESULT
-      ? rate(window.PROCFLOW_WORKSPACE_RESULT.passed,window.PROCFLOW_WORKSPACE_RESULT.total)
+    workspacePassRate:window.SQL_CARTOGRAPHER_WORKSPACE_RESULT
+      ? rate(window.SQL_CARTOGRAPHER_WORKSPACE_RESULT.passed,window.SQL_CARTOGRAPHER_WORKSPACE_RESULT.total)
       : 0,
     /* v1.9.0 resolve by catalogue: import parsing (JSON and line formats),
        exact synonym/linked-server/cross-database verification, conservative
        conflict handling, region-scoped partial diagnostics, export metadata,
        and workspace round-trip all pass on the checked-in fixture corpus. */
-    cataloguePassRate:window.PROCFLOW_CATALOGUE_RESULT
-      ? rate(window.PROCFLOW_CATALOGUE_RESULT.passed,window.PROCFLOW_CATALOGUE_RESULT.total)
+    cataloguePassRate:window.SQL_CARTOGRAPHER_CATALOGUE_RESULT
+      ? rate(window.SQL_CARTOGRAPHER_CATALOGUE_RESULT.passed,window.SQL_CARTOGRAPHER_CATALOGUE_RESULT.total)
       : 0,
     /* v1.10.0 column lineage foundations: single-statement column fixtures
        assert exact input→output mappings and spans, ambiguity never invents a
        column binding, and unsupported expressions become opaque with
        region-scoped diagnostics. */
-    columnPassRate:window.PROCFLOW_COLUMN_RESULT
-      ? rate(window.PROCFLOW_COLUMN_RESULT.passed,window.PROCFLOW_COLUMN_RESULT.total)
+    columnPassRate:window.SQL_CARTOGRAPHER_COLUMN_RESULT
+      ? rate(window.SQL_CARTOGRAPHER_COLUMN_RESULT.passed,window.SQL_CARTOGRAPHER_COLUMN_RESULT.total)
       : 0,
     /* v1.11.0 column lineage pipelines: end-to-end column-flow fixtures trace
        `SELECT col INTO #t` through transformations to outputs, ambiguous
        reaching definitions stay opaque, and the exported column graph
        round-trips with provenance and meets its bounded layout budgets. */
-    columnFlowPassRate:window.PROCFLOW_COLUMNFLOW_RESULT
-      ? rate(window.PROCFLOW_COLUMNFLOW_RESULT.passed,window.PROCFLOW_COLUMNFLOW_RESULT.total)
+    columnFlowPassRate:window.SQL_CARTOGRAPHER_COLUMNFLOW_RESULT
+      ? rate(window.SQL_CARTOGRAPHER_COLUMNFLOW_RESULT.passed,window.SQL_CARTOGRAPHER_COLUMNFLOW_RESULT.total)
       : 0,
-    columnLayoutPassRate:window.PROCFLOW_COLUMNFLOW_RESULT
-      ? rate(window.PROCFLOW_COLUMNFLOW_RESULT.layoutPassed,
-             window.PROCFLOW_COLUMNFLOW_RESULT.layoutTotal)
+    columnLayoutPassRate:window.SQL_CARTOGRAPHER_COLUMNFLOW_RESULT
+      ? rate(window.SQL_CARTOGRAPHER_COLUMNFLOW_RESULT.layoutPassed,
+             window.SQL_CARTOGRAPHER_COLUMNFLOW_RESULT.layoutTotal)
       : 1,
     /* v1.12.0 report import: SSRS/RDL fixtures link reports to datasets,
        preserve XML source locations where available, distinguish embedded,
        shared, and unresolved datasets, and keep parser-uncertainty diagnostics
        region- or document-scoped as appropriate. */
-    reportPassRate:window.PROCFLOW_REPORT_RESULT
-      ? rate(window.PROCFLOW_REPORT_RESULT.passed,window.PROCFLOW_REPORT_RESULT.total)
+    reportPassRate:window.SQL_CARTOGRAPHER_REPORT_RESULT
+      ? rate(window.SQL_CARTOGRAPHER_REPORT_RESULT.passed,window.SQL_CARTOGRAPHER_REPORT_RESULT.total)
       : 0,
     /* v1.13.0 report intelligence: report → dataset → object → column
        dependency fixtures assert the complete chain, report export parity and
        `.drawio` round-trip preserve report/dataset source identity, and report
        filtering is presentation-only. */
-    reportGraphPassRate:window.PROCFLOW_REPORTGRAPH_RESULT
-      ? rate(window.PROCFLOW_REPORTGRAPH_RESULT.passed,window.PROCFLOW_REPORTGRAPH_RESULT.total)
+    reportGraphPassRate:window.SQL_CARTOGRAPHER_REPORTGRAPH_RESULT
+      ? rate(window.SQL_CARTOGRAPHER_REPORTGRAPH_RESULT.passed,window.SQL_CARTOGRAPHER_REPORTGRAPH_RESULT.total)
       : 0,
-    reportGraphLayoutPassRate:window.PROCFLOW_REPORTGRAPH_RESULT
-      ? rate(window.PROCFLOW_REPORTGRAPH_RESULT.layoutPassed,
-             window.PROCFLOW_REPORTGRAPH_RESULT.layoutTotal)
+    reportGraphLayoutPassRate:window.SQL_CARTOGRAPHER_REPORTGRAPH_RESULT
+      ? rate(window.SQL_CARTOGRAPHER_REPORTGRAPH_RESULT.layoutPassed,
+             window.SQL_CARTOGRAPHER_REPORTGRAPH_RESULT.layoutTotal)
       : 1,
-    scalabilityPassRate:window.PROCFLOW_SCALABILITY_RESULT
-      ? rate(window.PROCFLOW_SCALABILITY_RESULT.passed,
-             window.PROCFLOW_SCALABILITY_RESULT.total)
+    scalabilityPassRate:window.SQL_CARTOGRAPHER_SCALABILITY_RESULT
+      ? rate(window.SQL_CARTOGRAPHER_SCALABILITY_RESULT.passed,
+             window.SQL_CARTOGRAPHER_SCALABILITY_RESULT.total)
       : 0,
-    realisticCorpusByDialect:window.PROCFLOW_REALISTIC_CORPUS_RESULT
-      ? window.PROCFLOW_REALISTIC_CORPUS_RESULT.dialects
+    realisticCorpusByDialect:window.SQL_CARTOGRAPHER_REALISTIC_CORPUS_RESULT
+      ? window.SQL_CARTOGRAPHER_REALISTIC_CORPUS_RESULT.dialects
       : {},
     /* v2.0.0 adversarial matrix: unlike attribution and edge-kind coverage,
        this asserts specific required and forbidden semantic facts. It is
        stronger qualification evidence, not a universal SQL-correctness claim. */
-    dialectAdversarialSemanticAssertionRate:window.PROCFLOW_ADVERSARIAL_RESULT
-      ? window.PROCFLOW_ADVERSARIAL_RESULT.rate:0,
-    adversarialSemanticAssertions:window.PROCFLOW_ADVERSARIAL_RESULT
-      ? {cases:window.PROCFLOW_ADVERSARIAL_RESULT.caseCount,
-         total:window.PROCFLOW_ADVERSARIAL_RESULT.total,
-         required:window.PROCFLOW_ADVERSARIAL_RESULT.required,
-         forbidden:window.PROCFLOW_ADVERSARIAL_RESULT.forbidden,
-         byDialect:window.PROCFLOW_ADVERSARIAL_RESULT.byDialect}:null,
+    dialectAdversarialSemanticAssertionRate:window.SQL_CARTOGRAPHER_ADVERSARIAL_RESULT
+      ? window.SQL_CARTOGRAPHER_ADVERSARIAL_RESULT.rate:0,
+    adversarialSemanticAssertions:window.SQL_CARTOGRAPHER_ADVERSARIAL_RESULT
+      ? {cases:window.SQL_CARTOGRAPHER_ADVERSARIAL_RESULT.caseCount,
+         total:window.SQL_CARTOGRAPHER_ADVERSARIAL_RESULT.total,
+         required:window.SQL_CARTOGRAPHER_ADVERSARIAL_RESULT.required,
+         forbidden:window.SQL_CARTOGRAPHER_ADVERSARIAL_RESULT.forbidden,
+         byDialect:window.SQL_CARTOGRAPHER_ADVERSARIAL_RESULT.byDialect}:null,
     aggregate:{
       totalTokens:totalTokens,
       accountedTokens:attributedAll,
@@ -211,7 +211,7 @@
   document.getElementById('summary').textContent=
     'Fixture-corpus metrics · '+corpus.length+' golden fixtures';
   document.getElementById('metrics-output').textContent=out;
-  document.title='proc>flow metrics';
-  window.PROCFLOW_METRICS_OUTPUT=out;
-  window.PROCFLOW_METRICS_READY=true;
+  document.title='SQL Cartographer metrics';
+  window.SQL_CARTOGRAPHER_METRICS_OUTPUT=out;
+  window.SQL_CARTOGRAPHER_METRICS_READY=true;
 })();

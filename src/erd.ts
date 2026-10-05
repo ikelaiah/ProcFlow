@@ -76,7 +76,7 @@ function erdRelationshipLabel(rel: SchemaRelationship, child: SchemaEntity): str
 function toMermaidER(result: SchemaResult): string {
   var ids=erdEntityIds(result);
   var lines: string[]=['erDiagram'];
-  lines.push('  %% procflow:erd v1 — declared constraints only; no inferred relationships');
+  lines.push('  %% sql-cartographer:erd v1 — declared constraints only; no inferred relationships');
   lines.push('  %% schema tables='+result.stats.tables+' views='+result.stats.views+
              ' columns='+result.stats.columns+' relationships='+result.stats.relationships+
              ' unresolved='+result.stats.unresolved);
@@ -552,7 +552,7 @@ function erdLayoutToJSON(result: SchemaResult,
     var position=positions[entity.id];
     if(position) ordered[entity.id]={x:Math.round(position.x),y:Math.round(position.y)};
   });
-  var file: ErdLayoutFile={format:'procflow-erd-layout',version:1,
+  var file: ErdLayoutFile={format:'sql-cartographer-erd-layout',version:1,
                            fingerprint:erdLayoutFingerprint(result),
                            positions:ordered};
   return JSON.stringify(file,null,1);
@@ -571,8 +571,8 @@ function erdLayoutFromJSON(text: string): ErdLayoutParseResult {
   } catch(err){
     return fail('erd_layout_parse_error','Layout file is not valid JSON.');
   }
-  if(!parsed||typeof parsed!=='object'||parsed.format!=='procflow-erd-layout'){
-    return fail('erd_layout_format_error','Layout file is not a ProcFlow ERD layout.');
+  if(!parsed||typeof parsed!=='object'||parsed.format!=='sql-cartographer-erd-layout'){
+    return fail('erd_layout_format_error','Layout file is not a SQL Cartographer ERD layout.');
   }
   if(parsed.version!==1){
     return fail('erd_layout_version_error',
@@ -589,7 +589,7 @@ function erdLayoutFromJSON(text: string): ErdLayoutParseResult {
       positions[id]={x:value.x,y:value.y};
     }
   });
-  return {file:{format:'procflow-erd-layout',version:1,
+  return {file:{format:'sql-cartographer-erd-layout',version:1,
                 fingerprint:String(parsed.fingerprint||''),
                 positions:positions},
           diagnostics:diagnostics};
@@ -598,7 +598,7 @@ function erdLayoutFromJSON(text: string): ErdLayoutParseResult {
 
 /* Bundled ERD samples (local-only, deterministic, and also used by the
    v2.1.0 fixtures so the demo path is covered by tests). */
-var PROCFLOW_ERD_SAMPLE_TSQL=[
+var SQL_CARTOGRAPHER_ERD_SAMPLE_TSQL=[
   '/* Sample retail schema — declared constraints only. */',
   'CREATE TABLE dbo.Customer (',
   '  CustomerId  INT IDENTITY(1,1) PRIMARY KEY,',
@@ -645,7 +645,7 @@ var PROCFLOW_ERD_SAMPLE_TSQL=[
 /* 8 tables, 4 views. EMPLOYEE (table 2) and ORDERS (table 4) are related
    through the employee who took the order. AUDIT_LOG and APP_SETTINGS are
    standalone: nothing references them and they reference nothing. */
-var PROCFLOW_ERD_SAMPLE_DB2=[
+var SQL_CARTOGRAPHER_ERD_SAMPLE_DB2=[
   '/* DB2 schema sample — declared constraints only. */',
   'CREATE SCHEMA sales;',
   '',

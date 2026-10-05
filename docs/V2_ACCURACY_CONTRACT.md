@@ -1,6 +1,6 @@
-# ProcFlow v2 accuracy contract
+# SQL Cartographer v2 accuracy contract
 
-ProcFlow v2.0.0 is a local-first, deterministic heuristic static analyser. It
+SQL Cartographer v2.0.0 is a local-first, deterministic heuristic static analyser. It
 does not compile or execute SQL, connect to databases, or prove runtime
 behaviour. Its diagrams are review evidence: validate material conclusions
 against source and the target database.
@@ -12,7 +12,7 @@ against source and the target database.
    malformed regions remain visible and diagnostic-bearing.
 2. **No invented semantic facts.** An object identity, call, dependency,
    column binding, control path, or data-flow edge is asserted only with static
-   evidence. Otherwise ProcFlow represents an external, ambiguous, opaque, or
+   evidence. Otherwise SQL Cartographer represents an external, ambiguous, opaque, or
    unresolved result.
 3. **Traceability.** Source-derived nodes and region diagnostics retain valid
    source spans. Synthetic nodes declare their origin; external identities keep
@@ -22,7 +22,7 @@ against source and the target database.
 
 ## Stable graph semantics
 
-| Kind | ProcFlow asserts | It does not assert |
+| Kind | SQL Cartographer asserts | It does not assert |
 | --- | --- | --- |
 | `control` | a statically modelled possible execution order | that every runtime path takes it |
 | `exception` | transfer to a compatible statically modelled handler | every database runtime error outcome |
@@ -73,7 +73,7 @@ The live graph, Mermaid, SVG, and draw.io exports preserve node identities,
 semantic edge kinds, labels, object identities, source provenance, and
 synthetic-node origin. Layout/style differences must not change meaning.
 
-ProcFlow has no required backend, automatic SQL transmission, telemetry,
+SQL Cartographer has no required backend, automatic SQL transmission, telemetry,
 database connection, SQL execution, or cloud persistence. Browser storage is
 opt-in; imports, exports, and clipboard operations are explicit. Export text
 is treated as hostile and escaped at Mermaid/XML boundaries.

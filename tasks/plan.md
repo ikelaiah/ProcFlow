@@ -1,4 +1,4 @@
-# Implementation Plan: ProcFlow v2.0.0 qualification
+# Implementation Plan: SQL Cartographer v2.0.0 qualification
 
 > **Historical.** This v2.0.0 qualification plan is complete and superseded by
 > the shipped release notes. Kept for provenance only.

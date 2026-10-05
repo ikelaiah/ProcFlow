@@ -2,7 +2,7 @@
     v1.3.0 demo — trust procedural control flow.
 
     dbo.v130_demo exercises the v1.3.0 procedural control-flow outcomes in one
-    procedure. Open the file in ProcFlow, pick dbo.v130_demo, and use View →
+    procedure. Open the file in SQL Cartographer, pick dbo.v130_demo, and use View →
     Control flow for the branching and loops; then View → Query structure to
     see the cursor body's source table.
 

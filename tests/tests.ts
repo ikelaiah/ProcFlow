@@ -7,7 +7,7 @@
     return (list||[]).some(function(v){ return v.toUpperCase()===value.toUpperCase(); });
   }
 
-  PROCFLOW_FIXTURES.forEach(function(f){
+  SQL_CARTOGRAPHER_FIXTURES.forEach(function(f){
     try{
       var r=analyse(f.sql,{dialect:f.dialect,mode:'auto',group:false,sources:true});
       var ir=buildObjectIR(r,{id:'fixture',name:f.name,kind:r.header.kind,
@@ -55,7 +55,7 @@
     });
   }
 
-  PROCFLOW_GRAPH_FIXTURES.forEach(function(fixture){
+  SQL_CARTOGRAPHER_GRAPH_FIXTURES.forEach(function(fixture){
     try{
       var result=analyse(fixture.sql,
         {dialect:fixture.dialect,mode:'flow',group:false,sources:true,fanIn:true});
@@ -81,7 +81,7 @@
     }
   });
 
-  PROCFLOW_RANGE_FIXTURES.forEach(function(rangeFixture){
+  SQL_CARTOGRAPHER_RANGE_FIXTURES.forEach(function(rangeFixture){
     try{
       var rangeResult=analyse(rangeFixture.sql,
         {dialect:rangeFixture.dialect,mode:'auto',group:false,sources:true});
@@ -126,8 +126,8 @@
   });
 
   record('T-SQL fixture corpus has at least 50 cases',
-    (window.PROCFLOW_TSQL_FIXTURE_COUNT||0)>=50,
-    'Found '+(window.PROCFLOW_TSQL_FIXTURE_COUNT||0)+' T-SQL fixtures.');
+    (window.SQL_CARTOGRAPHER_TSQL_FIXTURE_COUNT||0)>=50,
+    'Found '+(window.SQL_CARTOGRAPHER_TSQL_FIXTURE_COUNT||0)+' T-SQL fixtures.');
 
   try{
     var multiQuery=[
@@ -219,7 +219,7 @@
   });
 
   try{
-    var estate=analyseEstate([PROCFLOW_ESTATE_FIXTURE],
+    var estate=analyseEstate([SQL_CARTOGRAPHER_ESTATE_FIXTURE],
       {dialect:'tsql',mode:'auto',group:false,sources:true});
     var proc=estate.objects.filter(function(o){return /refresh_export/i.test(o.name);})[0];
     var ok=estate.objects.length===2&&proc&&
@@ -336,10 +336,10 @@
       'END',
       {dialect:'tsql',mode:'flow',group:false,sources:true});
     var mermaid=toMermaid(provenance.graph,'TD');
-    var hasProvenanceComment=/%% proc>flow provenance/.test(mermaid);
+    var hasProvenanceComment=/%% sql-cartographer provenance/.test(mermaid);
     var drawio=toDrawio(provenance.graph,{title:'provenance',dir:'TD'});
-    var hasDrawioMeta=/data-procflow=/.test(drawio);
-    var hasDrawioKind=/data-procflow-kind=/.test(drawio);
+    var hasDrawioMeta=/data-sql-cartographer=/.test(drawio);
+    var hasDrawioKind=/data-sql-cartographer-kind=/.test(drawio);
     record('v1.1.0 export provenance metadata (Mermaid + draw.io)',
       hasProvenanceComment&&hasDrawioMeta&&hasDrawioKind,
       JSON.stringify({mermaidHasComment:hasProvenanceComment,
@@ -573,7 +573,7 @@
     record('v1.3.0 F export parity for unresolved-label and ATOMIC nodes',
       !uxDoc.querySelector('parsererror')&&!axDoc.querySelector('parsererror')&&
         /flowchart/.test(uxMermaid)&&/flowchart/.test(axMermaid)&&
-        /data-procflow=/.test(uxXml)&&/data-procflow=/.test(axXml),
+        /data-sql-cartographer=/.test(uxXml)&&/data-sql-cartographer=/.test(axXml),
       JSON.stringify({ux:uxDoc.querySelector('parsererror')&&
         uxDoc.querySelector('parsererror').textContent,
         ax:axDoc.querySelector('parsererror')&&
@@ -708,7 +708,7 @@
     var hasQuerySources40=['dbo.a','dbo.b','dbo.fn','dbo.source','dbo.inner'].every(
       function(name){return m40.indexOf(name)>=0;});
     var parity40=!doc40.querySelector('parsererror')&&/flowchart/.test(m40)&&
-      hasQuerySources40&&/data-procflow=/.test(x40)&&/provenance=/.test(x40);
+      hasQuerySources40&&/data-sql-cartographer=/.test(x40)&&/provenance=/.test(x40);
     record('v1.4.0 F export parity for query graph constructs',
       parity40,JSON.stringify({parsererror:doc40.querySelector('parsererror')&&
         doc40.querySelector('parsererror').textContent}));
@@ -763,7 +763,7 @@
       dfDataEdges150.length>=2&&
         /linkStyle [0-9,]+ stroke:#54c39b/.test(dfMermaid150)&&
         !dfDoc150.querySelector('parsererror')&&
-        /data-procflow-kind="data"/.test(dfXml150)&&/strokeWidth=2/.test(dfXml150),
+        /data-sql-cartographer-kind="data"/.test(dfXml150)&&/strokeWidth=2/.test(dfXml150),
       JSON.stringify({dataEdges:dfDataEdges150.length,
         parsererror:dfDoc150.querySelector('parsererror')&&
           dfDoc150.querySelector('parsererror').textContent}));
@@ -889,15 +889,15 @@
      page on them. */
   try{
     record('v1.7.0 export-parity fixtures round-trip from both exporters',
-      window.PROCFLOW_PARITY_PASS===true&&
-        !!window.PROCFLOW_PARITY_RESULT&&
-        window.PROCFLOW_PARITY_RESULT.passed===window.PROCFLOW_PARITY_RESULT.total,
-      window.PROCFLOW_PARITY_RESULT||window.PROCFLOW_PARITY_FAILURES);
+      window.SQL_CARTOGRAPHER_PARITY_PASS===true&&
+        !!window.SQL_CARTOGRAPHER_PARITY_RESULT&&
+        window.SQL_CARTOGRAPHER_PARITY_RESULT.passed===window.SQL_CARTOGRAPHER_PARITY_RESULT.total,
+      window.SQL_CARTOGRAPHER_PARITY_RESULT||window.SQL_CARTOGRAPHER_PARITY_FAILURES);
     record('v1.7.0 layout budget fixtures (deterministic, no overlap, budgets)',
-      window.PROCFLOW_LAYOUT_PASS===true&&
-        !!window.PROCFLOW_LAYOUT_RESULT&&
-        window.PROCFLOW_LAYOUT_RESULT.passed===window.PROCFLOW_LAYOUT_RESULT.total,
-      window.PROCFLOW_LAYOUT_RESULT);
+      window.SQL_CARTOGRAPHER_LAYOUT_PASS===true&&
+        !!window.SQL_CARTOGRAPHER_LAYOUT_RESULT&&
+        window.SQL_CARTOGRAPHER_LAYOUT_RESULT.passed===window.SQL_CARTOGRAPHER_LAYOUT_RESULT.total,
+      window.SQL_CARTOGRAPHER_LAYOUT_RESULT);
   }catch(err){
     record('v1.7.0 export-parity fixtures round-trip from both exporters',
       false,String(err&&err.stack||err));
@@ -911,10 +911,10 @@
      them. */
   try{
     record('v1.8.0 workspace persistence, migration, clear, and filter fixtures',
-      window.PROCFLOW_WORKSPACE_PASS===true&&
-        !!window.PROCFLOW_WORKSPACE_RESULT&&
-        window.PROCFLOW_WORKSPACE_RESULT.passed===window.PROCFLOW_WORKSPACE_RESULT.total,
-      window.PROCFLOW_WORKSPACE_RESULT);
+      window.SQL_CARTOGRAPHER_WORKSPACE_PASS===true&&
+        !!window.SQL_CARTOGRAPHER_WORKSPACE_RESULT&&
+        window.SQL_CARTOGRAPHER_WORKSPACE_RESULT.passed===window.SQL_CARTOGRAPHER_WORKSPACE_RESULT.total,
+      window.SQL_CARTOGRAPHER_WORKSPACE_RESULT);
   }catch(err){
     record('v1.8.0 workspace persistence, migration, clear, and filter fixtures',
       false,String(err&&err.stack||err));
@@ -926,10 +926,10 @@
      in tests/catalogue.ts; gate the whole golden page on them. */
   try{
     record('v1.9.0 catalogue import, resolution, diagnostics, and export fixtures',
-      window.PROCFLOW_CATALOGUE_PASS===true&&
-        !!window.PROCFLOW_CATALOGUE_RESULT&&
-        window.PROCFLOW_CATALOGUE_RESULT.passed===window.PROCFLOW_CATALOGUE_RESULT.total,
-      window.PROCFLOW_CATALOGUE_RESULT);
+      window.SQL_CARTOGRAPHER_CATALOGUE_PASS===true&&
+        !!window.SQL_CARTOGRAPHER_CATALOGUE_RESULT&&
+        window.SQL_CARTOGRAPHER_CATALOGUE_RESULT.passed===window.SQL_CARTOGRAPHER_CATALOGUE_RESULT.total,
+      window.SQL_CARTOGRAPHER_CATALOGUE_RESULT);
   }catch(err){
     record('v1.9.0 catalogue import, resolution, diagnostics, and export fixtures',
       false,String(err&&err.stack||err));
@@ -942,10 +942,10 @@
      tests/columns.ts; gate the whole golden page on them. */
   try{
     record('v1.10.0 column scopes, bindings, wildcards, and diagnostics fixtures',
-      window.PROCFLOW_COLUMN_PASS===true&&
-        !!window.PROCFLOW_COLUMN_RESULT&&
-        window.PROCFLOW_COLUMN_RESULT.passed===window.PROCFLOW_COLUMN_RESULT.total,
-      window.PROCFLOW_COLUMN_RESULT);
+      window.SQL_CARTOGRAPHER_COLUMN_PASS===true&&
+        !!window.SQL_CARTOGRAPHER_COLUMN_RESULT&&
+        window.SQL_CARTOGRAPHER_COLUMN_RESULT.passed===window.SQL_CARTOGRAPHER_COLUMN_RESULT.total,
+      window.SQL_CARTOGRAPHER_COLUMN_RESULT);
   }catch(err){
     record('v1.10.0 column scopes, bindings, wildcards, and diagnostics fixtures',
       false,String(err&&err.stack||err));
@@ -959,11 +959,11 @@
      page on them. */
   try{
     record('v1.11.0 column-flow pipelines, exports, and column layout fixtures',
-      window.PROCFLOW_COLUMNFLOW_PASS===true&&
-        !!window.PROCFLOW_COLUMNFLOW_RESULT&&
-        window.PROCFLOW_COLUMNFLOW_RESULT.passed===window.PROCFLOW_COLUMNFLOW_RESULT.total&&
-        window.PROCFLOW_COLUMNFLOW_RESULT.layoutPassed===window.PROCFLOW_COLUMNFLOW_RESULT.layoutTotal,
-      window.PROCFLOW_COLUMNFLOW_RESULT);
+      window.SQL_CARTOGRAPHER_COLUMNFLOW_PASS===true&&
+        !!window.SQL_CARTOGRAPHER_COLUMNFLOW_RESULT&&
+        window.SQL_CARTOGRAPHER_COLUMNFLOW_RESULT.passed===window.SQL_CARTOGRAPHER_COLUMNFLOW_RESULT.total&&
+        window.SQL_CARTOGRAPHER_COLUMNFLOW_RESULT.layoutPassed===window.SQL_CARTOGRAPHER_COLUMNFLOW_RESULT.layoutTotal,
+      window.SQL_CARTOGRAPHER_COLUMNFLOW_RESULT);
   }catch(err){
     record('v1.11.0 column-flow pipelines, exports, and column layout fixtures',
       false,String(err&&err.stack||err));
@@ -976,10 +976,10 @@
      Runs ahead in tests/report.ts; gate the whole golden page on them. */
   try{
     record('v1.12.0 report import, dataset linking, and diagnostics fixtures',
-      window.PROCFLOW_REPORT_PASS===true&&
-        !!window.PROCFLOW_REPORT_RESULT&&
-        window.PROCFLOW_REPORT_RESULT.passed===window.PROCFLOW_REPORT_RESULT.total,
-      window.PROCFLOW_REPORT_RESULT);
+      window.SQL_CARTOGRAPHER_REPORT_PASS===true&&
+        !!window.SQL_CARTOGRAPHER_REPORT_RESULT&&
+        window.SQL_CARTOGRAPHER_REPORT_RESULT.passed===window.SQL_CARTOGRAPHER_REPORT_RESULT.total,
+      window.SQL_CARTOGRAPHER_REPORT_RESULT);
   }catch(err){
     record('v1.12.0 report import, dataset linking, and diagnostics fixtures',
       false,String(err&&err.stack||err));
@@ -991,11 +991,11 @@
      tests/report-graph.ts; gate the whole golden page on them. */
   try{
     record('v1.13.0 report dependency chain, export parity, and filter fixtures',
-      window.PROCFLOW_REPORTGRAPH_PASS===true&&
-        !!window.PROCFLOW_REPORTGRAPH_RESULT&&
-        window.PROCFLOW_REPORTGRAPH_RESULT.passed===window.PROCFLOW_REPORTGRAPH_RESULT.total&&
-        window.PROCFLOW_REPORTGRAPH_RESULT.layoutPassed===window.PROCFLOW_REPORTGRAPH_RESULT.layoutTotal,
-      window.PROCFLOW_REPORTGRAPH_RESULT);
+      window.SQL_CARTOGRAPHER_REPORTGRAPH_PASS===true&&
+        !!window.SQL_CARTOGRAPHER_REPORTGRAPH_RESULT&&
+        window.SQL_CARTOGRAPHER_REPORTGRAPH_RESULT.passed===window.SQL_CARTOGRAPHER_REPORTGRAPH_RESULT.total&&
+        window.SQL_CARTOGRAPHER_REPORTGRAPH_RESULT.layoutPassed===window.SQL_CARTOGRAPHER_REPORTGRAPH_RESULT.layoutTotal,
+      window.SQL_CARTOGRAPHER_REPORTGRAPH_RESULT);
   }catch(err){
     record('v1.13.0 report dependency chain, export parity, and filter fixtures',
       false,String(err&&err.stack||err));
@@ -1005,21 +1005,21 @@
      anonymised realistic-corpus invariants run ahead in tests/scalability.ts. */
   try{
     record('v1.14.0 scale and realistic-corpus invariants',
-      window.PROCFLOW_SCALABILITY_PASS===true&&
-        !!window.PROCFLOW_SCALABILITY_RESULT&&
-        window.PROCFLOW_SCALABILITY_RESULT.passed===window.PROCFLOW_SCALABILITY_RESULT.total,
-      window.PROCFLOW_SCALABILITY_RESULT);
+      window.SQL_CARTOGRAPHER_SCALABILITY_PASS===true&&
+        !!window.SQL_CARTOGRAPHER_SCALABILITY_RESULT&&
+        window.SQL_CARTOGRAPHER_SCALABILITY_RESULT.passed===window.SQL_CARTOGRAPHER_SCALABILITY_RESULT.total,
+      window.SQL_CARTOGRAPHER_SCALABILITY_RESULT);
   }catch(err){
     record('v1.14.0 scale and realistic-corpus invariants',false,String(err&&err.stack||err));
   }
 
   try{
     record('v2 adversarial semantic qualification matrix',
-      window.PROCFLOW_ADVERSARIAL_PASS===true&&
-        !!window.PROCFLOW_ADVERSARIAL_RESULT&&
-        window.PROCFLOW_ADVERSARIAL_RESULT.passed===window.PROCFLOW_ADVERSARIAL_RESULT.total&&
-        window.PROCFLOW_ADVERSARIAL_RESULT.rate===1,
-      window.PROCFLOW_ADVERSARIAL_FAILURES||window.PROCFLOW_ADVERSARIAL_RESULT);
+      window.SQL_CARTOGRAPHER_ADVERSARIAL_PASS===true&&
+        !!window.SQL_CARTOGRAPHER_ADVERSARIAL_RESULT&&
+        window.SQL_CARTOGRAPHER_ADVERSARIAL_RESULT.passed===window.SQL_CARTOGRAPHER_ADVERSARIAL_RESULT.total&&
+        window.SQL_CARTOGRAPHER_ADVERSARIAL_RESULT.rate===1,
+      window.SQL_CARTOGRAPHER_ADVERSARIAL_FAILURES||window.SQL_CARTOGRAPHER_ADVERSARIAL_RESULT);
   }catch(err){
     record('v2 adversarial semantic qualification matrix',false,String(err&&err.stack||err));
   }
@@ -1030,11 +1030,11 @@
      ahead in tests/schema.ts; gate the whole golden page on them. */
   try{
     record('v2.1.0 ERD schema parse and Mermaid erDiagram fixtures',
-      window.PROCFLOW_SCHEMA_PASS===true&&
-        !!window.PROCFLOW_SCHEMA_RESULT&&
-        window.PROCFLOW_SCHEMA_RESULT.passed===window.PROCFLOW_SCHEMA_RESULT.total&&
-        window.PROCFLOW_SCHEMA_RESULT.mermaidPassed===window.PROCFLOW_SCHEMA_RESULT.mermaidTotal,
-      window.PROCFLOW_SCHEMA_DETAIL||window.PROCFLOW_SCHEMA_RESULT);
+      window.SQL_CARTOGRAPHER_SCHEMA_PASS===true&&
+        !!window.SQL_CARTOGRAPHER_SCHEMA_RESULT&&
+        window.SQL_CARTOGRAPHER_SCHEMA_RESULT.passed===window.SQL_CARTOGRAPHER_SCHEMA_RESULT.total&&
+        window.SQL_CARTOGRAPHER_SCHEMA_RESULT.mermaidPassed===window.SQL_CARTOGRAPHER_SCHEMA_RESULT.mermaidTotal,
+      window.SQL_CARTOGRAPHER_SCHEMA_DETAIL||window.SQL_CARTOGRAPHER_SCHEMA_RESULT);
   }catch(err){
     record('v2.1.0 ERD schema parse and Mermaid erDiagram fixtures',
       false,String(err&&err.stack||err));
@@ -1046,10 +1046,10 @@
      gate the whole golden page on them. */
   try{
     record('v2.4.0 ERD query-builder fixtures',
-      window.PROCFLOW_QUERY_PASS===true&&
-        !!window.PROCFLOW_QUERY_RESULT&&
-        window.PROCFLOW_QUERY_RESULT.passed===window.PROCFLOW_QUERY_RESULT.total,
-      window.PROCFLOW_QUERY_DETAIL||window.PROCFLOW_QUERY_RESULT);
+      window.SQL_CARTOGRAPHER_QUERY_PASS===true&&
+        !!window.SQL_CARTOGRAPHER_QUERY_RESULT&&
+        window.SQL_CARTOGRAPHER_QUERY_RESULT.passed===window.SQL_CARTOGRAPHER_QUERY_RESULT.total,
+      window.SQL_CARTOGRAPHER_QUERY_DETAIL||window.SQL_CARTOGRAPHER_QUERY_RESULT);
   }catch(err){
     record('v2.4.0 ERD query-builder fixtures',false,String(err&&err.stack||err));
   }
@@ -1060,5 +1060,5 @@
   document.getElementById('results').textContent=JSON.stringify(results,null,2);
   /* Named result for scripts/test-all.mjs, which reads this instead of
      scraping the DOM. */
-  (window as any).PROCFLOW_GOLDEN_PASS=passed===results.length;
+  (window as any).SQL_CARTOGRAPHER_GOLDEN_PASS=passed===results.length;
 })();

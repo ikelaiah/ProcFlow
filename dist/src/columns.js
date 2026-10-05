@@ -1,5 +1,5 @@
 "use strict";
-/* proc>flow: column lineage foundations (v1.10.0)
+/* sql-cartographer: column lineage foundations (v1.10.0)
    Column scopes and bindings for qualified references, aliases, projections,
    CTEs, derived tables, and catalogue-backed wildcard expansion; expression-
    level provenance within one query statement; explicit ambiguous and opaque

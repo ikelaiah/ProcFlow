@@ -1,10 +1,10 @@
-/* proc>flow v2.6.0 — ERD query-builder fixtures.
+/* sql-cartographer v2.6.0 — ERD query-builder fixtures.
    Join graph construction from declared FKs only, shortest-path selection
    with equal-cost alternatives, bridge discovery, optional/reverse join
    policy, hand-taught joins, disconnected-selection problems, dialect
    quoting, and deterministic SQL emission.
 
-   After this suite runs, PROCFLOW_QUERY_PASS and PROCFLOW_QUERY_RESULT gate
+   After this suite runs, SQL_CARTOGRAPHER_QUERY_PASS and SQL_CARTOGRAPHER_QUERY_RESULT gate
    the golden suite (tests/tests.ts). */
 (function(){
   var results: Array<{name: string; pass: boolean; detail: unknown}>=[];
@@ -489,7 +489,7 @@
           return token.kind==='ident'&&token.text==='[dbo]';
         })&&
         tokens.some(function(token){
-          return token.kind==='comment'&&token.text.indexOf('proc>flow')>=0;
+          return token.kind==='comment'&&token.text.indexOf('sql-cartographer')>=0;
         })&&
         tokens.some(function(token){
           return token.kind==='punct'&&token.text===';';
@@ -703,7 +703,7 @@
     var badJSON=queryStateFromJSON('not json');
     var badFormat=queryStateFromJSON('{"format":"other","version":1}');
     var badVersion=queryStateFromJSON(
-      '{"format":"procflow-erd-query","version":9}');
+      '{"format":"sql-cartographer-erd-query","version":9}');
     record('v2.5.0 foreign, future, and malformed query files are rejected',
       !badJSON.state&&
         badJSON.diagnostics[0].code==='erd_query_parse_error'&&
@@ -713,7 +713,7 @@
         badVersion.diagnostics[0].code==='erd_query_version_error',
       {badJSON:badJSON,badFormat:badFormat,badVersion:badVersion});
     var messy=queryStateFromJSON(JSON.stringify({
-      format:'procflow-erd-query',version:1,fingerprint:'abc',
+      format:'sql-cartographer-erd-query',version:1,fingerprint:'abc',
       selections:[{entityId:'A',column:'X'},{entityId:7},{column:'Y'},null],
       manual:[{id:'m',leftId:'A'}],
       cross:['ok',42],
@@ -793,10 +793,10 @@
     delete noName.name;
     record('v2.5.0 export file names derive from the query name or fingerprint',
       queryFileBaseName(built)==='orders-by-customer'&&
-        queryFileBaseName(noName)==='procflow-query-'+schemaFingerprint(schema),
+        queryFileBaseName(noName)==='sql-cartographer-query-'+schemaFingerprint(schema),
       {named:queryFileBaseName(built),unnamed:queryFileBaseName(noName)});
     var v1File=queryStateFromJSON(JSON.stringify({
-      format:'procflow-erd-query',version:1,fingerprint:'abc',
+      format:'sql-cartographer-erd-query',version:1,fingerprint:'abc',
       selections:[{entityId:'A',column:'X'}],
       options:{dialect:'tsql',comments:true,distinct:false,rowLimit:0,
         onlyUsed:false,sorts:[]}
@@ -883,9 +883,9 @@
   }
 
   var passed=results.filter(function(result){ return result.pass; }).length;
-  window.PROCFLOW_QUERY_DETAIL=results;
-  window.PROCFLOW_QUERY_RESULT={passed:passed,total:results.length};
-  window.PROCFLOW_QUERY_PASS=passed===results.length;
+  window.SQL_CARTOGRAPHER_QUERY_DETAIL=results;
+  window.SQL_CARTOGRAPHER_QUERY_RESULT={passed:passed,total:results.length};
+  window.SQL_CARTOGRAPHER_QUERY_PASS=passed===results.length;
 })();
 
 

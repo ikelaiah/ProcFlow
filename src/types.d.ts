@@ -1,4 +1,4 @@
-/* Shared compile-time model for Procflow's ordered browser scripts. */
+/* Shared compile-time model for SQL Cartographer's ordered browser scripts. */
 
 type Dialect = 'tsql' | 'db2' | 'plpgsql' | 'sqlite';
 type DialectChoice = Dialect | 'auto';
@@ -866,7 +866,7 @@ interface FixtureExpectation {
   coverageMin?: number;
 }
 
-interface ProcflowFixture {
+interface Fixture {
   name: string;
   dialect: Dialect;
   sql: string;
@@ -888,7 +888,7 @@ interface ExpectedGraphNode {
   occurrence?: number;
 }
 
-interface GraphFixture extends ProcflowFixture {
+interface GraphFixture extends Fixture {
   graphExpect: {
     required: ExpectedGraphWire[];
     forbidden: ExpectedGraphWire[];
@@ -1273,84 +1273,84 @@ interface Window {
     initialize(options: Record<string, unknown>): void;
     render(id: string, definition: string): Promise<{svg: string}>;
   };
-  PROCFLOW_LARGE_INPUT_THRESHOLD: number;
-  PROCFLOW_TSQL_FIXTURE_COUNT?: number;
-  PROCFLOW_METRICS_OUTPUT?: string;
-  PROCFLOW_METRICS_READY?: boolean;
+  SQL_CARTOGRAPHER_LARGE_INPUT_THRESHOLD: number;
+  SQL_CARTOGRAPHER_TSQL_FIXTURE_COUNT?: number;
+  SQL_CARTOGRAPHER_METRICS_OUTPUT?: string;
+  SQL_CARTOGRAPHER_METRICS_READY?: boolean;
   /* v1.7.0 export-parity / layout suite results, published for the golden and
      metrics pages. */
-  PROCFLOW_PARITY_PASS?: boolean;
-  PROCFLOW_PARITY_RESULT?: {
+  SQL_CARTOGRAPHER_PARITY_PASS?: boolean;
+  SQL_CARTOGRAPHER_PARITY_RESULT?: {
     passed: number;
     total: number;
     traceabilityPassed: number;
     traceabilityTotal: number;
   };
-  PROCFLOW_PARITY_FAILURES?: string[];
-  PROCFLOW_LAYOUT_PASS?: boolean;
-  PROCFLOW_LAYOUT_RESULT?: {passed: number; total: number};
+  SQL_CARTOGRAPHER_PARITY_FAILURES?: string[];
+  SQL_CARTOGRAPHER_LAYOUT_PASS?: boolean;
+  SQL_CARTOGRAPHER_LAYOUT_RESULT?: {passed: number; total: number};
   /* v1.8.0 workspace-persistence / dependency-filtering suite results,
      published for the golden and metrics pages. */
-  PROCFLOW_WORKSPACE_PASS?: boolean;
-  PROCFLOW_WORKSPACE_RESULT?: {
+  SQL_CARTOGRAPHER_WORKSPACE_PASS?: boolean;
+  SQL_CARTOGRAPHER_WORKSPACE_RESULT?: {
     passed: number;
     total: number;
   };
   /* v1.9.0 catalogue suite results, published for the golden and metrics pages. */
-  PROCFLOW_CATALOGUE_PASS?: boolean;
-  PROCFLOW_CATALOGUE_RESULT?: {
+  SQL_CARTOGRAPHER_CATALOGUE_PASS?: boolean;
+  SQL_CARTOGRAPHER_CATALOGUE_RESULT?: {
     passed: number;
     total: number;
   };
   /* v1.10.0 column-lineage suite results, published for the golden and metrics
      pages. */
-  PROCFLOW_COLUMN_PASS?: boolean;
-  PROCFLOW_COLUMN_RESULT?: {
+  SQL_CARTOGRAPHER_COLUMN_PASS?: boolean;
+  SQL_CARTOGRAPHER_COLUMN_RESULT?: {
     passed: number;
     total: number;
   };
   /* v1.10.0 per-fixture column suite records, published for debugging. */
-  PROCFLOW_COLUMN_DETAIL?: Array<{name: string; pass: boolean; detail: unknown}>;
+  SQL_CARTOGRAPHER_COLUMN_DETAIL?: Array<{name: string; pass: boolean; detail: unknown}>;
   /* v1.11.0 column-flow pipeline suite results, published for the golden and
      metrics pages (end-to-end traces, opaque ambiguity, export parity, and the
      column layout class budget). */
-  PROCFLOW_COLUMNFLOW_PASS?: boolean;
-  PROCFLOW_COLUMNFLOW_RESULT?: {
+  SQL_CARTOGRAPHER_COLUMNFLOW_PASS?: boolean;
+  SQL_CARTOGRAPHER_COLUMNFLOW_RESULT?: {
     passed: number;
     total: number;
     layoutPassed: number;
     layoutTotal: number;
   };
-  PROCFLOW_COLUMNFLOW_DETAIL?: Array<{name: string; pass: boolean; detail: unknown}>;
+  SQL_CARTOGRAPHER_COLUMNFLOW_DETAIL?: Array<{name: string; pass: boolean; detail: unknown}>;
   /* v1.12.0 report-import suite results (SSRS/RDL parse, report→dataset
      linking, XML source locations, and region/document-scoped diagnostics),
      published for the golden and metrics pages. */
-  PROCFLOW_REPORT_PASS?: boolean;
-  PROCFLOW_REPORT_RESULT?: {
+  SQL_CARTOGRAPHER_REPORT_PASS?: boolean;
+  SQL_CARTOGRAPHER_REPORT_RESULT?: {
     passed: number;
     total: number;
   };
-  PROCFLOW_REPORT_DETAIL?: Array<{name: string; pass: boolean; detail: unknown}>;
+  SQL_CARTOGRAPHER_REPORT_DETAIL?: Array<{name: string; pass: boolean; detail: unknown}>;
   /* v1.13.0 report-graph suite results (report → dataset → object → column
      dependency chain, export parity, `.drawio` round-trip identity, and
      presentation-only filtering), published for the golden and metrics pages. */
-  PROCFLOW_REPORTGRAPH_PASS?: boolean;
-  PROCFLOW_REPORTGRAPH_RESULT?: {
+  SQL_CARTOGRAPHER_REPORTGRAPH_PASS?: boolean;
+  SQL_CARTOGRAPHER_REPORTGRAPH_RESULT?: {
     passed: number;
     total: number;
     layoutPassed: number;
     layoutTotal: number;
   };
-  PROCFLOW_REPORTGRAPH_DETAIL?: Array<{name: string; pass: boolean; detail: unknown}>;
+  SQL_CARTOGRAPHER_REPORTGRAPH_DETAIL?: Array<{name: string; pass: boolean; detail: unknown}>;
   /* v1.14.0 deterministic scale and realistic-corpus invariants. */
-  PROCFLOW_SCALABILITY_PASS?: boolean;
-  PROCFLOW_SCALABILITY_RESULT?: {passed: number; total: number};
-  PROCFLOW_SCALABILITY_DETAIL?: Array<{name: string; pass: boolean; detail?: unknown}>;
-  PROCFLOW_REALISTIC_CORPUS_RESULT?: {total: number; dialects: Record<string, number>};
+  SQL_CARTOGRAPHER_SCALABILITY_PASS?: boolean;
+  SQL_CARTOGRAPHER_SCALABILITY_RESULT?: {passed: number; total: number};
+  SQL_CARTOGRAPHER_SCALABILITY_DETAIL?: Array<{name: string; pass: boolean; detail?: unknown}>;
+  SQL_CARTOGRAPHER_REALISTIC_CORPUS_RESULT?: {total: number; dialects: Record<string, number>};
   /* v2.0.0 cross-dialect qualification matrix. Counts come only from checked-in
      synthetic fixtures and cover required as well as forbidden semantics. */
-  PROCFLOW_ADVERSARIAL_PASS?: boolean;
-  PROCFLOW_ADVERSARIAL_RESULT?: {
+  SQL_CARTOGRAPHER_ADVERSARIAL_PASS?: boolean;
+  SQL_CARTOGRAPHER_ADVERSARIAL_RESULT?: {
     passed: number;
     total: number;
     rate: number;
@@ -1364,7 +1364,7 @@ interface Window {
       forbidden: number;
     }>;
   };
-  PROCFLOW_ADVERSARIAL_FAILURES?: Array<{
+  SQL_CARTOGRAPHER_ADVERSARIAL_FAILURES?: Array<{
     dialect: Dialect;
     case: string;
     assertion: string;
@@ -1374,27 +1374,27 @@ interface Window {
   /* v2.1.0 schema/ERD suite results (DDL parse, declared constraints,
      relationship derivation, Mermaid erDiagram export), published for the
      golden tests. */
-  PROCFLOW_SCHEMA_PASS?: boolean;
-  PROCFLOW_SCHEMA_RESULT?: {
+  SQL_CARTOGRAPHER_SCHEMA_PASS?: boolean;
+  SQL_CARTOGRAPHER_SCHEMA_RESULT?: {
     passed: number;
     total: number;
     mermaidPassed: number;
     mermaidTotal: number;
   };
-  PROCFLOW_SCHEMA_DETAIL?: Array<{name: string; pass: boolean; detail?: unknown}>;
+  SQL_CARTOGRAPHER_SCHEMA_DETAIL?: Array<{name: string; pass: boolean; detail?: unknown}>;
   /* v2.4.0 ERD query-builder suite (join graph, pathfinding with alternatives,
      taught joins, disconnected selections, SQL emission), published for the
      golden tests. */
-  PROCFLOW_QUERY_PASS?: boolean;
-  PROCFLOW_QUERY_RESULT?: {
+  SQL_CARTOGRAPHER_QUERY_PASS?: boolean;
+  SQL_CARTOGRAPHER_QUERY_RESULT?: {
     passed: number;
     total: number;
   };
-  PROCFLOW_QUERY_DETAIL?: Array<{name: string; pass: boolean; detail?: unknown}>;
+  SQL_CARTOGRAPHER_QUERY_DETAIL?: Array<{name: string; pass: boolean; detail?: unknown}>;
   /* v1.14.0 hostile-input security suite. */
-  PROCFLOW_SECURITY_PASS?: boolean;
-  PROCFLOW_SECURITY_RESULT?: {passed: number; total: number};
-  PROCFLOW_SECURITY_DETAIL?: Array<{name: string; pass: boolean; detail?: unknown}>;
+  SQL_CARTOGRAPHER_SECURITY_PASS?: boolean;
+  SQL_CARTOGRAPHER_SECURITY_RESULT?: {passed: number; total: number};
+  SQL_CARTOGRAPHER_SECURITY_DETAIL?: Array<{name: string; pass: boolean; detail?: unknown}>;
   /* v2.4.0 ERD query-builder panel (src/ui/erd-query.ts), mounted on erd.html. */
   erdQueryPanelInit(options?: {focusEntity?: (id: string) => void}): void;
   erdQueryPanelSetSchema(result: SchemaResult): void;

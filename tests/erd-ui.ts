@@ -1,4 +1,4 @@
-/* proc>flow v2.6.0 — ERD query-builder browser interaction suite.
+/* sql-cartographer v2.6.0 — ERD query-builder browser interaction suite.
    Drives erd.html in an iframe: query mode, on-card picking, join and problem
    cards, teaching by clicks, self joins, SQL options, highlighting, resize,
    Find, and the only-used filter. Publishes pass/fail on the page body so the
@@ -17,7 +17,7 @@
     output.textContent=JSON.stringify(results,null,2);
     /* Named result for scripts/test-all.mjs, which reads this instead of
        scraping the DOM. */
-    (window as any).PROCFLOW_ERD_UI_PASS=passed===results.length;
+    (window as any).SQL_CARTOGRAPHER_ERD_UI_PASS=passed===results.length;
   }
   function wait(ms: number): Promise<void> {
     return new Promise(function(resolve){ setTimeout(resolve,ms); });
@@ -35,7 +35,7 @@
     });
   }
   function ready(d: Document): boolean {
-    return d.documentElement.getAttribute('data-procflow-ready')==='true';
+    return d.documentElement.getAttribute('data-sql-cartographer-ready')==='true';
   }
 
   frame.addEventListener('load',function(){ run(); });
@@ -51,8 +51,8 @@
   }
   if(pageLoaded()) run();
   function run(): void {
-    if((frame as any).__procflowRan) return;
-    (frame as any).__procflowRan=true;
+    if((frame as any).__sqlCartographerRan) return;
+    (frame as any).__sqlCartographerRan=true;
     var d=frame.contentDocument as Document;
     var body=frame.contentWindow as any;
     body.onerror=function(message: string){ record('no runtime errors: '+message,false); };
@@ -60,7 +60,7 @@
       var tries=0;
       while(!ready(d)&&tries++<150) await wait(100);
       if(!ready(d)){
-        record('erd page initializes',false,'data-procflow-ready never set');
+        record('erd page initializes',false,'data-sql-cartographer-ready never set');
         finish();
         return;
       }
@@ -353,7 +353,7 @@
 
       /* ---- query file import ---- */
       var importPayload=JSON.stringify({
-        format:'procflow-erd-query',version:1,fingerprint:'stale-hash',
+        format:'sql-cartographer-erd-query',version:1,fingerprint:'stale-hash',
         name:'imported smoke',
         selections:[
           {entityId:'DBO.CUSTOMER',column:'Email'},

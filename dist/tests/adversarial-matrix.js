@@ -186,8 +186,8 @@
             failures.push({ dialect: f.dialect, case: f.name, assertion: label(c), expected: c.must, actual: result.actual });
         });
     });
-    window.PROCFLOW_ADVERSARIAL_RESULT = { passed: passed, total: total, rate: total ? passed / total : 1, caseCount: fixtures.length, required: required, forbidden: forbidden, byDialect: byDialect };
-    window.PROCFLOW_ADVERSARIAL_FAILURES = failures;
-    window.PROCFLOW_ADVERSARIAL_PASS = passed === total;
+    window.SQL_CARTOGRAPHER_ADVERSARIAL_RESULT = { passed: passed, total: total, rate: total ? passed / total : 1, caseCount: fixtures.length, required: required, forbidden: forbidden, byDialect: byDialect };
+    window.SQL_CARTOGRAPHER_ADVERSARIAL_FAILURES = failures;
+    window.SQL_CARTOGRAPHER_ADVERSARIAL_PASS = passed === total;
 })();
 //# sourceMappingURL=adversarial-matrix.js.map

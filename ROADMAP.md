@@ -1,4 +1,4 @@
-# proc>flow Roadmap — Diagram Accuracy
+# SQL Cartographer Roadmap — Diagram Accuracy
 
 > **Historical.** This roadmap records the v1.x/v2.0 accuracy-convergence
 > workstreams, all of which shipped. It predates the ERD, query builder, and
@@ -7,7 +7,7 @@
 > what shipped.
 
 This roadmap has one goal: **diagrams that accurately represent the logic flow
-of the SQL they are given.** Because ProcFlow is a heuristic, browser-only
+of the SQL they are given.** Because SQL Cartographer is a heuristic, browser-only
 parser, accuracy is pursued on three fronts:
 
 1. **Resolve more SQL correctly** — turn `Unresolved SQL` nodes, misplaced
@@ -492,11 +492,11 @@ A release that raises attribution or construct coverage but lowers reference-
 or edge-fixture pass rates has reduced accuracy and does not ship. The same
 applies on the export side when a construct ships without an export-parity
 fixture. Published metrics are derived only from the checked-in anonymised
-fixture corpus in CI; ProcFlow does not collect runtime telemetry or user SQL.
+fixture corpus in CI; SQL Cartographer does not collect runtime telemetry or user SQL.
 
 ## Non-goals
 
-- **Compiler-grade parsing.** ProcFlow is heuristic; full grammar compliance is
+- **Compiler-grade parsing.** SQL Cartographer is heuristic; full grammar compliance is
   out of scope. The roadmap closes the highest-impact gaps and reports the
   rest.
 - **Dynamic SQL resolution.** `EXEC(@sql)`, `sp_executesql`, and PL/pgSQL

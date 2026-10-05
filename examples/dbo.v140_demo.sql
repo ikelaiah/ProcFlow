@@ -2,7 +2,7 @@
     v1.4.0 demo — report every object a query touches.
 
     dbo.v140_demo exercises the v1.4.0 query-lineage outcomes in one script.
-    Open the file in ProcFlow and use View → Query structure: every object
+    Open the file in SQL Cartographer and use View → Query structure: every object
     the queries read — comma-separated sources, APPLY functions, tabular
     functions, MERGE/DELETE sources, recursive-CTE self-references, and
     derived-table inner tables — appears as a source node.

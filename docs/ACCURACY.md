@@ -1,6 +1,6 @@
 # Accuracy and analysis contract
 
-ProcFlow v2.7.0 is the current released version. It is a deterministic
+SQL Cartographer v2.7.0 is the current released version. It is a deterministic
 heuristic analyser, not a database compiler, and does not execute SQL.
 Diagrams are investigation aids: verify material findings against the source
 and the target database.
@@ -37,7 +37,7 @@ SQL into a resolved dependency.
   join, opt-in `CROSS JOIN`, or exclusion); a cartesian product is never
   silent, and the SQL header names any picked columns left out.
 - Taught joins and self-join aliases are labelled as not declared in the plan
-  and in the generated SQL; ProcFlow states that it cannot verify them.
+  and in the generated SQL; SQL Cartographer states that it cannot verify them.
 - Unsupported or malformed regions are retained as source spans and reported.
 
 ## Fixture evidence

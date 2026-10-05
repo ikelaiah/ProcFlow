@@ -2,7 +2,7 @@
     v1.5.0 demo — data flow and internal resilience.
 
     dbo.v150_demo exercises the v1.5.0 outcomes in one script. Open the file
-    in ProcFlow with the default Control flow view:
+    in SQL Cartographer with the default Control flow view:
 
     1. Temp-table producer→consumer edges: SELECT … INTO #stage wires a
        labelled data-flow edge to each later consumer on a provably linear

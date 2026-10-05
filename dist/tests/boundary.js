@@ -4,7 +4,7 @@
    statement, for both terminated and valid unterminated statements, and for
    the one-line semicolon-free grammar that previously required a newline.
    Golden additions cover the hardened findBody headers. */
-var PROCFLOW_RANGE_FIXTURES = [
+var SQL_CARTOGRAPHER_RANGE_FIXTURES = [
     { name: 'T-SQL all one-line, no semicolons', dialect: 'tsql',
         sql: 'CREATE PROC dbo.p AS BEGIN SET @x = 1 PRINT @x SELECT @x END',
         statements: ['SET @x = 1', 'PRINT @x', 'SELECT @x'] },
@@ -39,7 +39,7 @@ var PROCFLOW_RANGE_FIXTURES = [
         sql: 'CREATE PROCEDURE APP.P() LANGUAGE SQL BEGIN IF V = 1 THEN SET V_A = 1; ELSE BEGIN SET V_B = 2; END; END IF; END',
         statements: ['SET V_A = 1', 'SET V_B = 2'] }
 ];
-var PROCFLOW_BOUNDARY_FIXTURES = [
+var SQL_CARTOGRAPHER_BOUNDARY_FIXTURES = [
     {
         name: 'T-SQL · CREATE VIEW WITH schema-binding header',
         dialect: 'tsql',
@@ -65,5 +65,5 @@ var PROCFLOW_BOUNDARY_FIXTURES = [
         expect: { object: 'dbo.p60', resultSets: 1, noErrors: true, coverageMin: 1 }
     }
 ];
-PROCFLOW_FIXTURES = PROCFLOW_FIXTURES.concat(PROCFLOW_BOUNDARY_FIXTURES);
+SQL_CARTOGRAPHER_FIXTURES = SQL_CARTOGRAPHER_FIXTURES.concat(SQL_CARTOGRAPHER_BOUNDARY_FIXTURES);
 //# sourceMappingURL=boundary.js.map

@@ -9,7 +9,7 @@ interface RealisticCorpusFixture {
   expectsOpaque: boolean;
 }
 
-var PROCFLOW_REALISTIC_CORPUS: RealisticCorpusFixture[]=[
+var SQL_CARTOGRAPHER_REALISTIC_CORPUS: RealisticCorpusFixture[]=[
   {
     name:'T-SQL nightly reconciliation procedure', dialect:'tsql', expectsOpaque:true,
     sql:[

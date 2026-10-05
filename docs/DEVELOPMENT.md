@@ -70,7 +70,7 @@ npm run package:runtime
 npm run package:smoke
 ```
 
-The package script creates `.release/procflow-v<package.json version>.zip`
+The package script creates `.release/sql-cartographer-v<package.json version>.zip`
 from an explicit allowlist and writes its SHA-256 to `.release/SHA256SUMS.txt`.
 The package smoke validates archive paths, required runtime files, exclusion of
 development files, and local-file startup. Do not change the package version
@@ -86,7 +86,7 @@ documented strictness debt. Keep changes incremental, add deterministic tests
 for behavior changes, and rebuild `dist/` before committing.
 
 Module headers follow one convention for new and materially changed modules:
-`/* proc>flow vX.Y.Z — <role>. … */`, where `vX.Y.Z` is the release that last
+`/* sql-cartographer vX.Y.Z — <role>. … */`, where `vX.Y.Z` is the release that last
 changed the module. Update the header in the same commit as the change;
 historical headers are migrated when the file is next touched. New
 browser-facing scripts must also be added to `scripts/package-runtime.mjs` and,

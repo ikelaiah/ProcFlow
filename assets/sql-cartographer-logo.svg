@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="780" height="220" viewBox="0 0 780 220" role="img" aria-labelledby="title description">
-  <title id="title">proc&gt;flow</title>
-  <desc id="description">ProcFlow logo with a SQL flowchart inside a terminal window</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="220" viewBox="0 0 1000 220" role="img" aria-labelledby="title description">
+  <title id="title">SQL Cartographer</title>
+  <desc id="description">SQL Cartographer logo with a SQL flowchart inside a terminal window</desc>
 
   <style>
     .shell-fill { fill: #f5f8fa; }
@@ -41,8 +41,8 @@
     <path d="M17 64l8 8-8 8M30 80h13" fill="none" stroke="#e8a33d" stroke-linecap="round" stroke-linejoin="round" stroke-width="4" opacity=".85"/>
   </g>
 
-  <text class="wordmark" x="230" y="118" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, Liberation Mono, monospace" font-size="88" font-weight="700" letter-spacing="-5">
-    proc<tspan fill="#e8a33d">&gt;</tspan>flow
+  <text class="wordmark" x="230" y="118" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, Liberation Mono, monospace" font-size="72" font-weight="700" letter-spacing="-3">
+    sql<tspan fill="#e8a33d">&gt;</tspan>cartographer
   </text>
 
   <text class="tagline" x="236" y="158" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="18" font-weight="650" letter-spacing="4">

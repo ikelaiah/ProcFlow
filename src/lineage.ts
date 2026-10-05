@@ -1,4 +1,4 @@
-﻿/* proc>flow v2.7.0 — query and CTE lineage.
+/* sql-cartographer v2.7.0 — query and CTE lineage.
    Owns splitCTEs, refsIn, statementFacts, and the query/object graph builders.
    Depends only on tokenizer, catalogue, and token-utils — never on ir.ts — so
    the analysis leaf modules form a one-way dependency chain. */

@@ -1,7 +1,35 @@
 # Changelog
 
-All notable released ProcFlow changes are recorded here. Detailed verification
+All notable released SQL Cartographer changes are recorded here. Detailed verification
 evidence belongs in the canonical release note under `docs/releases/`.
+
+## Unreleased
+
+### Renamed: ProcFlow → SQL Cartographer
+
+The project has been renamed. The GitHub repository is now
+[`ikelaiah/sql-cartographer`](https://github.com/ikelaiah/sql-cartographer),
+the npm package name is `sql-cartographer`, and the product name in prose is
+**SQL Cartographer**. The old `ikelaiah/ProcFlow` URL redirects automatically.
+
+### Breaking
+
+User-data-facing identifiers were renamed in the same pass. **Anything saved
+before this change will not load:**
+
+| Kind | Old | New |
+| --- | --- | --- |
+| Browser storage keys | `procflow.workspace`, `procflow.erd.layout`, `procflow.erd.query` | `sql-cartographer.workspace`, `sql-cartographer.erd.layout`, `sql-cartographer.erd.query` |
+| Saved-query file format | `procflow-erd-query` | `sql-cartographer-erd-query` |
+| ERD-layout file format | `procflow-erd-layout` | `sql-cartographer-erd-layout` |
+| draw.io XML attributes | `data-procflow`, `data-procflow-kind` | `data-sql-cartographer`, `data-sql-cartographer-kind` |
+| draw.io diagram id | `procflow-page` | `sql-cartographer-page` |
+| Default download names | `procflow-report`, `procflow-estate`, `procflow-workspace.json`, `procflow-query-<fp>` | `sql-cartographer-report`, `sql-cartographer-estate`, `sql-cartographer-workspace.json`, `sql-cartographer-query-<fp>` |
+| Release archive | `procflow-vX.Y.Z.zip` | `sql-cartographer-vX.Y.Z.zip` |
+
+No migration path is provided. Before upgrading, export any saved queries and
+ERD layouts you want to keep and re-import them after the upgrade; workspace
+exports must be created by the old version and are not readable by the new one.
 
 ## v2.7.0 — Maintainability pass
 

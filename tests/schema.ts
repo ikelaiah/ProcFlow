@@ -1,10 +1,10 @@
-/* proc>flow v2.1.0 — ERD / schema foundation fixtures.
+/* sql-cartographer v2.1.0 — ERD / schema foundation fixtures.
    DDL parsing across T-SQL, PostgreSQL, DB2, and SQLite: declared keys and
    foreign keys only, composite-key grouping, raw type preservation,
    conservative unresolved references, source spans, deterministic output,
    and the Mermaid erDiagram export.
 
-   After this suite runs, PROCFLOW_SCHEMA_PASS and PROCFLOW_SCHEMA_RESULT gate
+   After this suite runs, SQL_CARTOGRAPHER_SCHEMA_PASS and SQL_CARTOGRAPHER_SCHEMA_RESULT gate
    the golden suite (tests/tests.ts). */
 (function(){
   var results: Array<{name: string; pass: boolean; detail: unknown}>=[];
@@ -272,7 +272,7 @@
 
   /* ---- Bundled DB2 ERD sample: 8 tables, 4 views, 6 relationships ---- */
   try{
-    var db2Sample=parseSchema(PROCFLOW_ERD_SAMPLE_DB2);
+    var db2Sample=parseSchema(SQL_CARTOGRAPHER_ERD_SAMPLE_DB2);
     function hasNoRelationships(id: string): boolean {
       return !db2Sample.relationships.some(function(rel){
         return rel.fromId===id||rel.toId===id;
@@ -361,7 +361,7 @@
   }
 
   try{
-    var viewLayoutSchema=parseSchema(PROCFLOW_ERD_SAMPLE_DB2);
+    var viewLayoutSchema=parseSchema(SQL_CARTOGRAPHER_ERD_SAMPLE_DB2);
     var viewLayoutSizes: Record<string, ErdLayoutSize>={};
     viewLayoutSchema.entities.forEach(function(entity){
       viewLayoutSizes[entity.id]={w:260,h:140};
@@ -402,7 +402,7 @@
           erdLayoutFingerprint(parseSchema(SQLITE)),
       parsedFile);
     var badFormat=erdLayoutFromJSON('{"format":"other","version":1,"positions":{}}');
-    var badVersion=erdLayoutFromJSON('{"format":"procflow-erd-layout","version":9,"positions":{}}');
+    var badVersion=erdLayoutFromJSON('{"format":"sql-cartographer-erd-layout","version":9,"positions":{}}');
     var badJson=erdLayoutFromJSON('not json');
     record('v2.2.0 layout parser rejects foreign, stale, and malformed files',
       !badFormat.file&&!badVersion.file&&!badJson.file&&
@@ -450,7 +450,7 @@
   }
 
   try{
-    var orientSchema=parseSchema(PROCFLOW_ERD_SAMPLE_DB2);
+    var orientSchema=parseSchema(SQL_CARTOGRAPHER_ERD_SAMPLE_DB2);
     var orientSizes: Record<string, ErdLayoutSize>={};
     orientSchema.entities.forEach(function(entity){ orientSizes[entity.id]={w:260,h:140}; });
     var lrLayout=erdAutoLayout(orientSchema,orientSizes,{orientation:'LR'});
@@ -505,7 +505,7 @@
   }
 
   try{
-    var densitySchema=parseSchema(PROCFLOW_ERD_SAMPLE_DB2);
+    var densitySchema=parseSchema(SQL_CARTOGRAPHER_ERD_SAMPLE_DB2);
     var densitySizes: Record<string, ErdLayoutSize>={};
     densitySchema.entities.forEach(function(entity){ densitySizes[entity.id]={w:260,h:140}; });
     var compactLayout=erdAutoLayout(densitySchema,densitySizes,{orientation:'LR',density:'compact'});
@@ -605,8 +605,8 @@
   }
 
   var passed=results.filter(function(r){ return r.pass; }).length;
-  window.PROCFLOW_SCHEMA_DETAIL=results;
-  window.PROCFLOW_SCHEMA_RESULT={passed:passed,total:results.length,
+  window.SQL_CARTOGRAPHER_SCHEMA_DETAIL=results;
+  window.SQL_CARTOGRAPHER_SCHEMA_RESULT={passed:passed,total:results.length,
                                   mermaidPassed:mermaidPassed,mermaidTotal:mermaidTotal};
-  window.PROCFLOW_SCHEMA_PASS=passed===results.length;
+  window.SQL_CARTOGRAPHER_SCHEMA_PASS=passed===results.length;
 })();

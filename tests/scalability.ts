@@ -73,7 +73,7 @@
         backbone:layout.backboneEdges,warnings:layout.warnings});
   });
 
-  PROCFLOW_REALISTIC_CORPUS.forEach(function(f){
+  SQL_CARTOGRAPHER_REALISTIC_CORPUS.forEach(function(f){
     var passed=false, detail:Record<string,unknown>={};
     try{
       var result=analyse(f.sql,{dialect:f.dialect,mode:'auto',group:false,sources:true});
@@ -93,13 +93,13 @@
 
   var passed=results.filter(function(r){return r.pass;}).length;
   var corpusByDialect:Record<string,number>={};
-  PROCFLOW_REALISTIC_CORPUS.forEach(function(f){
+  SQL_CARTOGRAPHER_REALISTIC_CORPUS.forEach(function(f){
     corpusByDialect[f.dialect]=(corpusByDialect[f.dialect]||0)+1;
   });
-  window.PROCFLOW_SCALABILITY_PASS=passed===results.length;
-  window.PROCFLOW_SCALABILITY_RESULT={passed:passed,total:results.length};
-  window.PROCFLOW_SCALABILITY_DETAIL=results;
-  window.PROCFLOW_REALISTIC_CORPUS_RESULT={total:PROCFLOW_REALISTIC_CORPUS.length,
+  window.SQL_CARTOGRAPHER_SCALABILITY_PASS=passed===results.length;
+  window.SQL_CARTOGRAPHER_SCALABILITY_RESULT={passed:passed,total:results.length};
+  window.SQL_CARTOGRAPHER_SCALABILITY_DETAIL=results;
+  window.SQL_CARTOGRAPHER_REALISTIC_CORPUS_RESULT={total:SQL_CARTOGRAPHER_REALISTIC_CORPUS.length,
     dialects:corpusByDialect};
   var out=document.getElementById('scalability-results');
   if(out) out.textContent=JSON.stringify({passed:passed,total:results.length,

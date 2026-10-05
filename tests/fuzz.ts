@@ -43,7 +43,7 @@
     });
   }
 
-  var seeds=PROCFLOW_FIXTURES.map(function(f){return {sql:f.sql,dialect:f.dialect};});
+  var seeds=SQL_CARTOGRAPHER_FIXTURES.map(function(f){return {sql:f.sql,dialect:f.dialect};});
   var failures: Array<{case: number; reason: string; sample?: string}>=[], cases=400;
   for(var i=0;i<cases;i++){
     var seed=seeds[i%seeds.length], sql=seed.sql;
@@ -89,5 +89,5 @@
   output.textContent=JSON.stringify({seed:'0x5052464c',cases:cases,failures:failures},null,2);
   /* Named result for scripts/test-all.mjs, which reads this instead of
      scraping the DOM. */
-  (window as any).PROCFLOW_FUZZ_PASS=pass;
+  (window as any).SQL_CARTOGRAPHER_FUZZ_PASS=pass;
 })();

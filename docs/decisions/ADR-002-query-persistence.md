@@ -17,7 +17,7 @@ them.
 
 Existing constraints shape the answer:
 
-- ProcFlow is local-first: no backend, no accounts, no network calls. Browser
+- SQL Cartographer is local-first: no backend, no accounts, no network calls. Browser
   storage is opt-in and guarded by CI to live only in `src/workspace.ts`.
 - The ERD layout already established the pattern: one saved payload per
   browser, explicit Save/Restore/Forget, plus a versioned file with a schema
@@ -29,11 +29,11 @@ Existing constraints shape the answer:
 
 Ship three capabilities, all local:
 
-1. **One saved query per browser**, under `procflow.erd.query`, written only
+1. **One saved query per browser**, under `sql-cartographer.erd.query`, written only
    by `src/workspace.ts`. Save, Restore, and Forget are explicit user actions;
    nothing is stored automatically.
 2. **Versioned query files** in a pure module, `src/query-store.ts`: format
-   `procflow-erd-query`, version 1, with a schema fingerprint. Foreign,
+   `sql-cartographer-erd-query`, version 1, with a schema fingerprint. Foreign,
    future-version, and malformed payloads are rejected with diagnostics;
    unreadable entries inside a valid file are ignored with one informational
    diagnostic.
@@ -77,7 +77,7 @@ wants it.
 - Pros: one snapshot restores everything.
 - Cons: couples the ERD query to the flowchart workspace lifecycle; forgetting
   a workspace would silently drop a query and vice versa.
-- Rejected: separate key, mirroring `procflow.erd.layout`.
+- Rejected: separate key, mirroring `sql-cartographer.erd.layout`.
 
 ## Consequences
 

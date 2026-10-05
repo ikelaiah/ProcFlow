@@ -435,7 +435,7 @@
       showDiagnostics(currentReportDiagnostics);
       out.textContent=reportCode;
       lastCode=reportCode; lastGraph=filteredReport; lastResult=null;
-      lastTitle='procflow-report'; lastDirection=opts.dir||'TD';
+      lastTitle='sql-cartographer-report'; lastDirection=opts.dir||'TD';
       render(reportCode,filteredReport);
       return;
     }
@@ -489,7 +489,7 @@
       showDiagnostics(estate.diagnostics);
       out.textContent=dependencyCode;
       lastCode=dependencyCode; lastGraph=filtered; lastResult=null;
-      lastTitle='procflow-estate'; lastDirection=opts.dir||'TD';
+      lastTitle='sql-cartographer-estate'; lastDirection=opts.dir||'TD';
       render(dependencyCode,filtered);
       return;
     }
@@ -523,7 +523,7 @@
     lastDialect=result.dialect;
     lastGraph=result.graph;
     lastResult=result;
-    lastTitle=result.header.name||'procflow';
+    lastTitle=result.header.name||'sql-cartographer';
     lastDirection=opts.dir||'TD';
     render(result.mermaid,result.graph);
   }
@@ -685,7 +685,7 @@
   $('btn-sample').onclick=function(){
     var d=$('opt-dialect').value;
     workspaceFiles=null; estate=null; activeObjectId=null;
-    sql.value=PROCFLOW_SAMPLES[d]||PROCFLOW_SAMPLES.tsql;
+    sql.value=SQL_CARTOGRAPHER_SAMPLES[d]||SQL_CARTOGRAPHER_SAMPLES.tsql;
     drawGutter(); run();
   };
   $('btn-clear').onclick=function(){
@@ -749,7 +749,7 @@
     var blob=new Blob([data],{type:'image/svg+xml'});
     var a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
-    a.download=($('proc-name').textContent||'procflow').replace(/[^\w.-]/g,'_')+'.svg';
+    a.download=($('proc-name').textContent||'sql-cartographer').replace(/[^\w.-]/g,'_')+'.svg';
     a.click();
     setTimeout(function(){ URL.revokeObjectURL(a.href); },2000);
   };
@@ -759,7 +759,7 @@
     var blob=new Blob([data],{type:'application/xml'});
     var a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
-    a.download=(lastTitle||'procflow').replace(/[^\w.-]/g,'_')+'.drawio';
+    a.download=(lastTitle||'sql-cartographer').replace(/[^\w.-]/g,'_')+'.drawio';
     a.click();
     setTimeout(function(){ URL.revokeObjectURL(a.href); },2000);
   };
@@ -779,7 +779,7 @@
     var snap=readWorkspace();
     if(!snap){
       if(workspaceLastError()==='future_workspace_version'){
-        showMsg('This workspace was created by a newer unsupported ProcFlow version. It was not changed; upgrade ProcFlow before restoring it.');
+        showMsg('This workspace was created by a newer unsupported SQL Cartographer version. It was not changed; upgrade SQL Cartographer before restoring it.');
         flash($('btn-ws-restore'),'Newer version');
       }else if(workspaceLastError()){
         showMsg('The saved workspace could not be read. It was not changed; use Forget only if you want to remove it.');
@@ -795,7 +795,7 @@
     var blob=new Blob([serializeWorkspace(snap)],{type:'application/json'});
     var a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
-    a.download='procflow-workspace.json';
+    a.download='sql-cartographer-workspace.json';
     a.click();
     setTimeout(function(){ URL.revokeObjectURL(a.href); },2000);
   };
@@ -812,8 +812,8 @@
       var parsed=parseWorkspace(text);
       if(parsed.error||!parsed.snapshot){
         showMsg(parsed.error==='future_workspace_version'
-          ? 'This workspace was created by a newer unsupported ProcFlow version. It was not imported or changed; upgrade ProcFlow before opening it.'
-          : 'That file is not a valid ProcFlow workspace export.');
+          ? 'This workspace was created by a newer unsupported SQL Cartographer version. It was not imported or changed; upgrade SQL Cartographer before opening it.'
+          : 'That file is not a valid SQL Cartographer workspace export.');
         return;
       }
       applySnapshot(parsed.snapshot);
@@ -905,7 +905,7 @@
      written to or restored from storage on load. This attribute lets the
      release smoke test assert the app initialises local-only. */
   document.documentElement.setAttribute('data-workspace-optin','1');
-  document.documentElement.setAttribute('data-procflow-ready',String(
+  document.documentElement.setAttribute('data-sql-cartographer-ready',String(
     typeof mermaid!=='undefined'&&
     typeof tokenize==='function'&&
     typeof detectDialect==='function'&&

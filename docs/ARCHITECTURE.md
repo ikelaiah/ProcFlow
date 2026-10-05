@@ -1,6 +1,6 @@
 # Architecture
 
-ProcFlow is a static browser application. The runtime is a set of ordered
+SQL Cartographer is a static browser application. The runtime is a set of ordered
 classic scripts compiled from TypeScript with `module: none`; the browser does
 not need a backend, package manager, or database connection.
 

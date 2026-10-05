@@ -38,7 +38,7 @@
     var drawio = toDrawio(analysed.graph, { title: payloads[2], dir: 'TD' });
     var xmlDoc = new DOMParser().parseFromString(drawio, 'application/xml');
     record('hostile SQL remains escaped in exports', !containsExecutableMarkup(mermaidCode) && !containsExecutableMarkup(drawio) &&
-        !xmlDoc.querySelector('parsererror') && drawio.indexOf('data-procflow=') >= 0, { mermaidHasRaw: payloads.some(function (p) { return mermaidCode.indexOf(p) >= 0; }),
+        !xmlDoc.querySelector('parsererror') && drawio.indexOf('data-sql-cartographer=') >= 0, { mermaidHasRaw: payloads.some(function (p) { return mermaidCode.indexOf(p) >= 0; }),
         drawioHasExecutableMarkup: containsExecutableMarkup(drawio) });
     var catalogue = parseCatalogue(JSON.stringify({ objects: [
             { name: payloads[0], kind: 'TABLE' }, { name: payloads[1], kind: 'TABLE' }
@@ -85,9 +85,9 @@
         if (extra)
             record(extra.name, extra.pass, extra.detail);
         var passed = results.filter(function (r) { return r.pass; }).length;
-        window.PROCFLOW_SECURITY_PASS = passed === results.length;
-        window.PROCFLOW_SECURITY_RESULT = { passed: passed, total: results.length };
-        window.PROCFLOW_SECURITY_DETAIL = results;
+        window.SQL_CARTOGRAPHER_SECURITY_PASS = passed === results.length;
+        window.SQL_CARTOGRAPHER_SECURITY_RESULT = { passed: passed, total: results.length };
+        window.SQL_CARTOGRAPHER_SECURITY_DETAIL = results;
         document.body.className = passed === results.length ? 'pass' : 'fail';
         var out = document.getElementById('security-results');
         if (out)

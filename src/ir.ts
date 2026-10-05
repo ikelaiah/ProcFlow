@@ -1,4 +1,4 @@
-/* proc>flow: graph construction and shared intermediate representation.
+/* sql-cartographer: graph construction and shared intermediate representation.
    Token/AST helpers live in token-utils.ts; dialect transaction and error
    helpers live in dialects-state.ts. This module orchestrates them into the
    flow graph, object IR, and estate analysis. */

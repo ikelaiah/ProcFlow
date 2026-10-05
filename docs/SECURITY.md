@@ -1,6 +1,6 @@
 # Security and privacy
 
-ProcFlow is local-first. In the shipped runtime, SQL, catalogue data, reports,
+SQL Cartographer is local-first. In the shipped runtime, SQL, catalogue data, reports,
 and diagrams are processed in the browser. There is no backend, sign-in,
 database connection, telemetry, or network submission path.
 
@@ -26,7 +26,7 @@ organisation's policy.
 - Security fixtures cover hostile labels and attributes including script,
   event-handler, `javascript:`, and `foreignObject` payloads.
 
-The browser's own file and clipboard permissions remain outside ProcFlow's
+The browser's own file and clipboard permissions remain outside SQL Cartographer's
 control. Organisations embedding the app should add an appropriate Content
 Security Policy and serve it from a trusted location.
 
@@ -39,6 +39,6 @@ store-only ZIPs with a deterministic entry list and a SHA-256 checksum in
 distributing an archive.
 
 Report security issues without including confidential SQL. Provide the
-ProcFlow version, browser, a minimal anonymised payload, and reproduction
+SQL Cartographer version, browser, a minimal anonymised payload, and reproduction
 steps; use the repository's private security reporting channel when the issue
 itself is sensitive.

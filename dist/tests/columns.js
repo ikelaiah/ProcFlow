@@ -1,5 +1,5 @@
 "use strict";
-/* proc>flow v1.10.0 — column lineage foundations.
+/* sql-cartographer v1.10.0 — column lineage foundations.
    Fixtures assert exact input→output mappings and spans for qualified
    references, aliases, projections, CTEs, derived tables, and catalogue-backed
    wildcard expansion; that ambiguity never invents a column binding; and that
@@ -7,7 +7,7 @@
    Multi-statement temp-table and inter-object column flow (v1.11.0) is out of
    scope here; every fixture is a single query statement.
 
-   After this suite runs, PROCFLOW_COLUMN_PASS and PROCFLOW_COLUMN_RESULT gate
+   After this suite runs, SQL_CARTOGRAPHER_COLUMN_PASS and SQL_CARTOGRAPHER_COLUMN_RESULT gate
    the golden suite (tests/tests.ts) and feed the fixture-corpus metrics. */
 (function () {
     var results = [];
@@ -17,7 +17,7 @@
     function hasDiag(list, code) {
         return (list || []).some(function (d) { return d.code === code; });
     }
-    var PROCFLOW_COLUMN_FIXTURES = [
+    var SQL_CARTOGRAPHER_COLUMN_FIXTURES = [
         {
             name: 'qualified references, aliases, and JOIN predicates',
             dialect: 'tsql',
@@ -209,7 +209,7 @@
     function spanText(sql, span) {
         return span ? sql.slice(span.start, span.end) : '';
     }
-    PROCFLOW_COLUMN_FIXTURES.forEach(function (f) {
+    SQL_CARTOGRAPHER_COLUMN_FIXTURES.forEach(function (f) {
         try {
             var cat = null;
             if (f.catalogue)
@@ -341,8 +341,8 @@
         record('v1.10.0 output binding carries source, column, and span', false, String(err && err.stack || err));
     }
     var passed = results.filter(function (r) { return r.pass; }).length;
-    window.PROCFLOW_COLUMN_RESULT = { passed: passed, total: results.length };
-    window.PROCFLOW_COLUMN_PASS = passed === results.length;
-    window.PROCFLOW_COLUMN_DETAIL = results;
+    window.SQL_CARTOGRAPHER_COLUMN_RESULT = { passed: passed, total: results.length };
+    window.SQL_CARTOGRAPHER_COLUMN_PASS = passed === results.length;
+    window.SQL_CARTOGRAPHER_COLUMN_DETAIL = results;
 })();
 //# sourceMappingURL=columns.js.map

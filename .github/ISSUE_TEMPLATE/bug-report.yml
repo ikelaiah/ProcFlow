@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible ProcFlow problem.
+description: Report a reproducible SQL Cartographer problem.
 title: "Bug: "
 labels: ["bug", "needs-triage"]
 body:
@@ -8,7 +8,7 @@ body:
       value: Do not include secrets or confidential production data in reproductions.
   - type: input
     id: version
-    attributes: {label: ProcFlow version}
+    attributes: {label: SQL Cartographer version}
     validations: {required: true}
   - type: input
     id: browser

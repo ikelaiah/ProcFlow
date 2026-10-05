@@ -14,7 +14,7 @@ The ERD page already parses DDL into a conservative model of declared tables,
 columns, and keys. The next step was to let a user pick columns and get runnable
 SQL. That forces a decision about what may become a join.
 
-ProcFlow's standing contract (see [ACCURACY.md](../ACCURACY.md) and the
+SQL Cartographer's standing contract (see [ACCURACY.md](../ACCURACY.md) and the
 [V2 accuracy contract](../V2_ACCURACY_CONTRACT.md)) is that diagrams assert only
 statically evidenced facts, stay deterministic, and run entirely in the
 browser. A query builder that guesses joins would violate that contract more

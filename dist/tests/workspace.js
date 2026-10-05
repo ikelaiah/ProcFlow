@@ -1,5 +1,5 @@
 "use strict";
-/* proc>flow v1.8.0 — usable local workspace (README post-v1.0.0 item 7).
+/* sql-cartographer v1.8.0 — usable local workspace (README post-v1.0.0 item 7).
    Fixtures for the two v1.8.0 features:
      1. Persistence — opt-in, versioned, exportable. Save → reload reproduces
         an identical analysis; schema-version migration and corrupt-state
@@ -10,7 +10,7 @@
    browser-storage round-trips (write/read/clear) are exercised when the test
    page runs in a browser that provides localStorage.
 
-   After this suite runs, PROCFLOW_WORKSPACE_PASS and PROCFLOW_WORKSPACE_RESULT
+   After this suite runs, SQL_CARTOGRAPHER_WORKSPACE_PASS and SQL_CARTOGRAPHER_WORKSPACE_RESULT
    gate the golden suite (tests/tests.ts) and feed the fixture-corpus metrics. */
 (function () {
     var results = [];
@@ -149,7 +149,7 @@
     try {
         var storageAvailable = true;
         try {
-            var probe = window.localStorage.getItem('procflow.probe');
+            var probe = window.localStorage.getItem('sql-cartographer.probe');
         }
         catch (e) {
             storageAvailable = false;
@@ -255,7 +255,7 @@
         record('v1.8.0 dependency filtering never mutates the analysis graph', false, String(err && err.stack || err));
     }
     var passed = results.filter(function (r) { return r.pass; }).length;
-    window.PROCFLOW_WORKSPACE_RESULT = { passed: passed, total: results.length };
-    window.PROCFLOW_WORKSPACE_PASS = passed === results.length;
+    window.SQL_CARTOGRAPHER_WORKSPACE_RESULT = { passed: passed, total: results.length };
+    window.SQL_CARTOGRAPHER_WORKSPACE_PASS = passed === results.length;
 })();
 //# sourceMappingURL=workspace.js.map

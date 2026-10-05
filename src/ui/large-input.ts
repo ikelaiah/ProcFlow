@@ -1,6 +1,6 @@
-/* proc>flow: conservative editor policy for inputs that are expensive to
+/* sql-cartographer: conservative editor policy for inputs that are expensive to
    analyse repeatedly while a user is still typing. */
-var PROCFLOW_LARGE_INPUT_THRESHOLD=100000;
+var SQL_CARTOGRAPHER_LARGE_INPUT_THRESHOLD=100000;
 
 interface LargeInputPolicy {
   large: boolean;
@@ -10,6 +10,6 @@ interface LargeInputPolicy {
 
 function largeInputPolicy(length: number): LargeInputPolicy {
   var size=Math.max(0,Number(length)||0);
-  return {large:size>=PROCFLOW_LARGE_INPUT_THRESHOLD,
-          length:size,threshold:PROCFLOW_LARGE_INPUT_THRESHOLD};
+  return {large:size>=SQL_CARTOGRAPHER_LARGE_INPUT_THRESHOLD,
+          length:size,threshold:SQL_CARTOGRAPHER_LARGE_INPUT_THRESHOLD};
 }

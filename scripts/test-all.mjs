@@ -34,7 +34,7 @@ const args = process.argv.slice(2);
 const debug = args.includes("--debug");
 const onlyIndex = args.indexOf("--suite");
 const only = onlyIndex >= 0 ? args[onlyIndex + 1] : null;
-const timeoutMs = Number(process.env.PROCFLOW_TEST_TIMEOUT_MS || 120_000);
+const timeoutMs = Number(process.env.SQL_CARTOGRAPHER_TEST_TIMEOUT_MS || 120_000);
 
 const browser = findBrowser();
 if (!browser) {
@@ -100,7 +100,7 @@ function runSuite(suite, runDirectory, baseUrl) {
   });
 }
 
-const runDirectory = mkdtempSync(join(tmpdir(), "procflow-tests-"));
+const runDirectory = mkdtempSync(join(tmpdir(), "sql-cartographer-tests-"));
 const server = await startStaticServer(repositoryRoot);
 let failed = 0;
 try {

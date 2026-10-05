@@ -1,5 +1,5 @@
 "use strict";
-var PROCFLOW_FIXTURES = [
+var SQL_CARTOGRAPHER_FIXTURES = [
     {
         name: 'T-SQL procedure',
         dialect: 'tsql',
@@ -76,7 +76,7 @@ var PROCFLOW_FIXTURES = [
         expect: { mode: 'query', ctes: 1, tables: 2, resultSets: 1 }
     }
 ];
-var PROCFLOW_ESTATE_FIXTURE = {
+var SQL_CARTOGRAPHER_ESTATE_FIXTURE = {
     name: 'school.sql',
     text: [
         'CREATE VIEW dbo.student_export AS',

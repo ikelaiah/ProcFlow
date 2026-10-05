@@ -1,4 +1,4 @@
-/* proc>flow v2.4.1 — clipboard helper shared by the flowchart and ERD pages. */
+/* sql-cartographer v2.4.1 — clipboard helper shared by the flowchart and ERD pages. */
 function copyText(text: string, done: () => void): void {
   if(navigator.clipboard&&navigator.clipboard.writeText){
     navigator.clipboard.writeText(text).then(done,function(){

@@ -1,5 +1,5 @@
 "use strict";
-/* proc>flow v2.6.0 — ERD query builder (picked columns → declared-FK joins → SQL).
+/* sql-cartographer v2.6.0 — ERD query builder (picked columns → declared-FK joins → SQL).
    Picked columns define a set of tables. The builder follows declared
    FOREIGN KEY constraints to connect those tables, preferring exact
    resolutions over name-matched ones, and emits a SELECT ready to paste into
@@ -10,9 +10,9 @@
      relationship.
    - Tables the declared graph cannot reach are reported as problems with
      explicit resolutions: teach the join by hand, opt into a cartesian
-     product, or leave the columns out. ProcFlow never silently cross-joins.
+     product, or leave the columns out. SQL Cartographer never silently cross-joins.
    - Hand-taught joins are labelled "not declared" in the plan and in the SQL
-     header, and ProcFlow says it cannot verify them.
+     header, and SQL Cartographer says it cannot verify them.
    - When two declared paths tie, the first declaration is used and the
      alternatives are surfaced, never hidden.
    - Same schema + picks + options → identical plan and SQL. */
@@ -263,14 +263,14 @@ function queryJoinExplanation(graph, join, attachToId, entityId) {
             bits.push('Columns read from the second copy: ' +
                 join.copyColumns.join(', ') + '.');
         }
-        bits.push('No declared foreign key backs this condition, so ProcFlow cannot verify it.');
+        bits.push('No declared foreign key backs this condition, so SQL Cartographer cannot verify it.');
         return bits.join(' ');
     }
     if (join.kind === 'manual') {
         bits.push('Taught in the builder: ' + (join.predicate ||
             (attachName + '.' + join.leftColumns.join(',') + ' = ' + entityName + '.' +
                 join.rightColumns.join(','))) + '.');
-        bits.push('No declared foreign key backs this condition, so ProcFlow cannot verify it.');
+        bits.push('No declared foreign key backs this condition, so SQL Cartographer cannot verify it.');
         return bits.join(' ');
     }
     var childName = join.reverse ? entityName : attachName;
@@ -508,10 +508,10 @@ function queryBuildPlan(input) {
                 message: 'No declared foreign-key path connects ' + names.join(', ') +
                     ' to ' + fromName + '.' +
                     (views ? ' Views declare no keys, so they can only join through keys declared on other tables.' : ''),
-                education: 'If the database has an implicit relationship (matching columns without a declared foreign key), teach the join below and ProcFlow will label it as not declared. You can also add a CROSS JOIN for every combination, or leave the table out of the query.' });
+                education: 'If the database has an implicit relationship (matching columns without a declared foreign key), teach the join below and SQL Cartographer will label it as not declared. You can also add a CROSS JOIN for every combination, or leave the table out of the query.' });
         });
     }
-    plan.education.push('Joins follow declared FOREIGN KEY constraints only; ProcFlow never guesses a relationship from column names.');
+    plan.education.push('Joins follow declared FOREIGN KEY constraints only; SQL Cartographer never guesses a relationship from column names.');
     if (plan.bridges.length) {
         plan.education.push('Bridge tables connect picked tables through declared keys; they appear in FROM but not in SELECT.');
     }
@@ -522,7 +522,7 @@ function queryBuildPlan(input) {
         plan.education.push('CROSS JOIN pairs every row with every row; check the row estimate before running it.');
     }
     if (plan.joins.some(function (join) { return join.selfJoin; })) {
-        plan.education.push('A self join compares rows of the same table; ProcFlow adds a second alias, and the ON condition is the one you taught.');
+        plan.education.push('A self join compares rows of the same table; SQL Cartographer adds a second alias, and the ON condition is the one you taught.');
     }
     if (plan.joins.some(function (join) {
         return join.reverse && join.cardinality === 'one-to-many';
@@ -858,7 +858,7 @@ function queryPlanSQL(plan, options) {
             missing.push(name);
     });
     var header = [];
-    header.push('proc>flow ' + QUERY_VERSION + ' query builder — joins use declared FOREIGN KEY evidence only.');
+    header.push('sql-cartographer ' + QUERY_VERSION + ' query builder — joins use declared FOREIGN KEY evidence only.');
     header.push('Dialect: ' + QUERY_DIALECT_LABELS[dialect] + '.');
     if (distinct)
         header.push('Distinct: duplicate rows are collapsed.');

@@ -1,6 +1,6 @@
-# ProcFlow user guide
+# SQL Cartographer user guide
 
-ProcFlow is a local-first investigation aid for SQL control flow and object
+SQL Cartographer is a local-first investigation aid for SQL control flow and object
 dependencies. It accepts pasted SQL, a folder of SQL files, a catalogue, or an
 SSRS/RDL report definition and renders an explorable diagram.
 
@@ -44,7 +44,7 @@ grip) shows the generated SQL. The window controls:
   INNER/LEFT switch and a sentence explaining direction, optionality, and row
   multiplication. Bridge tables are tagged; hovering a join card highlights
   the exact edge and both endpoint cards.
-- **Problems** for tables no declared path reaches. ProcFlow never silently
+- **Problems** for tables no declared path reaches. SQL Cartographer never silently
   cross-joins: teach the join with the column pair (or a typed predicate),
   opt into a CROSS JOIN, or leave the table's columns out. The SQL header lists
   anything left out.
@@ -102,7 +102,7 @@ options, catalogue, and report in local browser storage. **Export workspace
 file** creates a portable JSON snapshot; **Import workspace file** restores it.
 Dependency filters change presentation only and do not rewrite analysis counts.
 Older supported workspaces migrate deterministically. A workspace from a newer
-ProcFlow schema is not imported or changed; upgrade ProcFlow to open it.
+SQL Cartographer schema is not imported or changed; upgrade SQL Cartographer to open it.
 
 ## Exports
 
@@ -112,7 +112,7 @@ ProcFlow schema is not imported or changed; upgrade ProcFlow to open it.
 - **Copy narration prompt** creates a text prompt describing the diagram.
 
 Treat exported diagrams as review artifacts. Keep the source SQL with them and
-record the ProcFlow version used.
+record the SQL Cartographer version used.
 
 ## Troubleshooting
 

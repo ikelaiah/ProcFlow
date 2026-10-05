@@ -1,4 +1,4 @@
-﻿/* proc>flow: Mermaid, draw.io, and narration exporters */
+/* sql-cartographer: Mermaid, draw.io, and narration exporters */
 /* Canonical node-class→shape/style and semantic edge-kind→style mapping shared
    by both exporters. toMermaid and toDrawio derive every fill, stroke, dash,
    and width from these registries, so the two renderings can never disagree
@@ -73,7 +73,7 @@ function safeMermaidMetadata(value: unknown): string {
 }
 
 function provenanceComment(graph: Graph): string {
-  var lines: string[]=['%% proc>flow provenance'];
+  var lines: string[]=['%% sql-cartographer provenance'];
   (graph.nodes||[]).forEach(function(n){
     var bits: string[]=[safeMermaidMetadata(n.id)+':'+safeMermaidMetadata(n.cls)];
     if(n.provenance) bits.push('provenance='+safeMermaidMetadata(n.provenance));
@@ -479,10 +479,10 @@ function toDrawio(graph: Graph, opts?: DrawioOptions): string {
   var analysis=layoutAnalysis(graph,dir);
   var pos=analysis.positions;
   var waypoints=edgeWaypoints(graph,pos,dir);
-  var title=opts.title||'Procflow';
+  var title=opts.title||'SQL Cartographer';
   var L=['<?xml version="1.0" encoding="UTF-8"?>',
-    '<mxfile host="app.diagrams.net" agent="Procflow">',
-    '  <diagram id="procflow-page" name="'+xmlAttr(title)+'">',
+    '<mxfile host="app.diagrams.net" agent="SQL Cartographer">',
+    '  <diagram id="sql-cartographer-page" name="'+xmlAttr(title)+'">',
     '    <mxGraphModel dx="1200" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">',
     '      <root>',
     '        <mxCell id="0"/>',
@@ -503,7 +503,7 @@ function toDrawio(graph: Graph, opts?: DrawioOptions): string {
     if(n.resolution) meta.push('resolution='+n.resolution);
     if(n.resolvedName) meta.push('resolved='+n.resolvedName);
     if(n.reason) meta.push('reason='+n.reason);
-    var metaAttr=meta.length?' data-procflow="'+xmlAttr(meta.join(' '))+'"':'';
+    var metaAttr=meta.length?' data-sql-cartographer="'+xmlAttr(meta.join(' '))+'"':'';
     L.push('        <mxCell id="pf-'+xmlAttr(n.id)+'" value="'+
       xmlAttr(nodeLabelLines(n).join('\n'))+
       '" style="'+xmlAttr(nodeStyle(n))+'" vertex="1" parent="1"'+metaAttr+'>');
@@ -519,7 +519,7 @@ function toDrawio(graph: Graph, opts?: DrawioOptions): string {
       'html=0;endArrow=block;endFill=1;strokeColor='+boxColor+';fontColor=#334155;'+
       'strokeWidth='+CANONICAL_EDGE_WIDTH[kind]+';';
     if(dash) style+='dashed=1;';
-    var kindAttr=e.kind?' data-procflow-kind="'+xmlAttr(e.kind)+'"':'';
+    var kindAttr=e.kind?' data-sql-cartographer-kind="'+xmlAttr(e.kind)+'"':'';
     L.push('        <mxCell id="pf-e'+(i+1)+'" value="'+xmlAttr(e.label||'')+
       '" style="'+xmlAttr(style)+'" edge="1" parent="1" source="pf-'+xmlAttr(e.from)+
       '" target="pf-'+xmlAttr(e.to)+'"'+kindAttr+'>');

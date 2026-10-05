@@ -12,7 +12,7 @@ decision records are
 ## The declared-evidence rule
 
 Every join comes from a declared `PRIMARY KEY`, `UNIQUE`, or `FOREIGN KEY`
-constraint parsed from the DDL. ProcFlow never infers a relationship from a
+constraint parsed from the DDL. SQL Cartographer never infers a relationship from a
 column name, a query body, or a convention like `*_id`. Two consequences:
 
 - If the database has an implicit relationship that was never declared, the
@@ -69,7 +69,7 @@ resolutions, and none of them is silent:
 
 1. **Teach the join.** Provide a column pair, type a predicate, or click two
    columns on the diagram. The plan and the SQL header label it
-   `taught join — not declared`, and the explanation states that ProcFlow
+   `taught join — not declared`, and the explanation states that SQL Cartographer
    cannot verify it.
 2. **CROSS JOIN.** Explicit opt-in for a cartesian product, labelled in the SQL
    with a row-count warning.
@@ -151,7 +151,7 @@ row counts. `GROUP BY` covers picked columns only. See
 Picks and options are session state by default. The **Query** menu keeps them
 across reloads and moves them between machines, all locally:
 
-- **Save to this browser** stores one query under `procflow.erd.query`.
+- **Save to this browser** stores one query under `sql-cartographer.erd.query`.
   **Restore saved** brings it back; **Forget saved** removes it. Nothing is
   stored automatically, matching the ERD layout and workspace rules.
 - **Export query file** writes a versioned JSON file. **Import query file**
@@ -164,7 +164,7 @@ The file format is small and stable:
 
 ```json
 {
-  "format": "procflow-erd-query",
+  "format": "sql-cartographer-erd-query",
   "version": 2,
   "fingerprint": "f971b08a",
   "name": "orders by customer",

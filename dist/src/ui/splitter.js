@@ -1,5 +1,5 @@
 "use strict";
-/* proc>flow v2.1.0 — shared resizable pane divider.
+/* sql-cartographer v2.1.0 — shared resizable pane divider.
    Works on any page with a `.wrap` grid and a `#splitter` element between the
    two panes. Pointer, double-click reset, and arrow-key resizing; the width is
    session-only and never persisted. */

@@ -8,8 +8,8 @@
         output.textContent = JSON.stringify(results, null, 2);
         /* Named result for scripts/test-all.mjs, which reads this instead of
            scraping the DOM. Named suites (parity, schema, ...) publish their own
-           PROCFLOW_*_PASS globals; UI suites publish this one. */
-        window.PROCFLOW_UI_PASS = passed === results.length;
+           SQL_CARTOGRAPHER_*_PASS globals; UI suites publish this one. */
+        window.SQL_CARTOGRAPHER_UI_PASS = passed === results.length;
     }
     frame.addEventListener('load', function () { run(); });
     // The iframe may already have fired 'load' before this script ran (a fast
@@ -28,9 +28,9 @@
     if (pageLoaded())
         run();
     function run() {
-        if (frame.__procflowRan)
+        if (frame.__sqlCartographerRan)
             return;
-        frame.__procflowRan = true;
+        frame.__sqlCartographerRan = true;
         var w = frame.contentWindow, d = frame.contentDocument, results = [];
         var get = function (id) { return d.getElementById(id); };
         results.push({ name: 'compact local-processing header',
@@ -96,7 +96,7 @@
                 /refresh_students/i.test(get('proc-name').textContent) });
         try {
             var beforeLargeInput = get('mermaid-out').textContent;
-            var largeSource = 'SELECT 1;\n' + new Array(w.PROCFLOW_LARGE_INPUT_THRESHOLD + 16).join(' ');
+            var largeSource = 'SELECT 1;\n' + new Array(w.SQL_CARTOGRAPHER_LARGE_INPUT_THRESHOLD + 16).join(' ');
             get('sql').value = largeSource;
             get('sql').dispatchEvent(new Event('input'));
             results.push({ name: 'large input pauses automatic analysis without losing SQL',
@@ -375,7 +375,7 @@
                validate the immediate notice and explicit refresh; this second pass
                proves no automatic run appears after the normal 350 ms delay. */
             var delayedLargeSource = 'SELECT 1;\n' +
-                new Array(w.PROCFLOW_LARGE_INPUT_THRESHOLD + 16).join(' ');
+                new Array(w.SQL_CARTOGRAPHER_LARGE_INPUT_THRESHOLD + 16).join(' ');
             var delayedBefore = get('mermaid-out').textContent;
             get('sql').value = delayedLargeSource;
             get('sql').dispatchEvent(new Event('input'));

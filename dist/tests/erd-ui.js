@@ -1,5 +1,5 @@
 "use strict";
-/* proc>flow v2.6.0 — ERD query-builder browser interaction suite.
+/* sql-cartographer v2.6.0 — ERD query-builder browser interaction suite.
    Drives erd.html in an iframe: query mode, on-card picking, join and problem
    cards, teaching by clicks, self joins, SQL options, highlighting, resize,
    Find, and the only-used filter. Publishes pass/fail on the page body so the
@@ -17,7 +17,7 @@
         output.textContent = JSON.stringify(results, null, 2);
         /* Named result for scripts/test-all.mjs, which reads this instead of
            scraping the DOM. */
-        window.PROCFLOW_ERD_UI_PASS = passed === results.length;
+        window.SQL_CARTOGRAPHER_ERD_UI_PASS = passed === results.length;
     }
     function wait(ms) {
         return new Promise(function (resolve) { setTimeout(resolve, ms); });
@@ -41,7 +41,7 @@
         });
     }
     function ready(d) {
-        return d.documentElement.getAttribute('data-procflow-ready') === 'true';
+        return d.documentElement.getAttribute('data-sql-cartographer-ready') === 'true';
     }
     frame.addEventListener('load', function () { run(); });
     // The iframe may already have fired 'load' before this script ran (a fast
@@ -60,9 +60,9 @@
     if (pageLoaded())
         run();
     function run() {
-        if (frame.__procflowRan)
+        if (frame.__sqlCartographerRan)
             return;
-        frame.__procflowRan = true;
+        frame.__sqlCartographerRan = true;
         var d = frame.contentDocument;
         var body = frame.contentWindow;
         body.onerror = function (message) { record('no runtime errors: ' + message, false); };
@@ -71,7 +71,7 @@
             while (!ready(d) && tries++ < 150)
                 await wait(100);
             if (!ready(d)) {
-                record('erd page initializes', false, 'data-procflow-ready never set');
+                record('erd page initializes', false, 'data-sql-cartographer-ready never set');
                 finish();
                 return;
             }
@@ -303,7 +303,7 @@
             record('only-used filter restores tables', !!productCard && productCard.offsetParent !== null);
             /* ---- query file import ---- */
             var importPayload = JSON.stringify({
-                format: 'procflow-erd-query', version: 1, fingerprint: 'stale-hash',
+                format: 'sql-cartographer-erd-query', version: 1, fingerprint: 'stale-hash',
                 name: 'imported smoke',
                 selections: [
                     { entityId: 'DBO.CUSTOMER', column: 'Email' },

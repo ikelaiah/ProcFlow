@@ -1,4 +1,4 @@
-﻿/* proc>flow: dialect detection and procedural parsing */
+/* sql-cartographer: dialect detection and procedural parsing */
 /* Pure functions: detect dialect, tokenise, parse control flow, emit Mermaid.
    Dialects: tsql | db2 (SQL PL) | plpgsql | sqlite */
 

@@ -1,4 +1,4 @@
-/* proc>flow v2.6.0 — ERD query persistence (saved state and versioned query files).
+/* sql-cartographer v2.6.0 — ERD query persistence (saved state and versioned query files).
    Pure serialization and validation for the query builder. The browser store
    itself lives in src/workspace.ts (storage is opt-in and local-only); this
    module never touches the DOM or storage, so the file format is testable and
@@ -11,7 +11,7 @@
      changed schema never blocks a restore.
    - Serialization is deterministic: same state in, identical JSON out. */
 
-var QUERY_FILE_FORMAT = 'procflow-erd-query';
+var QUERY_FILE_FORMAT = 'sql-cartographer-erd-query';
 /* Version 1 shipped without aggregates; version 2 adds them and still reads
    version-1 files by defaulting the missing field. */
 var QUERY_FILE_VERSION = 2;
@@ -126,7 +126,7 @@ function queryStateFromJSON(text: string): ErdQueryStoreParseResult {
     return fail('erd_query_parse_error','Query file is not valid JSON.');
   }
   if(!parsed||typeof parsed!=='object'||parsed.format!==QUERY_FILE_FORMAT){
-    return fail('erd_query_format_error','File is not a ProcFlow query.');
+    return fail('erd_query_format_error','File is not a SQL Cartographer query.');
   }
   var fileVersion=typeof parsed.version==='number'?parsed.version:0;
   if(fileVersion<QUERY_FILE_MIN_VERSION||fileVersion>QUERY_FILE_VERSION){
@@ -334,6 +334,6 @@ function queryStatePrune(state: ErdQuerySavedState,
 function queryFileBaseName(state: ErdQuerySavedState): string {
   var slug=querySavedName(state.name||'').toLowerCase()
     .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
-  return slug||('procflow-query-'+state.fingerprint);
+  return slug||('sql-cartographer-query-'+state.fingerprint);
 }
 

@@ -1,4 +1,4 @@
-/* proc>flow v2.6.0 — ERD query-builder view builders.
+/* sql-cartographer v2.6.0 — ERD query-builder view builders.
    Pure DOM construction for the floating window: chips, join cards, problem
    cards, ambiguity choices, the teaching banner, and the learn list. These
    functions hold no state and attach no listeners; every interaction is wired
@@ -34,7 +34,7 @@ function qbViewEmptyPlan(): HTMLElement {
   var title=document.createElement('h4');
   title.textContent='Pick columns on the diagram';
   var line=document.createElement('p');
-  line.textContent='Every table card now shows a checkbox per column. ProcFlow follows declared FOREIGN KEY constraints to work out the joins while you pick.';
+  line.textContent='Every table card now shows a checkbox per column. SQL Cartographer follows declared FOREIGN KEY constraints to work out the joins while you pick.';
   var steps=document.createElement('ol');
   steps.className='qb-steps';
   ['Tick the columns you need.',
@@ -46,7 +46,7 @@ function qbViewEmptyPlan(): HTMLElement {
   });
   var hint=document.createElement('p');
   hint.className='qb-hint';
-  hint.textContent='No foreign key between two tables? ProcFlow says so and lets you teach the join. It never invents one.';
+  hint.textContent='No foreign key between two tables? SQL Cartographer says so and lets you teach the join. It never invents one.';
   box.appendChild(title);
   box.appendChild(line);
   box.appendChild(steps);

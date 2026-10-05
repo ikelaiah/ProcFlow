@@ -1,4 +1,4 @@
-/* proc>flow v1.11.0 — column lineage pipelines.
+/* sql-cartographer v1.11.0 — column lineage pipelines.
    Fixtures assert, end to end, that `SELECT col INTO #t` flows through
    transformations (UPDATE / INSERT … SELECT / CREATE TABLE) to later outputs
    with the column origin traced to its source object; that ambiguous reaching
@@ -9,8 +9,8 @@
    column-flow graph round-trips through Mermaid and draw.io with provenance
    intact and meets its bounded column layout budgets.
 
-   After this suite runs, PROCFLOW_COLUMNFLOW_PASS and
-   PROCFLOW_COLUMNFLOW_RESULT gate the golden suite (tests/tests.ts) and feed
+   After this suite runs, SQL_CARTOGRAPHER_COLUMNFLOW_PASS and
+   SQL_CARTOGRAPHER_COLUMNFLOW_RESULT gate the golden suite (tests/tests.ts) and feed
    the fixture-corpus metrics (tests/metrics.ts). */
 (function(){
   var results: Array<{name: string; pass: boolean; detail: unknown}>=[];
@@ -54,7 +54,7 @@
     expect: CFFixtureExpect;
   }
 
-  var PROCFLOW_COLUMNFLOW_FIXTURES: CFFixture[] = [
+  var SQL_CARTOGRAPHER_COLUMNFLOW_FIXTURES: CFFixture[] = [
     /* ---- end-to-end through a temporary-table pipeline ---- */
     {
       name:'end-to-end: SELECT col INTO #t through UPDATE to outputs',
@@ -288,7 +288,7 @@
   }
 
   var layoutPassed=0, layoutTotal=0;
-  PROCFLOW_COLUMNFLOW_FIXTURES.forEach(function(f){
+  SQL_CARTOGRAPHER_COLUMNFLOW_FIXTURES.forEach(function(f){
     try{
       var got=runCF(f);
       var cf=got.cf;
@@ -475,10 +475,10 @@
   }
 
   var passed=results.filter(function(r){return r.pass;}).length;
-  window.PROCFLOW_COLUMNFLOW_RESULT={passed:passed,total:results.length,
+  window.SQL_CARTOGRAPHER_COLUMNFLOW_RESULT={passed:passed,total:results.length,
     layoutPassed:layoutPassed,layoutTotal:layoutTotal};
-  window.PROCFLOW_COLUMNFLOW_PASS=passed===results.length;
-  window.PROCFLOW_COLUMNFLOW_DETAIL=results;
+  window.SQL_CARTOGRAPHER_COLUMNFLOW_PASS=passed===results.length;
+  window.SQL_CARTOGRAPHER_COLUMNFLOW_DETAIL=results;
 
   var out=document.getElementById('columnflow-results');
   if(out) out.textContent=JSON.stringify({

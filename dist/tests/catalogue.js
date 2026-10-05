@@ -1,5 +1,5 @@
 "use strict";
-/* proc>flow v1.9.0 — resolve by catalogue (README post-v1.0.0 item 5).
+/* sql-cartographer v1.9.0 — resolve by catalogue (README post-v1.0.0 item 5).
    Fixtures for catalogue metadata import (JSON + simple line format), exact
    synonym / linked-server / cross-database resolution replacing the v1.5.0
    external label where the catalogue proves the match, and E diagnostics for
@@ -10,7 +10,7 @@
    present, plus one regression guard that the absent-catalogue output is the
    unchanged conservative path.
 
-   After this suite runs, PROCFLOW_CATALOGUE_PASS and PROCFLOW_CATALOGUE_RESULT
+   After this suite runs, SQL_CARTOGRAPHER_CATALOGUE_PASS and SQL_CARTOGRAPHER_CATALOGUE_RESULT
    gate the golden suite (tests/tests.ts) and feed the fixture-corpus metrics. */
 (function () {
     var results = [];
@@ -258,7 +258,7 @@
         record('v1.9.0 workspace snapshot round-trips the catalogue text', false, String(err && err.stack || err));
     }
     var passed = results.filter(function (r) { return r.pass; }).length;
-    window.PROCFLOW_CATALOGUE_RESULT = { passed: passed, total: results.length };
-    window.PROCFLOW_CATALOGUE_PASS = passed === results.length;
+    window.SQL_CARTOGRAPHER_CATALOGUE_RESULT = { passed: passed, total: results.length };
+    window.SQL_CARTOGRAPHER_CATALOGUE_PASS = passed === results.length;
 })();
 //# sourceMappingURL=catalogue.js.map

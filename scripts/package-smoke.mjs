@@ -14,11 +14,11 @@ if (packageResult.status !== 0) {
   process.stderr.write(packageResult.stderr || packageResult.stdout || "package failed\n");
   process.exit(1);
 }
-const archive = join(root, ".release", `procflow-v${JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version}.zip`);
+const archive = join(root, ".release", `sql-cartographer-v${JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version}.zip`);
 const bytes = readFileSync(archive);
 function readU16(offset) { return bytes.readUInt16LE(offset); }
 function readU32(offset) { return bytes.readUInt32LE(offset); }
-const out = mkdtempSync(join(tmpdir(), "procflow-package-smoke-"));
+const out = mkdtempSync(join(tmpdir(), "sql-cartographer-package-smoke-"));
 const extractedRoot = resolve(out);
 const names = [];
 let offset = 0;
@@ -47,7 +47,7 @@ try {
     throw new Error("package contains development files");
   const smoke = spawnSync(process.execPath, [join(root, "scripts", "file-smoke.mjs")], {
     encoding: "utf8", windowsHide: true,
-    env: { ...process.env, PROCFLOW_SMOKE_ROOT: out }
+    env: { ...process.env, SQL_CARTOGRAPHER_SMOKE_ROOT: out }
   });
   if (smoke.status !== 0) {
     process.stdout.write(`package: archive structure passed; browser smoke unavailable or failed\n${smoke.stderr || smoke.stdout || ""}`);

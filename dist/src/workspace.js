@@ -21,7 +21,7 @@
    without a schema bump: the field is optional and older snapshots simply lack
    it. */
 var WORKSPACE_SCHEMA_VERSION = 2;
-var WORKSPACE_STORAGE_KEY = 'procflow.workspace'; /* schema base key; versioned payload */
+var WORKSPACE_STORAGE_KEY = 'sql-cartographer.workspace'; /* schema base key; versioned payload */
 var WORKSPACE_LAST_ERROR = null;
 var DIALECT_SELECT_ORDER = ['auto', 'tsql', 'db2', 'plpgsql', 'sqlite'];
 function defaultWorkspaceOptions() {
@@ -150,7 +150,7 @@ function workspaceLastError() {
 /* v2.2.0 — ERD layout persistence. Same opt-in rule as the workspace: an
    explicit Save/Restore/Clear only, under its own key so a layout survives
    independent of the workspace snapshot and can be forgotten separately. */
-var ERD_LAYOUT_STORAGE_KEY = 'procflow.erd.layout';
+var ERD_LAYOUT_STORAGE_KEY = 'sql-cartographer.erd.layout';
 function writeErdLayout(text) {
     try {
         window.localStorage.setItem(ERD_LAYOUT_STORAGE_KEY, text);
@@ -185,7 +185,7 @@ function clearErdLayout() {
 /* v2.5.0 — ERD query persistence. Same opt-in rule again: one saved query per
    browser, explicit Save/Restore/Forget only, under its own key. Serialization
    and validation live in src/query-store.ts; this module owns storage. */
-var ERD_QUERY_STORAGE_KEY = 'procflow.erd.query';
+var ERD_QUERY_STORAGE_KEY = 'sql-cartographer.erd.query';
 function writeErdQuery(text) {
     try {
         window.localStorage.setItem(ERD_QUERY_STORAGE_KEY, text);

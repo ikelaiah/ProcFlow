@@ -1,4 +1,4 @@
-/* proc>flow v1.12.0 — report import (README post-v1.0.0 item 4).
+/* sql-cartographer v1.12.0 — report import (README post-v1.0.0 item 4).
    Fixtures assert that an SSRS/RDL report definition parses into a report
    linked to its datasets, that embedded, shared, and unresolved datasets are
    distinguished, that XML source locations are preserved where the element
@@ -9,7 +9,7 @@
    is analysed and linked via dataset.analysis, and analyse() attaches the
    parsed report plus its diagnostics.
 
-   After this suite runs, PROCFLOW_REPORT_PASS and PROCFLOW_REPORT_RESULT gate
+   After this suite runs, SQL_CARTOGRAPHER_REPORT_PASS and SQL_CARTOGRAPHER_REPORT_RESULT gate
    the golden suite (tests/tests.ts) and feed the fixture-corpus metrics
    (tests/metrics.ts). */
 (function(){
@@ -71,7 +71,7 @@
     '  </DataSource>\n'+
     '</DataSources>';
 
-  var PROCFLOW_REPORT_FIXTURES: ReportFixture[] = [
+  var SQL_CARTOGRAPHER_REPORT_FIXTURES: ReportFixture[] = [
     /* ---- report → dataset linking + XML source locations ---- */
     {
       name:'embedded dataset links to its SQL analysis with source locations',
@@ -237,7 +237,7 @@
     return parseReport(f.rdl);
   }
 
-  PROCFLOW_REPORT_FIXTURES.forEach(function(f){
+  SQL_CARTOGRAPHER_REPORT_FIXTURES.forEach(function(f){
     try{
       var got=runReport(f);
       var e=f.expect;
@@ -371,9 +371,9 @@
   }
 
   var passed=results.filter(function(r){return r.pass;}).length;
-  window.PROCFLOW_REPORT_RESULT={passed:passed,total:results.length};
-  window.PROCFLOW_REPORT_PASS=passed===results.length;
-  window.PROCFLOW_REPORT_DETAIL=results;
+  window.SQL_CARTOGRAPHER_REPORT_RESULT={passed:passed,total:results.length};
+  window.SQL_CARTOGRAPHER_REPORT_PASS=passed===results.length;
+  window.SQL_CARTOGRAPHER_REPORT_DETAIL=results;
 
   var out=document.getElementById('report-results');
   if(out) out.textContent=JSON.stringify({

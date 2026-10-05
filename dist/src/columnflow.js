@@ -1,5 +1,5 @@
 "use strict";
-/* proc>flow: column lineage pipelines (v1.11.0)
+/* sql-cartographer: column lineage pipelines (v1.11.0)
    Column-flow edges through CTEs, views, temporary tables, transformations,
    and catalogue-resolved object boundaries; the exported column-flow graph with
    its own documented layout class; column-resolution signals surfaced as

@@ -1,5 +1,5 @@
 "use strict";
-var PROCFLOW_REALISTIC_CORPUS = [
+var SQL_CARTOGRAPHER_REALISTIC_CORPUS = [
     {
         name: 'T-SQL nightly reconciliation procedure', dialect: 'tsql', expectsOpaque: true,
         sql: [

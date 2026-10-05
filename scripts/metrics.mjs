@@ -67,7 +67,7 @@ if (!existsSync(metricsPage)) {
       : "no Chromium browser found; install Chrome, Edge, or Chromium, or set CHROME_PATH");
     process.exit(1);
   }
-  const runDirectory = mkdtempSync(join(tmpdir(), "procflow-metrics-"));
+  const runDirectory = mkdtempSync(join(tmpdir(), "sql-cartographer-metrics-"));
   const fileUrl = pathToFileURL(metricsPage).href;
   try {
     const result = spawnSync(browser, [

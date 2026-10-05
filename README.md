@@ -1,30 +1,36 @@
 <p align="center">
-  <img src="assets/procflow-logo.svg"
-       alt="proc&gt;flow — SQL logic and dependency visualiser"
-       width="760">
+  <img src="assets/sql-cartographer-logo.svg"
+       alt="SQL Cartographer — SQL logic and dependency visualiser"
+       width="820">
 </p>
 
 <p align="center"><strong>Understand complicated SQL without tracing every branch by hand.</strong></p>
 
 <p align="center">
-  <a href="https://github.com/ikelaiah/ProcFlow/actions/workflows/correctness.yml"><img src="https://github.com/ikelaiah/ProcFlow/actions/workflows/correctness.yml/badge.svg?branch=main" alt="Correctness workflow status"></a>
-  <a href="https://github.com/ikelaiah/ProcFlow/releases/latest"><img src="https://img.shields.io/github/v/release/ikelaiah/ProcFlow?display_name=tag&amp;sort=semver" alt="Latest release"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/ikelaiah/ProcFlow?color=54c39b" alt="MIT license"></a>
+  <a href="https://github.com/ikelaiah/sql-cartographer/actions/workflows/correctness.yml"><img src="https://github.com/ikelaiah/sql-cartographer/actions/workflows/correctness.yml/badge.svg?branch=main" alt="Correctness workflow status"></a>
+  <a href="https://github.com/ikelaiah/sql-cartographer/releases/latest"><img src="https://img.shields.io/github/v/release/ikelaiah/sql-cartographer?display_name=tag&amp;sort=semver" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/ikelaiah/sql-cartographer?color=54c39b" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/runtime-local--only-54c39b" alt="Runtime: local only">
 </p>
 
-ProcFlow turns SQL into diagrams for control flow, query structure, object
+SQL Cartographer turns SQL into diagrams for control flow, query structure, object
 dependencies, column lineage, report dependencies, and entity relationship
 diagrams from schema DDL. It runs locally in the browser: no backend, database
 connection, sign-in, or installation is required.
 
-> **Accuracy warning:** ProcFlow is a deterministic heuristic analyser, not a
+> **Accuracy warning:** SQL Cartographer is a deterministic heuristic analyser, not a
 > database compiler. Treat diagrams as investigation aids and verify important
 > findings against the source SQL and target database.
 
-> **Trust model:** ProcFlow v2.7.0 asserts semantic relationships only where
+> **Trust model:** SQL Cartographer v2.7.0 asserts semantic relationships only where
 > static evidence supports them. Dynamic and ambiguous regions stay explicit.
 > See [Accuracy](docs/ACCURACY.md) and the [v2 accuracy contract](docs/V2_ACCURACY_CONTRACT.md).
+
+> **Breaking change (rename):** The project was renamed from *ProcFlow* to
+> *SQL Cartographer*. Browser-stored queries, ERD layouts, and workspace
+> exports created before the rename are not read by this version — see the
+> [CHANGELOG](CHANGELOG.md) for the full identifier mapping and what to
+> export before upgrading.
 
 ## Use cases
 
@@ -42,7 +48,7 @@ connection, sign-in, or installation is required.
 
 ## Quick start
 
-1. Download the `v2.7.0` runtime ZIP from the [GitHub release](https://github.com/ikelaiah/ProcFlow/releases/tag/v2.7.0), or clone this repository.
+1. Download the `v2.7.0` runtime ZIP from the [GitHub release](https://github.com/ikelaiah/sql-cartographer/releases/tag/v2.7.0), or clone this repository.
 2. Open `index.html` in a current Chromium, Firefox, or Edge browser.
 3. Paste SQL or import local files, select a dialect or **Auto**, and choose
    **Refresh**.
@@ -111,14 +117,14 @@ in the browser.
 
 ## Supported dialects
 
-ProcFlow v2.7.0 supports Microsoft T-SQL, IBM DB2 SQL PL, PostgreSQL
+SQL Cartographer v2.7.0 supports Microsoft T-SQL, IBM DB2 SQL PL, PostgreSQL
 PL/pgSQL, and SQLite. Detection is automatic but can be overridden. Vendor
 extensions outside these tested constructs may produce diagnostics or reduced
 coverage; see [Accuracy](docs/ACCURACY.md).
 
 ## Privacy and security
 
-Runtime analysis is local-only. Nothing is submitted to ProcFlow. Browser
+Runtime analysis is local-only. Nothing is submitted to SQL Cartographer. Browser
 storage is opt-in through **Save to this browser**; workspace export and
 clipboard actions are explicit. Mermaid uses strict rendering in the security
 suite, and hostile labels are escaped for diagram/XML output. Read the full
@@ -160,7 +166,7 @@ reports, bugs, and feature requests; never include confidential SQL.
 
 ## License
 
-ProcFlow is released under the [MIT License](LICENSE). Mermaid is vendored under
+SQL Cartographer is released under the [MIT License](LICENSE). Mermaid is vendored under
 its own MIT license in `vendor/mermaid/LICENSE`.
 
 

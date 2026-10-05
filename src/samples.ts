@@ -1,9 +1,9 @@
-/* proc>flow v2.7.0 — bundled demo sample SQL.
+/* sql-cartographer v2.7.0 — bundled demo sample SQL.
    One representative script per dialect, used by the "Load sample" button so
    users can explore the analyser without preparing input. Kept as data,
    separate from the application controller. */
-var PROCFLOW_SAMPLES = {} as Record<Dialect, string>;
-  PROCFLOW_SAMPLES.tsql = [
+var SQL_CARTOGRAPHER_SAMPLES = {} as Record<Dialect, string>;
+  SQL_CARTOGRAPHER_SAMPLES.tsql = [
 "CREATE PROCEDURE dbo.usp_SyncStudentPhotos",
 "    @SchoolYear INT,",
 "    @DryRun BIT = 0",
@@ -63,7 +63,7 @@ var PROCFLOW_SAMPLES = {} as Record<Dialect, string>;
 "    RETURN 0;",
 "END"].join('\n');
 
-  PROCFLOW_SAMPLES.db2 = [
+  SQL_CARTOGRAPHER_SAMPLES.db2 = [
 "CREATE PROCEDURE ADMIN.SYNC_ENROLMENT (IN P_YEAR INTEGER, OUT P_COUNT INTEGER)",
 "LANGUAGE SQL",
 "SPECIFIC SYNC_ENROLMENT",
@@ -105,7 +105,7 @@ var PROCFLOW_SAMPLES = {} as Record<Dialect, string>;
 "    RETURN 0;",
 "END"].join('\n');
 
-  PROCFLOW_SAMPLES.plpgsql = [
+  SQL_CARTOGRAPHER_SAMPLES.plpgsql = [
 "CREATE OR REPLACE FUNCTION app.sync_students(p_year integer, p_dry_run boolean DEFAULT false)",
 "RETURNS integer",
 "LANGUAGE plpgsql",
@@ -145,7 +145,7 @@ var PROCFLOW_SAMPLES = {} as Record<Dialect, string>;
 "END;",
 "$$;"].join('\n');
 
-  PROCFLOW_SAMPLES.sqlite = [
+  SQL_CARTOGRAPHER_SAMPLES.sqlite = [
 "CREATE TRIGGER trg_student_audit",
 "AFTER UPDATE OF surname, given_name ON student",
 "FOR EACH ROW",

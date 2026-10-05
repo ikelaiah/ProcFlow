@@ -2,7 +2,7 @@
     v1.7.0 demo — clear deterministic exports.
 
     dbo.v170_demo exercises the v1.7.0 territory (ROADMAP workstream F) in one
-    script. Open the file in ProcFlow with the default Control flow view, then
+    script. Open the file in SQL Cartographer with the default Control flow view, then
     use Export > Save draw.io (and copy the Mermaid tab):
 
     1. Deterministic layered layout. Every draw.io export is repositioned by a

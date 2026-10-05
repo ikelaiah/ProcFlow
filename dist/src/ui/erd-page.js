@@ -1,5 +1,5 @@
 "use strict";
-/* proc>flow v2.4.1 — ERD page controller.
+/* sql-cartographer v2.4.1 — ERD page controller.
    Parses schema DDL into the shared schema IR and draws an entity map of
    declared tables, views, and foreign keys. Declared constraints only: this
    page never infers a relationship from query text. */
@@ -671,7 +671,7 @@
         var url = URL.createObjectURL(blob);
         var anchor = document.createElement('a');
         anchor.href = url;
-        anchor.download = 'procflow-erd-layout-' + erdLayoutFingerprint(result) + '.json';
+        anchor.download = 'sql-cartographer-erd-layout-' + erdLayoutFingerprint(result) + '.json';
         document.body.appendChild(anchor);
         anchor.click();
         document.body.removeChild(anchor);
@@ -1183,7 +1183,7 @@
         sample.addEventListener('click', function () {
             if (!sql)
                 return;
-            sql.value = PROCFLOW_ERD_SAMPLE_TSQL;
+            sql.value = SQL_CARTOGRAPHER_ERD_SAMPLE_TSQL;
             drawGutter();
             render();
             sql.focus();
@@ -1193,7 +1193,7 @@
         sampleDb2.addEventListener('click', function () {
             if (!sql)
                 return;
-            sql.value = PROCFLOW_ERD_SAMPLE_DB2;
+            sql.value = SQL_CARTOGRAPHER_ERD_SAMPLE_DB2;
             drawGutter();
             render();
             sql.focus();
@@ -1248,7 +1248,7 @@
         tabMermaid.addEventListener('keydown', tablistKeys);
     /* Query mode adds column checkboxes to the cards, so it needs a card
        rebuild and a redraw; compact mode is suspended while picking. */
-    document.addEventListener('procflow-query-mode', function (event) {
+    document.addEventListener('sql-cartographer-query-mode', function (event) {
         var modeActive = !!event.detail.active;
         if (modeActive && compactMode) {
             compactBeforeQuery = true;
@@ -1274,7 +1274,7 @@
     });
     /* Query state changes are low-frequency and must be visible immediately;
        animation frames can be starved in headless and off-screen contexts. */
-    document.addEventListener('procflow-query-changed', drawOverlay);
+    document.addEventListener('sql-cartographer-query-changed', drawOverlay);
     if (findInput) {
         findInput.addEventListener('input', function () { findIndex = 0; applyFind(true); });
         findInput.addEventListener('keydown', function (event) {
@@ -1519,7 +1519,7 @@
     }
     drawGutter();
     render();
-    document.documentElement.setAttribute('data-procflow-ready', String(typeof parseSchema === 'function' && typeof toMermaidER === 'function' &&
+    document.documentElement.setAttribute('data-sql-cartographer-ready', String(typeof parseSchema === 'function' && typeof toMermaidER === 'function' &&
         typeof queryBuildPlan === 'function'));
 })();
 //# sourceMappingURL=erd-page.js.map

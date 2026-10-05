@@ -5,7 +5,7 @@ labels: ["enhancement", "needs-triage"]
 body:
   - type: markdown
     attributes:
-      value: ProcFlow is local-first and heuristic; requests should preserve explicit uncertainty and the no-upload security model.
+      value: SQL Cartographer is local-first and heuristic; requests should preserve explicit uncertainty and the no-upload security model.
   - type: textarea
     id: use-case
     attributes:

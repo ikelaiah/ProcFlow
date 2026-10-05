@@ -1,5 +1,5 @@
 "use strict";
-/* proc>flow: confidence scoring and health-band policy */
+/* sql-cartographer: confidence scoring and health-band policy */
 function confidenceBand(confidence) {
     return confidence >= 0.85 ? 'high' : (confidence >= 0.6 ? 'medium' : 'low');
 }

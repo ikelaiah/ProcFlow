@@ -1,5 +1,5 @@
 "use strict";
-/* proc>flow v1.7.0 — clear deterministic exports (ROADMAP workstream F).
+/* sql-cartographer v1.7.0 — clear deterministic exports (ROADMAP workstream F).
    Export-parity fixtures parse each generated Mermaid and draw.io output back
    into a semantic manifest (exportManifest / mermaidManifest / drawioManifest,
    defined at the top level so tests/metrics.ts can reuse them) and compare with
@@ -9,8 +9,8 @@
    budgets at documented size limits, and that large/non-planar graphs degrade
    honestly without ever claiming zero crossings.
 
-   After the suites run, the page-level globals PROCFLOW_PARITY_PASS and
-   PROCFLOW_LAYOUT_PASS gate the golden suite (tests/tests.ts) and feed the
+   After the suites run, the page-level globals SQL_CARTOGRAPHER_PARITY_PASS and
+   SQL_CARTOGRAPHER_LAYOUT_PASS gate the golden suite (tests/tests.ts) and feed the
    v1.7.0 fixture-corpus metrics (tests/metrics.ts). */
 /* ---------- canonical export contract (semantic manifest) ---------- */
 function normText(s) {
@@ -114,7 +114,7 @@ function drawioManifest(xml) {
         var geo = cell.querySelector('mxGeometry');
         var style = cell.getAttribute('style') || '';
         var m = /fillColor=(#[0-9a-fA-F]{6})/.exec(style);
-        var meta = cell.getAttribute('data-procflow') || '';
+        var meta = cell.getAttribute('data-sql-cartographer') || '';
         var metaCls = /cls=([A-Za-z_]+)/.exec(meta);
         nodes.push({
             id: rawId.replace(/^pf-/, ''),
@@ -132,7 +132,7 @@ function drawioManifest(xml) {
     Array.prototype.forEach.call(doc.querySelectorAll('mxCell[edge="1"]'), function (cell) {
         var style = cell.getAttribute('style') || '';
         var dashed = /dashed=1/.test(style);
-        var kind = cell.getAttribute('data-procflow-kind') || '';
+        var kind = cell.getAttribute('data-sql-cartographer-kind') || '';
         var waypoints = [];
         Array.prototype.forEach.call(cell.querySelectorAll('mxPoint'), function (p) {
             waypoints.push({ x: parseFloat(p.getAttribute('x') || '0'),
@@ -152,7 +152,7 @@ function drawioManifest(xml) {
 /* Class sign is recovered from the canonical fill registration both exporters
    source from (exporters.ts CANONICAL_NODE_STYLE); used only as a fallback when
    the metadata `cls=` attribute is absent. */
-var PROCFLOW_FILL_TO_CLS = (function () {
+var SQL_CARTOGRAPHER_FILL_TO_CLS = (function () {
     var out = {};
     Object.keys(CANONICAL_NODE_STYLE).forEach(function (cls) {
         out[CANONICAL_NODE_STYLE[cls].fill.toLowerCase()] = cls;
@@ -165,11 +165,11 @@ function clsAreEqual(a, b) {
     /* Legacy fallback: recover the class from the canonical fill registration
        when the metadata `cls=` attribute is absent. */
     if (a && a.charAt(0) === '#')
-        return (PROCFLOW_FILL_TO_CLS[a] || '') === b;
+        return (SQL_CARTOGRAPHER_FILL_TO_CLS[a] || '') === b;
     return false;
 }
 /* ---------- parity fixture list (one per graph construct) ---------- */
-var PROCFLOW_PARITY_FIXTURES = [
+var SQL_CARTOGRAPHER_PARITY_FIXTURES = [
     { name: 'control: procedure with IF/WHILE/try-catch/tx',
         dialect: 'tsql', cls: 'control', mode: 'flow', nodeLimit: 36, crossingBudget: 0,
         sql: [
@@ -288,7 +288,7 @@ var PROCFLOW_PARITY_FIXTURES = [
         ].join('\n') }
 ];
 /* Named layout classes with documented size limits and crossing budgets. */
-var PROCFLOW_LAYOUT_CLASSES = [
+var SQL_CARTOGRAPHER_LAYOUT_CLASSES = [
     { cls: 'control', nodeLimit: 36, crossingBudget: 0, large: false },
     { cls: 'query', nodeLimit: 18, crossingBudget: 1, large: false },
     { cls: 'data', nodeLimit: 20, crossingBudget: 0, large: false },
@@ -397,7 +397,7 @@ function layoutFor(fixture) {
     var parityPassed = 0, parityTotal = 0, layoutPassed = 0, layoutTotal = 0;
     var traceOk = 0, traceTotal = 0;
     var failures = [];
-    PROCFLOW_PARITY_FIXTURES.forEach(function (fixture) {
+    SQL_CARTOGRAPHER_PARITY_FIXTURES.forEach(function (fixture) {
         parityTotal += 2;
         ['TD', 'LR'].forEach(function (dir) {
             var p = parityFor(fixture, dir);
@@ -417,7 +417,7 @@ function layoutFor(fixture) {
         });
         var l = layoutFor(fixture);
         layoutTotal++;
-        var clsBudget = PROCFLOW_LAYOUT_CLASSES.filter(function (c) {
+        var clsBudget = SQL_CARTOGRAPHER_LAYOUT_CLASSES.filter(function (c) {
             return c.cls === fixture.cls;
         })[0];
         var withinLimit = clsBudget && l.graph.nodes.length <= clsBudget.nodeLimit;
@@ -445,7 +445,7 @@ function layoutFor(fixture) {
     var bigSrc = 'CREATE PROCEDURE dbo.big AS BEGIN\n' + bigStatement.join('\n') + '\nEND';
     try {
         var bigBig = analyse(bigSrc, { dialect: 'tsql', mode: 'flow', group: false, sources: true });
-        var bigCls = PROCFLOW_LAYOUT_CLASSES.filter(function (c) { return c.cls === 'nonplanar'; })[0];
+        var bigCls = SQL_CARTOGRAPHER_LAYOUT_CLASSES.filter(function (c) { return c.cls === 'nonplanar'; })[0];
         var bigA = layoutAnalysis(bigBig.graph, 'TD');
         var bigB = layoutAnalysis(bigBig.graph, 'TD');
         var bigOk = bigBig.graph.nodes.length <= bigCls.nodeLimit &&
@@ -468,12 +468,12 @@ function layoutFor(fixture) {
         layoutTotal++;
     }
     var parityPass = parityPassed === parityTotal && failures.length === 0;
-    window.PROCFLOW_PARITY_PASS = parityPass;
-    window.PROCFLOW_PARITY_RESULT = { passed: parityPassed, total: parityTotal,
+    window.SQL_CARTOGRAPHER_PARITY_PASS = parityPass;
+    window.SQL_CARTOGRAPHER_PARITY_RESULT = { passed: parityPassed, total: parityTotal,
         traceabilityPassed: traceOk, traceabilityTotal: traceTotal };
-    window.PROCFLOW_LAYOUT_PASS = layoutPassed === layoutTotal && failures.length === 0;
-    window.PROCFLOW_LAYOUT_RESULT = { passed: layoutPassed, total: layoutTotal };
-    window.PROCFLOW_PARITY_FAILURES = failures;
+    window.SQL_CARTOGRAPHER_LAYOUT_PASS = layoutPassed === layoutTotal && failures.length === 0;
+    window.SQL_CARTOGRAPHER_LAYOUT_RESULT = { passed: layoutPassed, total: layoutTotal };
+    window.SQL_CARTOGRAPHER_PARITY_FAILURES = failures;
     var out = document.getElementById('parity-results');
     if (out)
         out.textContent = JSON.stringify({

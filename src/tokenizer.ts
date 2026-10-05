@@ -1,4 +1,4 @@
-﻿/* proc>flow: tokenization and source positions */
+/* sql-cartographer: tokenization and source positions */
 var S = function(a: string[]): StringSet {
   var o: StringSet={};
   for(var i=0;i<a.length;i++) o[a[i]]=1;

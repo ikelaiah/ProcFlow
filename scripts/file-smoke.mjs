@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-const repositoryRoot = process.env.PROCFLOW_SMOKE_ROOT
-  ? resolve(process.env.PROCFLOW_SMOKE_ROOT)
+const repositoryRoot = process.env.SQL_CARTOGRAPHER_SMOKE_ROOT
+  ? resolve(process.env.SQL_CARTOGRAPHER_SMOKE_ROOT)
   : dirname(dirname(fileURLToPath(import.meta.url)));
 const smokePage = join(repositoryRoot, "index.html");
 const explicitBrowser = (process.env.CHROME_PATH || "").trim();
@@ -61,7 +61,7 @@ if (!existsSync(smokePage)) {
         : "no Chromium browser found; install Chrome, Edge, or Chromium, or set CHROME_PATH"
     );
   } else {
-    const runDirectory = mkdtempSync(join(tmpdir(), "procflow-file-smoke-"));
+    const runDirectory = mkdtempSync(join(tmpdir(), "sql-cartographer-file-smoke-"));
     const fileUrl = pathToFileURL(smokePage).href;
     try {
       const result = spawnSync(browser, [
@@ -91,7 +91,7 @@ if (!existsSync(smokePage)) {
         fail(`browser could not complete: ${result.error.message}`, result.stderr || output);
       } else if (result.status !== 0) {
         fail(`browser exited with status ${result.status}`, result.stderr || output);
-      } else if (!/data-procflow-ready="true"/.test(output)) {
+      } else if (!/data-sql-cartographer-ready="true"/.test(output)) {
         fail("application did not initialize its local runtime", output || result.stderr);
       } else if (!/data-workspace-optin="1"/.test(output)) {
         /* v1.8.0 extended local-only check: the app must initialise with

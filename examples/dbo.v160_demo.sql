@@ -2,7 +2,7 @@
     v1.6.0 demo — honest measurement.
 
     dbo.v160_demo exercises the v1.6.0 outcomes in one script. Open the file
-    in ProcFlow with the default Control flow view and open the analysis
+    in SQL Cartographer with the default Control flow view and open the analysis
     panel (Refresh if the panel predates the file):
 
     1. One headline, one honest formula. Confidence (v1.6.0) is derived from

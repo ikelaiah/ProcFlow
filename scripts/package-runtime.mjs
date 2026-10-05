@@ -10,10 +10,10 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 const version = packageJson.version;
 const outputDir = join(root, ".release");
-const archive = join(outputDir, `procflow-v${version}.zip`);
+const archive = join(outputDir, `sql-cartographer-v${version}.zip`);
 const checksumFile = join(outputDir, "SHA256SUMS.txt");
 const runtimeReadme = [
-  `ProcFlow v${version}`,
+  `SQL Cartographer v${version}`,
   "",
   "Open index.html in a current Chrome, Edge, Firefox, or Chromium browser.",
   "Open erd.html for the entity relationship diagram page built from schema DDL.",

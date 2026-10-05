@@ -41,30 +41,30 @@ jobs:
       - name: Start static test server
         shell: bash
         run: |
-          python3 -m http.server 8000 --bind 127.0.0.1 > /tmp/procflow-firefox-http.log 2>&1 &
-          echo $! > /tmp/procflow-firefox-http.pid
+          python3 -m http.server 8000 --bind 127.0.0.1 > /tmp/sql-cartographer-firefox-http.log 2>&1 &
+          echo $! > /tmp/sql-cartographer-firefox-http.pid
           for attempt in {1..20}; do
             if curl --fail --silent http://127.0.0.1:8000/tests/firefox-smoke.html > /dev/null; then
               exit 0
             fi
             sleep 0.25
           done
-          cat /tmp/procflow-firefox-http.log
+          cat /tmp/sql-cartographer-firefox-http.log
           exit 1
 
       - name: Run Firefox compatibility smoke
         shell: bash
         run: |
           set -euo pipefail
-          rm -f /tmp/procflow-firefox-smoke.png
-          "$FIREFOX_PATH" --headless --no-remote --screenshot /tmp/procflow-firefox-smoke.png \
+          rm -f /tmp/sql-cartographer-firefox-smoke.png
+          "$FIREFOX_PATH" --headless --no-remote --screenshot /tmp/sql-cartographer-firefox-smoke.png \
             http://127.0.0.1:8000/tests/firefox-smoke.html
-          test -s /tmp/procflow-firefox-smoke.png
+          test -s /tmp/sql-cartographer-firefox-smoke.png
 
       - name: Stop static test server
         if: always()
         shell: bash
         run: |
-          if [ -f /tmp/procflow-firefox-http.pid ]; then
-            kill "$(cat /tmp/procflow-firefox-http.pid)" 2>/dev/null || true
+          if [ -f /tmp/sql-cartographer-firefox-http.pid ]; then
+            kill "$(cat /tmp/sql-cartographer-firefox-http.pid)" 2>/dev/null || true
           fi

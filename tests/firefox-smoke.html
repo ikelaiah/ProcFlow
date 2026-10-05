@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>proc&gt;flow Firefox smoke</title>
+<title>SQL Cartographer Firefox smoke</title>
 <style>
 body{font:14px/1.5 system-ui,sans-serif;margin:24px;background:#111a21;color:#e7eef3}
 body.pass{background:#123027}body.fail{background:#39231f}
@@ -11,7 +11,7 @@ iframe{position:absolute;width:1280px;height:800px;left:-10000px}
 </style>
 </head>
 <body>
-<h1>proc&gt;flow Firefox smoke</h1>
+<h1>SQL Cartographer Firefox smoke</h1>
 <p id="summary">Running…</p>
 <iframe id="app" src="../index.html"></iframe>
 <iframe id="erd" src="../erd.html"></iframe>
@@ -26,12 +26,12 @@ iframe{position:absolute;width:1280px;height:800px;left:-10000px}
     document.getElementById('summary').textContent=(pass?'PASS':'FAIL')+' · '+
       checks.filter(function(value){return value;}).length+'/'+checks.length+
       ' critical paths';
-    document.title='proc>flow Firefox smoke '+(pass?'PASS':'FAIL');
+    document.title='SQL Cartographer Firefox smoke '+(pass?'PASS':'FAIL');
   }
   appFrame.addEventListener('load',function(){
     var w=appFrame.contentWindow,d=appFrame.contentDocument;
     function get(id){return d.getElementById(id);}
-    checks.push(!!d.documentElement.getAttribute('data-procflow-ready'));
+    checks.push(!!d.documentElement.getAttribute('data-sql-cartographer-ready'));
     get('sql').value='SELECT id FROM dbo.firefox_smoke_source;';
     get('sql').dispatchEvent(new Event('input'));
     get('btn-draw').click();
@@ -52,7 +52,7 @@ iframe{position:absolute;width:1280px;height:800px;left:-10000px}
   });
   erdFrame.addEventListener('load',function(){
     var w=erdFrame.contentWindow,d=erdFrame.contentDocument;
-    checks.push(!!d.documentElement.getAttribute('data-procflow-ready'));
+    checks.push(!!d.documentElement.getAttribute('data-sql-cartographer-ready'));
     checks.push(typeof w.erdQueryPanelSetSchema==='function'&&
       typeof w.queryBuildPlan==='function'&&
       typeof w.toMermaidER==='function');

@@ -3,14 +3,14 @@
     return 'CREATE OR ALTER PROCEDURE dbo.'+name+(params?' '+params:'')+
       ' AS\nBEGIN\n'+body+'\nEND';
   }
-  function valid(name: string, sql: string, expect?: FixtureExpectation): ProcflowFixture {
+  function valid(name: string, sql: string, expect?: FixtureExpectation): Fixture {
     expect=expect||{};
     expect.noErrors=true;
     expect.coverageMin=1;
     return {name:'T-SQL · '+name,dialect:'tsql',sql:sql,expect:expect};
   }
 
-  var cases: ProcflowFixture[]=[
+  var cases: Fixture[]=[
     valid('simple select',proc('p01','SELECT id FROM dbo.student;'),{read:'dbo.student',resultSets:1}),
     valid('simple IF',proc('p02','IF @x = 1 SELECT 1;'),{branch:1}),
     valid('IF ELSE',proc('p03','IF @x = 1 SELECT 1; ELSE SELECT 2;'),{branch:1,resultSets:2}),
@@ -67,6 +67,6 @@
     valid('parameter forms',proc('p54','SELECT @id, @name;','@id int, @name nvarchar(50)=N\'x\', @out int OUTPUT'),{object:'dbo.p54',resultSets:1})
   ];
 
-  PROCFLOW_FIXTURES=PROCFLOW_FIXTURES.concat(cases);
-  window.PROCFLOW_TSQL_FIXTURE_COUNT=cases.length;
+  SQL_CARTOGRAPHER_FIXTURES=SQL_CARTOGRAPHER_FIXTURES.concat(cases);
+  window.SQL_CARTOGRAPHER_TSQL_FIXTURE_COUNT=cases.length;
 })();

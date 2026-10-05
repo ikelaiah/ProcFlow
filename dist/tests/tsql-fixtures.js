@@ -66,7 +66,7 @@
         valid('EXECUTE AS header', 'CREATE PROCEDURE dbo.p53 WITH EXECUTE AS OWNER AS BEGIN\nSELECT id FROM dbo.t;\nEND', { object: 'dbo.p53', read: 'dbo.t' }),
         valid('parameter forms', proc('p54', 'SELECT @id, @name;', '@id int, @name nvarchar(50)=N\'x\', @out int OUTPUT'), { object: 'dbo.p54', resultSets: 1 })
     ];
-    PROCFLOW_FIXTURES = PROCFLOW_FIXTURES.concat(cases);
-    window.PROCFLOW_TSQL_FIXTURE_COUNT = cases.length;
+    SQL_CARTOGRAPHER_FIXTURES = SQL_CARTOGRAPHER_FIXTURES.concat(cases);
+    window.SQL_CARTOGRAPHER_TSQL_FIXTURE_COUNT = cases.length;
 })();
 //# sourceMappingURL=tsql-fixtures.js.map

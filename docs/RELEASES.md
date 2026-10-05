@@ -31,7 +31,7 @@ release and points here and to `CHANGELOG.md` for the history.
    gh release create vX.Y.Z \
      --title "vX.Y.Z — <title>" \
      --notes-file docs/releases/vX.Y.Z.md \
-     .release/procflow-vX.Y.Z.zip .release/SHA256SUMS.txt
+     .release/sql-cartographer-vX.Y.Z.zip .release/SHA256SUMS.txt
    ```
 
    Verify the uploaded ZIP digest against `.release/SHA256SUMS.txt`.

@@ -2,7 +2,7 @@
     v1.2.0 demo — trust statement boundaries.
 
     The four objects below exercise the v1.2.0 boundary-handling outcomes
-    directly. Open the file in ProcFlow, set Scope to Object dependencies to
+    directly. Open the file in SQL Cartographer, set Scope to Object dependencies to
     see the three objects, then switch to Internal logic for each.
 
     1. Semicolon-free statement boundaries are grammar-driven, not
