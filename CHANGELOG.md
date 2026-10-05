@@ -3,6 +3,59 @@
 All notable released SQL Cartographer changes are recorded here. Detailed verification
 evidence belongs in the canonical release note under `docs/releases/`.
 
+## v3.1.0 — Documentation, diagrams, and maintainability
+
+Detailed evidence in [docs/releases/v3.1.0.md](docs/releases/v3.1.0.md).
+
+### Fixed
+
+- `ROLLBACK TO <savepoint>` misread its target as the literal `TO`, because
+  `tsqlTransactionAction` never skipped the keyword. The savepoint name is now
+  read correctly and the "roll back to savepoint X" label can fire.
+- A failure in column-flow analysis or column-graph layout was swallowed with
+  no diagnostic, so the feature silently disappeared. Both now report a
+  document-scoped `column_flow_analysis_error`; the column-flow model survives
+  a layout failure.
+- Both pages shipped the pre-rename `proc>flow` wordmark despite v3.0.0
+  claiming one consistent wordmark. A CI guard now matches the split markup
+  form that hid it.
+
+### Documentation
+
+- Added Mermaid diagrams (analysis pipeline, module graph, ERD layout, bridge
+  tables, self joins, path tie-breaks, report chains, node/edge vocabulary) and
+  screenshots of both pages. Added a worked example built from real product
+  output.
+- Added `docs/README.md` (documentation map and learning path),
+  `CONTRIBUTING.md`, `docs/GLOSSARY.md`, an ADR template and index, and
+  `.github/SECURITY.md` so GitHub surfaces the policy.
+- Refreshed `docs/ARCHITECTURE.md` against `src/` (seven missing modules, one
+  stale attribution, the load-order contract). Repaired 21 broken links in
+  `docs/archive/`. Added TOCs to the user guide and query builder.
+
+### Changed
+
+- Extracted the pure T-SQL transaction model from `src/ir.ts` into
+  `src/dialects-state.ts`, alongside the `TSQL_XACT_*` constants it operates
+  on. `emitOne`'s 16 node-kind cases are now named, per-node-typed emitters.
+  `ir.ts` is 1532 → 1057 lines with unchanged output.
+- `Diagnostic.code` is a closed `DiagnosticCode` union of 54 codes rather than
+  `string`; typos are now compile errors.
+- Deduplicated the localStorage wrappers in `src/workspace.ts`, the span
+  predicate in the golden tests, and the outer-parenthesis stripper in
+  `src/dialects-state.ts`.
+- Renamed `queryBuildGraph` → `queryBuildJoinGraph`, the `O`/`o` parameter pair
+  in `src/columnflow.ts`, a variable named `any`, and the version-suffixed test
+  helpers. Moved bundled ERD sample DDL to `src/samples.ts`. Removed the
+  production-dead `layoutDrawio`.
+
+### Testing
+
+- New `tests/xact-state.ts` suite: 58 direct fixtures for the transaction
+  algebra, which had zero direct coverage. Two new fixtures require that
+  column-flow failures are reported. Golden 221 → 222; all tracked metric
+  rates remain `1` in `docs/metrics-v3.1.0.json`.
+
 ## v3.0.0 — Rename to SQL Cartographer (breaking)
 
 ### Renamed: ProcFlow → SQL Cartographer
@@ -94,7 +147,8 @@ entries for those releases describe what shipped under it.
 - Added query persistence: **Save to this browser**, **Restore saved**, and
   **Forget saved** store one query locally with explicit actions only.
 - Added versioned query files: **Export query file** and **Import query file**
-  use the `procflow-erd-query` format with a schema fingerprint. Foreign,
+  use the `procflow-erd-query` format with a schema fingerprint (renamed
+  `sql-cartographer-erd-query` in v3.0.0). Foreign,
   future-version, and malformed files are rejected with diagnostics.
 - Restores prune references that no longer exist (tables, columns, taught
   joins, sorts, cross/excluded ids, path choices) and report the drops and a
